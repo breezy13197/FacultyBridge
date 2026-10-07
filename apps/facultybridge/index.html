@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en" data-ft-tool="facultybridge">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="FacultyBridge brings seven practical faculty workflow tools together in one coherent suite.">
+  <title>FacultyBridge v1.3.0</title>
+  
+  
+  
+  
+<link rel="stylesheet" href="../../packages/ui/tokens.css">
+<link rel="stylesheet" href="../../packages/ui/themes.css">
+<link rel="stylesheet" href="../../packages/ui/components.css">
+<link rel="stylesheet" href="../../packages/ui/utilities.css">
+<link rel="stylesheet" href="facultybridge.css">
+</head>
+<body>
+  <div class="ft-app">
+    <header class="ft-topbar fb-topbar">
+      <div class="ft-brand" aria-label="FacultyBridge home">
+        <div class="ft-brand-mark" aria-hidden="true">F</div>
+        <div>
+          <div class="ft-brand-suite">Faculty Tools</div>
+          <div>FacultyBridge <span class="fb-version-label">v1.3.0</span></div>
+        </div>
+      </div>
+      <div class="fb-topbar-actions">
+        <span class="fb-home-label">Your faculty workflow toolkit</span>
+        <button class="ft-btn" id="aboutButton" type="button">About</button>
+        <button class="ft-icon-btn" id="themeToggle" type="button" aria-label="Toggle light and dark theme" title="Toggle theme">◐</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="ft-card fb-hero" aria-labelledby="pageTitle">
+        <div class="fb-hero-copy">
+          <div class="ft-eyebrow">One suite · focused tools</div>
+          <h1 class="ft-hero-title fb-hero-title" id="pageTitle">Move faculty work between systems with less friction.</h1>
+          <p class="ft-muted fb-hero-subtitle">FacultyBridge brings together small, purpose-built tools that prepare courses, improve assessments, manage class workflows, and move academic data between the systems faculty already use.</p>
+          <div class="fb-hero-badges" aria-label="FacultyBridge principles">
+            <span class="ft-pill">Local-first where practical</span>
+            <span class="ft-pill">Preview before export</span>
+            <span class="ft-pill">Built for faculty workflows</span>
+          </div>
+          <div class="fb-suite-count"><strong>7 active Bridge tools</strong><span aria-hidden="true">·</span><span>Designed to keep growing</span></div>
+        </div>
+      </section>
+
+      <section class="fb-section" aria-labelledby="toolsTitle">
+        <div class="fb-section-head">
+          <div>
+            <div class="ft-eyebrow">FacultyBridge tools</div>
+            <h2 id="toolsTitle">Choose where you want to start.</h2>
+          </div>
+          <p class="ft-muted">Each Bridge handles one focused workflow. A familiar layout makes it easy to move between tools as the suite grows.</p>
+        </div>
+        <div class="fb-tool-grid" id="toolGrid"></div>
+      </section>
+
+      <section class="fb-philosophy" aria-label="About the FacultyBridge approach">
+        <div class="ft-card">
+          <div class="ft-eyebrow">Why FacultyBridge</div>
+          <h2 class="ft-page-title">Small tools. Familiar patterns.</h2>
+          <p class="ft-muted">The suite is designed around repetitive handoffs and quality checks that happen between teaching systems—not around adding another system faculty have to learn.</p>
+          <div class="fb-principles">
+            <div class="fb-principle"><div class="fb-principle-icon">1</div><div><strong>Keep the job focused</strong><span>Each Bridge solves a defined faculty workflow.</span></div></div>
+            <div class="fb-principle"><div class="fb-principle-icon">2</div><div><strong>Make issues visible</strong><span>Validation explains what needs attention before export.</span></div></div>
+            <div class="fb-principle"><div class="fb-principle-icon">3</div><div><strong>Preserve control</strong><span>Faculty preview mappings, edits, groups, and outputs before committing.</span></div></div>
+            <div class="fb-principle"><div class="fb-principle-icon">4</div><div><strong>Stay consistent</strong><span>The same design language carries across every Bridge.</span></div></div>
+          </div>
+        </div>
+
+        <aside class="ft-card fb-suggest">
+          <div>
+            <div class="fb-suggest-mark" aria-hidden="true">+</div>
+            <h2>What should we bridge next?</h2>
+            <p>FacultyBridge is intentionally modular. Repeated faculty work that involves validating, reconciling, grouping, copying, or reformatting information may be a good candidate for the next tool.</p>
+          </div>
+          <span class="ft-badge ft-status-info">Designed for expansion</span>
+        </aside>
+      </section>
+    </main>
+
+    <footer class="fb-footer">
+      <span><strong>FacultyBridge v1.3.0</strong> · Faculty Tools suite</span>
+      <span>SyllabusBridge · CalendarBridge · QuestionBridge · ExamBridge · ItemBridge · GradeBridge · GroupBridge</span>
+    </footer>
+  </div>
+
+  <div class="ft-modal" id="aboutModal" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
+    <div class="ft-modal-card">
+      <div class="ft-eyebrow">Faculty Tools</div>
+      <h2 id="aboutTitle">About FacultyBridge</h2>
+      <p class="fb-dialog-copy">FacultyBridge is the shared home for seven focused tools that simplify faculty workflows between systems. Each tool remains independent, while the suite provides consistent navigation, design, and interaction patterns.</p>
+      <p class="fb-dialog-copy">This standalone v1.2 package expects sibling folders named <span class="fb-code">SyllabusBridge</span>, <span class="fb-code">CalendarBridge</span>, <span class="fb-code">QuestionBridge</span>, <span class="fb-code">ExamBridge</span>, <span class="fb-code">ItemBridge</span>, <span class="fb-code">GradeBridge</span>, and <span class="fb-code">GroupBridge</span>. Destinations are configured in <span class="fb-code">assets/facultybridge.js</span>.</p>
+      <p class="fb-dialog-copy">Tool colors are intentionally distinct across the suite: SyllabusBridge amber, CalendarBridge orange, QuestionBridge green, ExamBridge purple, ItemBridge teal, GradeBridge blue, and GroupBridge coral.</p>
+      <div class="ft-btn-row ft-mt-6"><button class="ft-btn ft-btn-primary" id="closeAbout" type="button">Close</button></div>
+    </div>
+  </div>
+
+  
+<script src="../../packages/ui/runtime.js"></script>
+<script src="facultybridge.js"></script>
+</body>
+</html>

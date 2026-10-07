@@ -1,0 +1,43 @@
+/* Per-tool identities; status tokens remain semantic across the suite. */
+:root {
+  --ft-tool-calendarbridge: #b84b0f;
+  --ft-tool-exambridge: #7c3aed;
+  --ft-tool-gradebridge: #1766a4;
+  --ft-tool-groupbridge: #a83e2c;
+  --ft-tool-itembridge: #096b6e;
+  --ft-tool-questionbridge: #337526;
+  --ft-tool-syllabusbridge: #9a7200;
+}
+[data-ft-tool="calendarbridge"] {--ft-brand-900:#b84b0f;--ft-brand-700:#b84b0f;--ft-brand-500:#b84b0f;--ft-brand-200:#fff0e2;}
+[data-ft-tool="calendarbridge"][data-ft-theme="dark"] {--ft-brand-900:#ffc28e;--ft-brand-700:#ffac69;--ft-brand-500:#f07a24;--ft-brand-200:#47291a;}
+[data-ft-tool="exambridge"] {--ft-brand-900:#4c1d95;--ft-brand-700:#6d28d9;--ft-brand-500:#7c3aed;--ft-brand-200:#ede9fe;}
+[data-ft-tool="exambridge"][data-ft-theme="dark"] {--ft-brand-900:#ede9fe;--ft-brand-700:#c4b5fd;--ft-brand-500:#a78bfa;--ft-brand-200:#35235c;}
+[data-ft-tool="gradebridge"] {--ft-brand-900:#165b94;--ft-brand-700:#1766a4;--ft-brand-500:#1766a4;--ft-brand-200:#eef6ff;}
+[data-ft-tool="gradebridge"][data-ft-theme="dark"] {--ft-brand-900:#cde7ff;--ft-brand-700:#9dc6ee;--ft-brand-500:#84c4fa;--ft-brand-200:#19334b;}
+[data-ft-tool="groupbridge"] {--ft-brand-900:#9f3828;--ft-brand-700:#a83e2c;--ft-brand-500:#a83e2c;--ft-brand-200:#fae3de;}
+[data-ft-tool="groupbridge"][data-ft-theme="dark"] {--ft-brand-900:#f7b09f;--ft-brand-700:#f18a73;--ft-brand-500:#f18a73;--ft-brand-200:#4b2722;}
+[data-ft-tool="itembridge"] {--ft-brand-900:#075b5e;--ft-brand-700:#096b6e;--ft-brand-500:#096b6e;--ft-brand-200:#bfe9e8;}
+[data-ft-tool="itembridge"][data-ft-theme="dark"] {--ft-brand-900:#bff4f2;--ft-brand-700:#59c9c7;--ft-brand-500:#65d2cf;--ft-brand-200:#164a4b;}
+[data-ft-tool="questionbridge"] {--ft-brand-900:#0b3b2b;--ft-brand-700:#1d6b45;--ft-brand-500:#337526;--ft-brand-200:#dff5ad;}
+[data-ft-tool="questionbridge"][data-ft-theme="dark"] {--ft-brand-900:#d8f8b8;--ft-brand-700:#8fd06b;--ft-brand-500:#a7e34b;--ft-brand-200:#284725;}
+[data-ft-tool="syllabusbridge"] {--ft-brand-900:#715600;--ft-brand-700:#715600;--ft-brand-500:#9a7200;--ft-brand-200:#fff4d6;}
+[data-ft-tool="syllabusbridge"][data-ft-theme="dark"] {--ft-brand-900:#f6c453;--ft-brand-700:#f6c453;--ft-brand-500:#d9a62e;--ft-brand-200:#3b301c;}
+[data-ft-tool="calendarbridge"] {--cb-orange-700:#b84b0f;--cb-orange-600:#d85b13;--cb-orange-500:#f07a24;--cb-orange-300:#ffc28e;--cb-orange-150:#fff0e2;}
+[data-ft-tool="calendarbridge"][data-ft-theme="dark"] {--cb-orange-700:#ffb06f;--cb-orange-600:#ff9346;--cb-orange-500:#f47f2c;--cb-orange-300:#a84d14;--cb-orange-150:#3a2419;}
+[data-ft-tool="groupbridge"] {--gb-coral:#c94f38;--gb-coral-dark:#9f3828;--gb-coral-soft:#fae3de;}
+[data-ft-tool="groupbridge"][data-ft-theme="dark"] {--gb-coral:#f18a73;--gb-coral-dark:#f7b09f;--gb-coral-soft:#4b2722;}
+[data-ft-tool="itembridge"] {--ib-900:#075b5e;--ib-800:#087579;--ib-700:#096b6e;--ib-600:#0b7c7f;--ib-500:#28aeb1;--ib-400:#4fc4c6;--ib-200:#bfe9e8;--ib-100:#e3f6f5;--ib-50:#f4fbfb;}
+[data-ft-tool="itembridge"][data-ft-theme="dark"] {--ib-900:#bff4f2;--ib-800:#86ddda;--ib-700:#59c9c7;--ib-600:#65d2cf;--ib-500:#32b4b4;--ib-400:#4fc4c6;--ib-200:#164a4b;--ib-100:#103637;--ib-50:#0d2728;}
+[data-ft-tool="itembridge"] {--ib-text-accent:#0a6b6d;--ib-400:#4fc4c6;--ib-600:#0d7f81;}
+[data-ft-tool="syllabusbridge"] {--ft-sb-accent:#715600;--ft-sb-accent-strong:#9a7200;--ft-sb-accent-soft:#fff4d6;}
+[data-ft-tool="syllabusbridge"][data-ft-theme="dark"] {--ft-sb-accent:#f6c453;--ft-sb-accent-strong:#d9a62e;--ft-sb-accent-soft:#3b301c;}
+
+/* GradeBridge compatibility names reference shared tokens, including dark overrides. */
+[data-ft-tool="gradebridge"] {
+ --navy:var(--ft-text); --teal:var(--ft-brand-700); --teal-dark:var(--ft-brand-900); --blue:var(--ft-brand-500);
+ --bg:var(--ft-bg); --card:var(--ft-surface); --text:var(--ft-text); --muted:var(--ft-text-muted); --line:var(--ft-border);
+ --success:var(--ft-success); --success-bg:var(--ft-success-bg); --warn:var(--ft-warning); --warn-bg:var(--ft-warning-bg);
+ --danger:var(--ft-danger); --danger-bg:var(--ft-danger-bg); --info:var(--ft-info); --info-bg:var(--ft-info-bg);
+ --shadow:var(--ft-shadow-card); --surface:var(--ft-surface-soft); --input:var(--ft-surface);
+}
+

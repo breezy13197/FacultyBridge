@@ -1,0 +1,31 @@
+name: Tagged suite release
+on:
+  push:
+    tags: ['facultybridge-v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Check tag agrees with manifest
+        run: node -e "const m=require('./suite.json');if(process.env.GITHUB_REF_NAME !== 'facultybridge-v'+m.suiteVersion)process.exit(1)"
+      - run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - name: Package downloads
+        run: |
+          cd dist/site
+          zip -r ../../FacultyBridge-website.zip .
+          cd ../standalone
+          zip -r ../../FacultyBridge-standalone.zip .
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" FacultyBridge-website.zip FacultyBridge-standalone.zip dist/build-manifest.json --generate-notes --verify-tag

@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en" data-ft-tool="exambridge">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ExamBridge | Faculty Tools</title>
+  
+  
+  
+  
+<link rel="stylesheet" href="../../packages/ui/tokens.css">
+<link rel="stylesheet" href="../../packages/ui/themes.css">
+<link rel="stylesheet" href="../../packages/ui/components.css">
+<link rel="stylesheet" href="../../packages/ui/utilities.css">
+<link rel="stylesheet" href="exambridge.css">
+</head>
+<body>
+<div class="ft-app eb-main">
+  <header class="ft-topbar">
+    <div class="ft-brand">
+      <div class="ft-brand-mark">E</div>
+      <div><div class="ft-brand-suite">Faculty Tools</div><div>ExamBridge <span class="eb-version">v1.8</span></div></div>
+    </div>
+    <nav class="ft-steps" aria-label="Workflow">
+      <button class="ft-step is-active" data-step="upload" aria-current="step">1 Upload</button>
+      <button class="ft-step" data-step="review">2 Review</button>
+      <button class="ft-step" data-step="report">3 Report</button>
+    </nav>
+    <button class="ft-icon-btn" id="themeToggle" aria-label="Toggle theme">◐</button>
+  </header>
+
+  <main id="uploadView">
+    <section class="ft-card eb-hero ft-mt-6">
+      <div class="eb-hero-grid">
+        <div>
+          <div class="ft-eyebrow">Exam quality check</div>
+          <h1 class="ft-hero-title eb-hero-title">Review an ExamSoft draft before students see it.</h1>
+          <p class="ft-muted">ExamBridge checks approved exam-writing limits, question weights, and required ExamSoft tagging. Your exam stays in this browser.</p>
+        </div>
+        <div class="ft-card-soft eb-privacy">
+          <span aria-hidden="true">🔒</span>
+          <div><strong>Local processing</strong><div class="eb-help">Exam files are read on this device. ExamBridge does not upload exam content to a server.</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="ft-card ft-p-6 ft-mt-6">
+      <div id="dropZone" class="ft-upload-zone" tabindex="0" role="button" aria-label="Choose ExamSoft exam export">
+        <div>
+          <div class="eb-upload-icon">↥</div>
+          <h2>Drop an ExamSoft exam export here</h2>
+          <p class="ft-muted">Supports ExamSoft Word exports saved as <strong>.doc</strong> (RTF) or <strong>.rtf</strong>.</p>
+          <div class="ft-btn-row" style="justify-content:center;margin-top:18px"><button class="ft-btn ft-btn-primary" id="chooseBtn">Choose exam export</button></div>
+          <input type="file" id="fileInput" accept=".doc,.rtf,application/rtf,text/rtf" hidden>
+        </div>
+      </div>
+      <div id="uploadError" class="ft-notice ft-notice-danger ft-mt-4 eb-hidden" role="alert"></div>
+    </section>
+
+    <section class="ft-card ft-p-6 ft-mt-6">
+      <div class="ft-eyebrow">Faculty-approved checks in v1</div>
+      <div class="eb-summary-grid ft-mt-4">
+        <div><strong>Exam composition</strong><p class="eb-help">Multiple response ≤20%, answer choices ≤5, K-type ≤2.</p></div>
+        <div><strong>Question weights</strong><p class="eb-help">Visible when &gt;2 points or when a question differs from the exam’s predominant weight.</p></div>
+        <div><strong>Required tagging</strong><p class="eb-help">Course, faculty, PSLO, CLO, and abbreviated Bloom's.</p></div>
+        <div><strong>Figure checks</strong><p class="eb-help">Flags questions that appear to reference a figure or image when no attachment is detected.</p></div><div><strong>Writing review</strong><p class="eb-help">Locally reviews student-visible stems and answer choices for high-confidence spelling, mechanics, cueing, and negative-stem issues. Advisory only.</p></div>
+      </div>
+    </section>
+  </main>
+
+  <main id="resultsView" class="eb-hidden">
+    <section class="ft-card ft-p-6 ft-mt-6 eb-file-meta">
+      <div><div class="ft-eyebrow">Loaded exam</div><div class="eb-file-name" id="fileName"></div><div class="eb-help" id="examMeta"></div></div>
+      <div class="ft-btn-row"><button class="ft-btn" id="changeFileBtn">Choose another exam</button><button class="ft-btn ft-btn-accent" id="printBtn">Print / Save PDF report</button></div>
+    </section>
+    <div id="administrationNotice" class="ft-notice ft-notice-warning ft-mt-3 eb-hidden"></div>
+
+    <div class="eb-layout ft-mt-5">
+      <aside class="ft-card eb-sidebar">
+        <div class="ft-eyebrow ft-mb-3">Review</div>
+        <div class="eb-sidebar-nav">
+          <button class="ft-btn is-active" data-section="overview" aria-current="true">Overview</button>
+          <button class="ft-btn" data-section="composition">Exam composition</button>
+          <button class="ft-btn" data-section="tagging">ExamSoft tagging</button>
+          <button class="ft-btn" data-section="itemQuality">Item quality <span class="eb-advisory-label">Advisory</span></button>
+          <button class="ft-btn" data-section="questions">Questions</button>
+          <button class="ft-btn" data-section="exceptions">Exceptions</button>
+        </div>
+      </aside>
+
+      <div class="eb-content">
+        <section class="ft-card eb-section" id="overview">
+          <div class="eb-scorecard">
+            <div><div class="ft-eyebrow">Exam review</div><div class="eb-big-status" id="overallTitle"></div><p class="ft-muted" id="overallDetail"></p></div>
+            <div id="overallBadge"></div>
+          </div>
+          <div class="eb-summary-grid ft-mt-5" id="summaryGrid"></div>
+        </section>
+
+        <section class="ft-card eb-section" id="composition">
+          <div class="eb-section-head"><div><h2>Exam composition</h2><p class="ft-muted">Checks structural limits approved for the exam as a whole and individual questions.</p></div></div>
+          <div class="eb-rule-list" id="compositionRules"></div>
+        </section>
+
+        <section class="ft-card eb-section" id="tagging">
+          <div class="eb-section-head"><div><h2>ExamSoft tagging</h2><p class="ft-muted">Completeness and basic quality checks use ExamSoft category paths when available.</p></div></div>
+          <div class="eb-rule-list" id="taggingRules"></div>
+        </section>
+
+        <section class="ft-card eb-section" id="itemQuality">
+          <div class="eb-section-head"><div><h2>Item quality</h2><p class="ft-muted">Findings require faculty judgment and never change compliance status.</p></div></div>
+          <div class="eb-rule-list" id="itemQualityRules"></div>
+        </section>
+
+        <section class="ft-card eb-section" id="questions">
+          <div class="eb-section-head"><div><h2>Question review</h2><p class="ft-muted">Select a row to see the stem, choices, tags, and findings.</p></div></div>
+          <div class="eb-question-tools ft-mb-4">
+            <div class="eb-filterbar" id="filterBar"></div>
+            <label class="eb-faculty-filter"><span>Faculty</span><select class="ft-select" id="facultyFilter" aria-label="Filter questions by faculty"></select></label>
+          </div>
+          <div class="ft-table-wrap"><table class="ft-table"><thead><tr><th>#</th><th>Question</th><th>Type</th><th>Pts</th><th>Options</th><th>Tags</th><th>Status</th></tr></thead><tbody id="questionRows"></tbody></table></div>
+        </section>
+
+        <section class="ft-card eb-section" id="exceptions">
+          <div class="eb-section-head"><div><h2>Approved exceptions</h2><p class="ft-muted">ExamBridge can record an exception; it does not approve one. Approval must come from the department chair or ADAA.</p></div></div>
+          <div id="exceptionArea"></div>
+        </section>
+
+        <section class="ft-card eb-section">
+          <div class="eb-section-head"><div><h2>Report notes</h2><p class="ft-muted">Optional notes are included when you print or save the report as PDF.</p></div></div>
+          <textarea class="ft-textarea" id="reportNotes" placeholder="Add notes about revisions, exemptions, or follow-up..."></textarea>
+          <div class="eb-print-only" id="printedNotes"></div>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="eb-modal-backdrop eb-hidden" id="reportModal" role="dialog" aria-modal="true" aria-labelledby="reportModalTitle">
+  <div class="ft-card eb-report-dialog">
+    <div class="eb-section-head">
+      <div><div class="ft-eyebrow">Create report</div><h2 id="reportModalTitle">Choose the report scope</h2><p class="ft-muted">The report focuses on clear action items rather than reproducing the ExamBridge screen.</p></div>
+      <button class="ft-icon-btn" id="closeReportModal" aria-label="Close report options">×</button>
+    </div>
+    <div class="ft-field">
+      <label for="reportFaculty">Faculty</label>
+      <select class="ft-select" id="reportFaculty"></select>
+      <div class="eb-help">Exam-wide limits remain based on the full exam. Question-level findings are filtered to the selected faculty.</div>
+    </div>
+    <div class="ft-btn-row ft-mt-4" style="justify-content:flex-end">
+      <button class="ft-btn" id="cancelReportBtn">Cancel</button>
+      <button class="ft-btn ft-btn-accent" id="generateReportBtn">Generate printable report</button>
+    </div>
+  </div>
+</div>
+
+<section class="eb-report-output" id="reportOutput" aria-hidden="true"></section>
+<div class="ft-toast" id="toast" role="status"></div>
+
+<script src="../../packages/ui/runtime.js"></script>
+<script src="exambridge.js"></script>
+</body>
+</html>

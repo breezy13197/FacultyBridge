@@ -1,0 +1,9 @@
+# FacultyBridge development
+
+Read packages/ui/DESIGN-SYSTEM.md and packages/ui/PRODUCT-PRINCIPLES.md before UI changes. Use the shared tokens, components, utilities, and component gallery. Follow packages/ui/AGENTS.md.
+
+Canonical editable sources are apps/<tool>/; generated dist/ output must never be edited or committed. Run npm run check and npm run test:browser for source/build changes. See docs/RELEASE-CHECKLIST.md for real-course regression and release sign-off. Never put real student records, grades, exams, or credentials in the repository. Test with synthetic or deidentified fixtures.
+
+Keep tool business logic independent. Promote genuinely reused UI into packages/ui. Identity colors are fixed: ItemBridge teal; CalendarBridge orange; ExamBridge purple; QuestionBridge green; GradeBridge blue; SyllabusBridge gold/amber; GroupBridge coral. Status colors remain semantic.
+
+suite.json is the source of version metadata, tool identities, source provenance, and routes. Bump a tool version only for an intentional tool release. Shared build changes use suiteVersion/uiVersion and visible build labels. Update tests/import-baseline.json only after a reviewed, intentional business-logic change; the imported hashes establish processing-code parity with the supplied attachments.

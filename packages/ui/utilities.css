@@ -1,0 +1,17 @@
+.ft-stack-2 > * + * { margin-top: var(--ft-space-2); }
+.ft-stack-4 > * + * { margin-top: var(--ft-space-4); }
+.ft-stack-6 > * + * { margin-top: var(--ft-space-6); }
+.ft-cluster { display: flex; flex-wrap: wrap; gap: var(--ft-space-3); align-items: center; }
+.ft-between { display: flex; justify-content: space-between; gap: var(--ft-space-4); align-items: center; }
+.ft-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ft-space-4); }
+.ft-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ft-space-4); }
+.ft-grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--ft-space-4); }
+.ft-p-4 { padding: var(--ft-space-4); }
+.ft-p-6 { padding: var(--ft-space-6); }
+.ft-p-8 { padding: var(--ft-space-8); }
+.ft-mt-4 { margin-top: var(--ft-space-4); }
+.ft-mt-6 { margin-top: var(--ft-space-6); }
+.ft-mb-4 { margin-bottom: var(--ft-space-4); }
+.ft-w-full { width: 100%; }
+.ft-text-center { text-align: center; }
+@media (max-width: 800px) { .ft-grid-2, .ft-grid-3, .ft-grid-4 { grid-template-columns: 1fr; } }
