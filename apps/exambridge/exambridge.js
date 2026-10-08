@@ -32,7 +32,9 @@
   $('#reportModal').addEventListener('click', e => { if(e.target === $('#reportModal')) closeReportModal(); });
   $('#generateReportBtn').addEventListener('click', () => {
     const scope=$('#reportFaculty').value;
-    buildReport(scope);
+    const selected=new Set($$('[data-report-finding]:checked',$('#reportFindingOptions')).map(x=>x.dataset.reportFinding));
+    const includePassed=$('#reportIncludePassed').checked;
+    buildReport(scope,selected,includePassed);
     closeReportModal();
     updateSteps('report');
     setTimeout(()=>window.print(),80);
@@ -886,24 +888,149 @@ with would you your following answer answers choice choices correct best appropr
     if(value==='__missing__') return qs.filter(q=>q.tags.faculty.length===0);
     return qs.filter(q=>q.tags.faculty.some(c=>c.name===value));
   }
+  const REPORT_CATEGORY_DEFS=[
+    {key:'parser',group:'Exam composition',label:'Parser validation',examWide:true},
+    {key:'multiple',group:'Exam composition',label:'Multiple response',examWide:true},
+    {key:'options',group:'Exam composition',label:'3–5 answer choices'},
+    {key:'ktype',group:'Exam composition',label:'K-type questions',examWide:true},
+    {key:'weights',group:'Exam composition',label:'Question weights'},
+    {key:'figures',group:'Exam composition',label:'Missing figures / attachments'},
+    {key:'answerKey',group:'Exam composition',label:'Correct-answer keys'},
+    {key:'manual',group:'Exam composition',label:'Manual composition check'},
+    {key:'rationale',group:'Item quality',label:'Rationale included'},
+    {key:'stemKeyOverlap',group:'Item quality',label:'Stem / correct-answer overlap'},
+    {key:'wording',group:'Item quality',label:'Wording review'},
+    {key:'choiceLength',group:'Item quality',label:'Correct-answer length cueing'},
+    {key:'writing',group:'Item quality',label:'Writing review'},
+    {key:'course',group:'ExamSoft tagging',label:'Course Name'},
+    {key:'faculty',group:'ExamSoft tagging',label:'Faculty Name'},
+    {key:'pslo',group:'ExamSoft tagging',label:'PSLO'},
+    {key:'clo',group:'ExamSoft tagging',label:'CLO'},
+    {key:'bloom',group:'ExamSoft tagging',label:"Abbreviated Bloom's"},
+    {key:'tagQuality',group:'ExamSoft tagging',label:'Tag quality'}
+  ];
+
+  function findingReportCategory(f){
+    if(!f) return null;
+    if(f.kind==='options') return 'options';
+    if(f.kind==='weight') return 'weights';
+    if(f.kind==='figure') return 'figures';
+    if(f.kind==='answer-key') return 'answerKey';
+    if(f.kind==='composition') return 'manual';
+    if(f.kind==='rationale') return 'rationale';
+    if(f.kind==='stem-key-overlap') return 'stemKeyOverlap';
+    if(f.kind==='wording') return 'wording';
+    if(f.kind==='choice-length') return 'choiceLength';
+    if(String(f.kind||'').startsWith('writing-')) return 'writing';
+    if(f.kind==='tag'){
+      if(/^Course Name tag/i.test(f.text)) return 'course';
+      if(/^Faculty Name tag/i.test(f.text)) return 'faculty';
+      if(/^PSLO tag missing/i.test(f.text)) return 'pslo';
+      if(/^CLO tag missing/i.test(f.text)) return 'clo';
+      if(/^Abbreviated Bloom/i.test(f.text)) return 'bloom';
+      return 'tagQuality';
+    }
+    return null;
+  }
+
+  function reportCategoryInfos(scope='all'){
+    if(!state.exam) return [];
+    const scoped=filterByFaculty(state.exam.questions,scope);
+    return REPORT_CATEGORY_DEFS.map(def=>{
+      const questions=scoped.filter(q=>q.findings.some(f=>findingReportCategory(f)===def.key));
+      const rule=state.exam.rules[def.key];
+      const examWideFinding=!!def.examWide && rule && rule.level!=='pass';
+      return {...def,questions,rule,examWideFinding,applicable:questions.length>0||examWideFinding};
+    }).filter(x=>x.applicable);
+  }
+
   let reportModalReturnFocus=null;
+  let reportSelectedKeys=null;
+  let reportKnownKeys=new Set();
+
   function reportModalFocusable(){
     return $$('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])',$('#reportModal'))
       .filter(el=>!el.disabled && el.offsetParent!==null);
   }
+
+  function updateReportFindingSummary(infos){
+    const selected=infos.filter(x=>reportSelectedKeys?.has(x.key)).length;
+    const el=$('#reportFindingSummary');
+    if(!infos.length) el.textContent='No finding categories apply to this report scope.';
+    else el.textContent=`${selected} of ${infos.length} applicable finding categor${infos.length===1?'y':'ies'} selected.`;
+  }
+
+  function renderReportFindingOptions(preserve=false){
+    const scope=$('#reportFaculty').value || 'all';
+    const infos=reportCategoryInfos(scope);
+    const nextKeys=new Set(infos.map(x=>x.key));
+
+    if(!preserve || reportSelectedKeys===null){
+      reportSelectedKeys=new Set(nextKeys);
+    } else {
+      const nextSelected=new Set();
+      infos.forEach(info=>{
+        if(reportSelectedKeys.has(info.key) || !reportKnownKeys.has(info.key)) nextSelected.add(info.key);
+      });
+      reportSelectedKeys=nextSelected;
+    }
+    reportKnownKeys=nextKeys;
+
+    if(!infos.length){
+      $('#reportFindingOptions').innerHTML='<div class="eb-report-picker-empty">No findings apply to this faculty scope. You can still generate a report or include passed checks below.</div>';
+      updateReportFindingSummary(infos);
+      return;
+    }
+
+    const groups=[...new Set(infos.map(x=>x.group))];
+    $('#reportFindingOptions').innerHTML=groups.map(group=>{
+      const rows=infos.filter(x=>x.group===group).map(info=>{
+        const countLabel=info.questions.length
+          ? `${info.questions.length} question${info.questions.length===1?'':'s'}`
+          : 'Exam-wide finding';
+        return `<label class="eb-report-finding-option"><input type="checkbox" data-report-finding="${info.key}" ${reportSelectedKeys.has(info.key)?'checked':''}><span><strong>${esc(info.label)}</strong><span class="eb-help">${esc(countLabel)}</span></span></label>`;
+      }).join('');
+      return `<div class="eb-report-picker-group"><div class="eb-report-picker-group-title">${esc(group)}</div>${rows}</div>`;
+    }).join('');
+
+    $$('[data-report-finding]',$('#reportFindingOptions')).forEach(cb=>cb.addEventListener('change',()=>{
+      if(cb.checked) reportSelectedKeys.add(cb.dataset.reportFinding);
+      else reportSelectedKeys.delete(cb.dataset.reportFinding);
+      updateReportFindingSummary(infos);
+    }));
+    updateReportFindingSummary(infos);
+  }
+
   function openReportModal(){
     if(!state.exam) return;
     reportModalReturnFocus=document.activeElement;
     $('#reportFaculty').innerHTML=facultySelectHTML(state.facultyFilter);
+    reportSelectedKeys=null;
+    reportKnownKeys=new Set();
+    $('#reportIncludePassed').checked=false;
+    renderReportFindingOptions(false);
     $('#reportModal').classList.remove('eb-hidden');
     const focusables=reportModalFocusable();
     (focusables[0]||$('#reportModal')).focus();
   }
+
   function closeReportModal(){
     $('#reportModal').classList.add('eb-hidden');
     if(reportModalReturnFocus && typeof reportModalReturnFocus.focus==='function') reportModalReturnFocus.focus();
     reportModalReturnFocus=null;
   }
+
+  $('#reportFaculty').addEventListener('change',()=>renderReportFindingOptions(true));
+  $('#reportSelectAllBtn').addEventListener('click',()=>{
+    const infos=reportCategoryInfos($('#reportFaculty').value||'all');
+    reportSelectedKeys=new Set(infos.map(x=>x.key));
+    renderReportFindingOptions(true);
+  });
+  $('#reportClearAllBtn').addEventListener('click',()=>{
+    reportSelectedKeys=new Set();
+    renderReportFindingOptions(true);
+  });
+
   $('#reportModal').addEventListener('keydown',e=>{
     if(e.key==='Escape'){ e.preventDefault(); closeReportModal(); return; }
     if(e.key!=='Tab') return;
@@ -913,33 +1040,90 @@ with would you your following answer answers choice choices correct best appropr
     if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
     else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
   });
+
   function ruleReportRow(key,r){
     const excepted=state.exceptions[key]?.approved && r.level==='action';
     const level=excepted?'exception':r.level;
     const label=level==='pass'?'Pass':level==='review'?'Review':level==='manual'?'Manual Check':level==='exception'?'Approved Exception':'Action Needed';
     return `<tr><td><strong>${esc(r.title)}</strong></td><td>${statusBadge(level,label)}</td><td>${esc(r.detail)}${excepted?' Approved exception recorded.':''}<div class="eb-help">Evaluated ${r.evaluated ?? state.exam.questions.length} of ${r.total ?? state.exam.questions.length} questions.</div></td></tr>`;
   }
-  function reportQuestionRow(q){
-    const actions=q.findings.filter(f=>f.level==='action');
-    const reviews=q.findings.filter(f=>f.level==='review');
-    const manuals=q.findings.filter(f=>f.level==='manual');
-    const faculty=facultyName(q)||'Unassigned';
-    return `<div class="eb-report-item"><div class="eb-report-item-head"><div><strong>Question ${q.number}</strong> <span class="eb-report-item-id">Item ${esc(q.itemId||'—')}</span></div><div>${statusBadge(q.status,q.status==='action'?'Action Needed':q.status==='review'?'Review':q.status==='manual'?'Manual Check':'Pass')}</div></div><div class="eb-report-stem">${esc(q.stem||'(No stem text parsed)')}</div><div class="eb-report-meta">${esc(faculty)} · ${esc(q.type)} · ${fmtWeight(q.weight)}</div>${actions.length?`<div class="eb-report-findings action"><strong>Required changes</strong><ul>${actions.map(f=>`<li>${esc(f.text)}</li>`).join('')}</ul></div>`:''}${reviews.length?`<div class="eb-report-findings review"><strong>Review recommended</strong><ul>${reviews.map(f=>`<li>${esc(f.text)}</li>`).join('')}</ul></div>`:''}${manuals.length?`<div class="eb-report-findings"><strong>Manual check</strong><ul>${manuals.map(f=>`<li>${esc(f.text)}</li>`).join('')}</ul></div>`:''}</div>`;
+
+  function selectedReportFindings(q,selectedKeys){
+    return q.findings.filter(f=>{
+      const key=findingReportCategory(f);
+      return key && selectedKeys.has(key);
+    });
   }
-  function buildReport(scope='all'){
+
+  function findingStatus(findings){
+    if(findings.some(f=>f.level==='action')) return 'action';
+    if(findings.some(f=>f.level==='review')) return 'review';
+    if(findings.some(f=>f.level==='manual')) return 'manual';
+    return 'pass';
+  }
+
+  function reportQuestionRow(q,findings){
+    const actions=findings.filter(f=>f.level==='action');
+    const reviews=findings.filter(f=>f.level==='review');
+    const manuals=findings.filter(f=>f.level==='manual');
+    const faculty=facultyName(q)||'Unassigned';
+    const status=findingStatus(findings);
+    const label=status==='action'?'Action Needed':status==='review'?'Review':status==='manual'?'Manual Check':'Pass';
+    return `<div class="eb-report-item"><div class="eb-report-item-head"><div><strong>Question ${q.number}</strong> <span class="eb-report-item-id">Item ${esc(q.itemId||'—')}</span></div><div>${statusBadge(status,label)}</div></div><div class="eb-report-stem">${esc(q.stem||'(No stem text parsed)')}</div><div class="eb-report-meta">${esc(faculty)} · ${esc(q.type)} · ${fmtWeight(q.weight)}</div>${actions.length?`<div class="eb-report-findings action"><strong>Required changes</strong><ul>${actions.map(f=>`<li>${esc(f.text)}</li>`).join('')}</ul></div>`:''}${reviews.length?`<div class="eb-report-findings review"><strong>Review recommended</strong><ul>${reviews.map(f=>`<li>${esc(f.text)}</li>`).join('')}</ul></div>`:''}${manuals.length?`<div class="eb-report-findings"><strong>Manual check</strong><ul>${manuals.map(f=>`<li>${esc(f.text)}</li>`).join('')}</ul></div>`:''}</div>`;
+  }
+
+  function buildReport(scope='all',selectedKeys=new Set(),includePassed=false){
     const e=state.exam, m=e.metadata;
-    let scoped=filterByFaculty(e.questions,scope);
-    const actionable=scoped.filter(q=>q.status==='action');
-    const review=scoped.filter(q=>q.status==='review');
-    const manual=scoped.filter(q=>q.findings.some(f=>f.level==='manual'));
-    const pass=scoped.filter(q=>q.status==='pass');
+    const scoped=filterByFaculty(e.questions,scope);
     const scopeLabel=scope==='all'?'All faculty':scope==='__missing__'?'Unassigned / missing faculty tag':scope;
     const notes=$('#reportNotes').value.trim();
-    const exceptions=Object.entries(state.exceptions).filter(([,v])=>v.approved);
-    const rules=sortedRuleKeys(['parser','multiple','options','ktype','weights','figures','answerKey','manual','rationale','stemKeyOverlap','wording','choiceLength','writing','ai','course','faculty','pslo','clo','bloom','tagQuality']);
-    const actionItems=actionable.length?actionable.map(reportQuestionRow).join(''):'<div class="eb-report-empty">No question-level required changes in this report scope.</div>';
-    const reviewItems=review.length?review.map(reportQuestionRow).join(''):'<div class="eb-report-empty">No question-level review items in this report scope.</div>';
-    $('#reportOutput').innerHTML=`<div class="eb-report-page"><header class="eb-report-header"><div><div class="eb-report-brand">Faculty Tools · ExamBridge</div><h1>Exam Review Report</h1><div class="eb-report-subtitle">${esc(e.fileName)}</div></div><div class="eb-report-date">Generated ${new Date().toLocaleDateString()}</div></header><div class="eb-report-meta-grid"><div><span>Course</span><strong>${esc(m.detectedCourseName||m.detectedCourseCode||'Not detected')}</strong></div><div><span>Exam</span><strong>${esc(m.examId?`Exam ID ${m.examId}`:'Exam ID not detected')}</strong></div><div><span>Scope</span><strong>${esc(scopeLabel)}</strong></div><div><span>Questions in scope</span><strong>${scoped.length}</strong></div></div>${m.appearsAdministered?`<div class="eb-report-findings review"><strong>Administration detected</strong><div>This export contains results for ${m.examTakers} exam taker(s). Findings can be used as a retrospective quality review.</div></div>`:''}<section class="eb-report-section"><h2>Audit details</h2><div class="eb-report-intro">${m.examUid?`Exam UID: ${esc(m.examUid)} · `:''}${m.creationDate?`Created: ${esc(m.creationDate)} · `:''}Parser validation: ${esc(e.rules.parser.detail)}</div></section><section class="eb-report-section"><h2>Action summary</h2><p class="eb-report-intro">Use this section as the revision checklist. Exam-wide limits are evaluated on the complete exam; question-specific findings below are filtered to <strong>${esc(scopeLabel)}</strong>.</p><div class="eb-report-summary"><div><span>Action needed</span><strong>${actionable.length}</strong></div><div><span>Review</span><strong>${review.length}</strong></div><div><span>Manual check</span><strong>${manual.length}</strong></div><div><span>No findings</span><strong>${pass.length}</strong></div></div></section><section class="eb-report-section"><h2>Required changes</h2>${actionItems}</section><section class="eb-report-section"><h2>Review recommended</h2>${reviewItems}</section><section class="eb-report-section"><h2>Manual checks</h2>${manual.length?manual.map(reportQuestionRow).join(''):'<div class="eb-report-empty">No manual composition checks in this report scope.</div>'}</section><section class="eb-report-section"><h2>Exam-wide compliance</h2><table class="eb-report-table"><thead><tr><th>Guideline</th><th>Status</th><th>Finding</th></tr></thead><tbody>${rules.map(k=>ruleReportRow(k,e.rules[k])).join('')}</tbody></table></section>${exceptions.length?`<section class="eb-report-section"><h2>Recorded approved exceptions</h2>${exceptions.map(([k,x])=>`<div class="eb-report-exception"><strong>${esc(e.rules[k]?.title||k)}</strong><div>${esc(x.authority||'Approving authority not recorded')}${x.note?` · ${esc(x.note)}`:''}</div></div>`).join('')}</section>`:''}${notes?`<section class="eb-report-section"><h2>Report notes</h2><div class="eb-report-notes">${esc(notes).replace(/\n/g,'<br>')}</div></section>`:''}<footer class="eb-report-footer">ExamBridge identifies guideline findings; it does not approve an exam or grant exceptions.</footer></div>`;
+    const applicable=reportCategoryInfos(scope);
+    const applicableKeys=new Set(applicable.map(x=>x.key));
+    const selectedApplicable=applicable.filter(x=>selectedKeys.has(x.key));
+    const selectedLabels=selectedApplicable.map(x=>x.label);
+
+    const questionRows=scoped.map(q=>({q,findings:selectedReportFindings(q,selectedKeys)})).filter(x=>x.findings.length);
+    const actionable=questionRows.filter(x=>findingStatus(x.findings)==='action');
+    const review=questionRows.filter(x=>findingStatus(x.findings)==='review');
+    const manual=questionRows.filter(x=>x.findings.some(f=>f.level==='manual'));
+    const noSelected=scoped.length-questionRows.length;
+
+    const allRuleKeys=['parser','multiple','options','ktype','weights','figures','answerKey','manual','rationale','stemKeyOverlap','wording','choiceLength','writing','ai','course','faculty','pslo','clo','bloom','tagQuality'];
+    const ruleKeys=allRuleKeys.filter(k=>selectedKeys.has(k) || (includePassed && e.rules[k]?.level==='pass'));
+    const rules=sortedRuleKeys(ruleKeys);
+    const exceptions=Object.entries(state.exceptions).filter(([k,v])=>v.approved && selectedKeys.has(k));
+
+    const actionItems=actionable.length
+      ? actionable.map(x=>reportQuestionRow(x.q,x.findings)).join('')
+      : '<div class="eb-report-empty">No question-level required changes are included in this report.</div>';
+    const reviewItems=review.length
+      ? review.map(x=>reportQuestionRow(x.q,x.findings)).join('')
+      : '<div class="eb-report-empty">No question-level review findings are included in this report.</div>';
+    const manualItems=manual.length
+      ? manual.map(x=>reportQuestionRow(x.q,x.findings)).join('')
+      : '<div class="eb-report-empty">No manual composition checks are included in this report.</div>';
+
+    let scopeSummary;
+    if(!applicable.length){
+      scopeSummary='No applicable finding categories were present for this faculty scope.';
+    } else if(selectedApplicable.length===applicable.length){
+      scopeSummary=`All applicable findings · ${applicable.length} categor${applicable.length===1?'y':'ies'} included.`;
+    } else {
+      scopeSummary=`Selected findings only · ${selectedApplicable.length} of ${applicable.length} applicable finding categories included.`;
+    }
+    const selectedList=selectedLabels.length?`<div class="eb-report-scope-list"><strong>Included findings:</strong> ${esc(selectedLabels.join(', '))}</div>`:'<div class="eb-report-scope-list"><strong>Included findings:</strong> None selected.</div>';
+    const passSummary=includePassed?'Passed checks are included in the guideline table.':'Passed checks are omitted from the guideline table.';
+
+    const auditBits=[];
+    if(m.examUid) auditBits.push(`Exam UID: ${esc(m.examUid)}`);
+    if(m.creationDate) auditBits.push(`Created: ${esc(m.creationDate)}`);
+    if(selectedKeys.has('parser') || includePassed) auditBits.push(`Parser validation: ${esc(e.rules.parser.detail)}`);
+
+    const tableRows=rules.length
+      ? rules.map(k=>ruleReportRow(k,e.rules[k])).join('')
+      : '<tr><td colspan="3"><div class="eb-report-empty">No guideline checks were selected for this report.</div></td></tr>';
+
+    $('#reportOutput').innerHTML=`<div class="eb-report-page"><header class="eb-report-header"><div><div class="eb-report-brand">Faculty Tools · ExamBridge</div><h1>Exam Review Report</h1><div class="eb-report-subtitle">${esc(e.fileName)}</div></div><div class="eb-report-date">Generated ${new Date().toLocaleDateString()}</div></header><div class="eb-report-meta-grid"><div><span>Course</span><strong>${esc(m.detectedCourseName||m.detectedCourseCode||'Not detected')}</strong></div><div><span>Exam</span><strong>${esc(m.examId?`Exam ID ${m.examId}`:'Exam ID not detected')}</strong></div><div><span>Faculty scope</span><strong>${esc(scopeLabel)}</strong></div><div><span>Questions in scope</span><strong>${scoped.length}</strong></div></div><div class="eb-report-scope"><strong>Report scope:</strong> ${esc(scopeSummary)}<div>${esc(passSummary)}</div>${selectedList}</div>${m.appearsAdministered?`<div class="eb-report-findings review"><strong>Administration detected</strong><div>This export contains results for ${m.examTakers} exam taker(s). Findings can be used as a retrospective quality review.</div></div>`:''}${auditBits.length?`<section class="eb-report-section"><h2>Audit details</h2><div class="eb-report-intro">${auditBits.join(' · ')}</div></section>`:''}<section class="eb-report-section"><h2>Action summary</h2><p class="eb-report-intro">Counts below reflect only the finding categories selected for this report. Exam-wide limits are evaluated on the complete exam; question-specific findings are filtered to <strong>${esc(scopeLabel)}</strong>.</p><div class="eb-report-summary"><div><span>Action needed</span><strong>${actionable.length}</strong></div><div><span>Review</span><strong>${review.length}</strong></div><div><span>Manual check</span><strong>${manual.length}</strong></div><div><span>No selected findings</span><strong>${noSelected}</strong></div></div></section><section class="eb-report-section"><h2>Required changes</h2>${actionItems}</section><section class="eb-report-section"><h2>Review recommended</h2>${reviewItems}</section><section class="eb-report-section"><h2>Manual checks</h2>${manualItems}</section><section class="eb-report-section"><h2>Guideline checks included</h2><table class="eb-report-table"><thead><tr><th>Guideline</th><th>Status</th><th>Finding</th></tr></thead><tbody>${tableRows}</tbody></table></section>${exceptions.length?`<section class="eb-report-section"><h2>Recorded approved exceptions</h2>${exceptions.map(([k,x])=>`<div class="eb-report-exception"><strong>${esc(e.rules[k]?.title||k)}</strong><div>${esc(x.authority||'Approving authority not recorded')}${x.note?` · ${esc(x.note)}`:''}</div></div>`).join('')}</section>`:''}${notes?`<section class="eb-report-section"><h2>Report notes</h2><div class="eb-report-notes">${esc(notes).replace(/\n/g,'<br>')}</div></section>`:''}<footer class="eb-report-footer">This report may contain a selected subset of ExamBridge findings. ExamBridge identifies guideline findings; it does not approve an exam or grant exceptions.</footer></div>`;
     $('#reportOutput').setAttribute('aria-hidden','false');
   }
 

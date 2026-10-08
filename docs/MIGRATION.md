@@ -6,14 +6,14 @@
 |---|---|---|
 | FacultyBridge | 1.2 | Suite landing page |
 | CalendarBridge | 7.5.9 | Orange |
-| ExamBridge | 1.8 | Purple |
+| ExamBridge | 1.8.1 | Purple |
 | GradeBridge | 6.0.1 | Blue |
 | GroupBridge | 1.2.1 | Coral |
 | ItemBridge | 1.9 | Teal |
 | QuestionBridge | 4.1 | Green |
 | SyllabusBridge | 2.1.2 | Gold/amber |
 
-GroupBridge uses the supplied v1.2.1 attachment, matching the landing page. The supplied ExamBridge v1.8 is also imported as supplied; this migration does not imply the additional v1.8.1 selective-printing feature.
+GroupBridge uses the supplied v1.2.1 attachment, matching the landing page. ExamBridge uses the supplied v1.8.1 beta attachment, including selection of report findings and optional passed checks.
 
 ## What changes
 

@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>ExamBridge | Faculty Tools</title>
-  
-  
-  
-  
+
+
+
+
 <link rel="stylesheet" href="../../packages/ui/tokens.css">
 <link rel="stylesheet" href="../../packages/ui/themes.css">
 <link rel="stylesheet" href="../../packages/ui/components.css">
@@ -19,7 +19,7 @@
   <header class="ft-topbar">
     <div class="ft-brand">
       <div class="ft-brand-mark">E</div>
-      <div><div class="ft-brand-suite">Faculty Tools</div><div>ExamBridge <span class="eb-version">v1.8</span></div></div>
+      <div><div class="ft-brand-suite">Faculty Tools</div><div>ExamBridge <span class="eb-version">v1.8.1</span></div></div>
     </div>
     <nav class="ft-steps" aria-label="Workflow">
       <button class="ft-step is-active" data-step="upload" aria-current="step">1 Upload</button>
@@ -147,6 +147,22 @@
       <select class="ft-select" id="reportFaculty"></select>
       <div class="eb-help">Exam-wide limits remain based on the full exam. Question-level findings are filtered to the selected faculty.</div>
     </div>
+
+    <fieldset class="eb-report-findings-picker">
+      <legend>Findings to include</legend>
+      <div class="eb-report-picker-head">
+        <div class="eb-help" id="reportFindingSummary">All applicable findings are selected by default.</div>
+        <div class="ft-btn-row">
+          <button type="button" class="ft-btn eb-report-picker-btn" id="reportSelectAllBtn">Select all</button>
+          <button type="button" class="ft-btn eb-report-picker-btn" id="reportClearAllBtn">Clear all</button>
+        </div>
+      </div>
+      <div id="reportFindingOptions"></div>
+      <div class="eb-report-pass-toggle">
+        <label><input type="checkbox" id="reportIncludePassed"> <span><strong>Include passed checks</strong><span class="eb-help">Adds passing guideline rows to the compliance table. This does not change which findings are selected above.</span></span></label>
+      </div>
+    </fieldset>
+
     <div class="ft-btn-row ft-mt-4" style="justify-content:flex-end">
       <button class="ft-btn" id="cancelReportBtn">Cancel</button>
       <button class="ft-btn ft-btn-accent" id="generateReportBtn">Generate printable report</button>

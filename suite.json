@@ -25,12 +25,11 @@
     {
       "id": "exambridge",
       "name": "ExamBridge",
-      "version": "1.8",
-      "sourceVersion": "1.8",
-      "sourceFile": "ExamBridge-v1.8(2).zip",
-      "sourceSha256": "bbd7b93f6c2c67e367e36814fd82121ead42247db133d2a3df89753643f34f7c",
+      "version": "1.8.1",
+      "sourceVersion": "1.8.1",
+      "sourceFile": "ExamBridge-v1.8.1-Beta-Standalone(1).html",
+      "sourceSha256": "09a4478a8c523bf54355990a48052d58299a07269f24d930893064b8b893cc8b",
       "route": "ExamBridge",
-      "sourceEntry": "ExamBridge-v1.8/index.html",
       "sourceEntrySha256": "c1b6d666b2946af31b2c292369311de97531df9a6d83066ac479dbd09b7b75d4"
     },
     {

@@ -159,6 +159,37 @@ try {
       await page.locator('#fileInput').setInputFiles({name:'invalid.doc',mimeType:'application/msword',buffer:Buffer.from('invalid export')});
       await page.waitForFunction(()=>document.getElementById('uploadError').textContent.includes('RTF'));
       assert.ok((await page.locator('#uploadError').textContent()).includes('ExamSoft'));
+      // Report customization uses synthetic question findings, with no real exam data.
+      await page.evaluate(()=>{
+        const qa=window.__ExamBridgeQA;
+        const text='Course Name: PHA9999 Synthetic\n# of Questions: 2\nQuestion #: 1\nQuestion Type: Multiple Choice\nQuestion #: 2\nQuestion Type: Multiple Choice';
+        const exam=qa.evaluateExam(qa.parseExam(text,'synthetic-exam.doc'));
+        exam.questions.forEach((q,i)=>{q.stem='Synthetic question '+(i+1);q.tags.faculty=[{name:i?'Dr. Beta':'Dr. Alpha'}];q.findings=[{kind:'rationale',level:'review',text:'Synthetic rationale finding '+(i+1)},{kind:'options',level:'action',text:'Synthetic options finding '+(i+1)}];q.status='action';});
+        qa.getState().exam=exam;document.getElementById('uploadView').classList.add('eb-hidden');document.getElementById('resultsView').classList.remove('eb-hidden');window.print=()=>{};
+      });
+      await page.locator('#printBtn').click();
+      assert.ok(await page.locator('[data-report-finding]:checked').count());
+      await page.locator('#reportClearAllBtn').click();assert.equal(await page.locator('[data-report-finding]:checked').count(),0);
+      await page.locator('[data-report-finding="rationale"]').check();
+      await page.locator('#reportFaculty').selectOption('Dr. Alpha');
+      assert.equal(await page.locator('[data-report-finding="rationale"]').isChecked(),true);
+      await page.locator('#generateReportBtn').click();
+      const selected=await page.locator('#reportOutput').textContent();
+      assert.ok(selected.includes('Selected findings only'));assert.ok(selected.includes('Synthetic rationale finding 1'));
+      assert.ok(!selected.includes('Synthetic options finding'));assert.ok(!selected.includes('Synthetic rationale finding 2'));
+      const summary=await page.locator('.eb-report-summary strong').allTextContents();assert.deepEqual(summary,['0','1','0','0']);
+      const selectedRows=await page.locator('.eb-report-table tbody tr').count();
+      await page.locator('#printBtn').click();await page.locator('#reportClearAllBtn').click();await page.locator('[data-report-finding="rationale"]').check();
+      await page.locator('#reportIncludePassed').check();await page.locator('#generateReportBtn').click();
+      assert.ok(await page.locator('.eb-report-table tbody tr').count()>selectedRows);
+      assert.ok((await page.locator('#reportOutput').textContent()).includes('Passed checks are included'));
+      await page.locator('#printBtn').click();await page.locator('#reportSelectAllBtn').click();
+      assert.equal(await page.locator('[data-report-finding]:not(:checked)').count(),0);
+      await page.screenshot({path:path.join(output,`exambridge-${format}-report-options.png`),fullPage:true,animations:'disabled'});
+      await page.locator('#generateReportBtn').click();assert.ok((await page.locator('#reportOutput').textContent()).includes('All applicable findings'));
+      // Empty selection must disclose that findings were omitted, rather than implying a clean exam.
+      await page.locator('#printBtn').click();await page.locator('#reportClearAllBtn').click();await page.locator('#generateReportBtn').click();
+      assert.ok((await page.locator('#reportOutput').textContent()).includes('None selected'));
     }
     // Keyboard navigation remains usable after the smoke workflow.
 

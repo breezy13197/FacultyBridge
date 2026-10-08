@@ -24,6 +24,7 @@ Verification repeated on 2026-10-08 using Node.js 24 and headless Chromium 138 o
 | Synthetic Word schedule extracts three events/rows | Pass (CalendarBridge/SyllabusBridge) |
 | Pasted QuestionBridge question reaches the review editor | Pass in both formats |
 | ExamBridge rejects a malformed non-RTF .doc upload with an actionable message | Pass in both formats |
+| ExamBridge v1.8.1 report category selection, faculty scope, selected-only counts, passed-check toggle, select/clear all and empty-selection disclosure | Pass in both formats |
 | ItemBridge rejects an invalid item-analysis input | Pass in both formats |
 
 Screenshots are generated into test-results/ (light, dark and 390-pixel mobile layouts). Animations are disabled during browser assertions and screenshots so transitional colors do not affect final-state checks. Light-mode desktop captures were visually reviewed across all eight applications, with selected full-size and dark-mode views checked for readability. This is a build migration smoke pass, not a comprehensive accessibility audit or tool release certification.

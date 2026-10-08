@@ -41,7 +41,7 @@ const FB_TOOLS = [
   {
     id: 'exambridge',
     name: 'ExamBridge',
-    version: 'v1.8',
+    version: 'v1.8.1',
     category: 'Pre-exam quality',
     description: 'Review an ExamSoft draft against faculty-approved exam-writing rules, question weights, tagging, and figure checks before administration.',
     input: 'ExamSoft exam export',

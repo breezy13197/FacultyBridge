@@ -70,3 +70,101 @@
   border-radius:0 var(--ft-radius-sm) var(--ft-radius-sm) 0;
 }
 .eb-rationale strong{display:block;margin-bottom:4px}
+
+
+.eb-report-findings-picker{
+  margin:18px 0 0;
+  padding:16px;
+  border:1px solid var(--ft-border);
+  border-radius:var(--ft-radius-md);
+  background:var(--ft-surface-soft);
+}
+.eb-report-findings-picker legend{
+  padding:0 6px;
+  font-weight:850;
+}
+.eb-report-picker-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin-bottom:12px;
+}
+.eb-report-picker-btn{
+  padding:7px 10px;
+  font-size:var(--ft-font-size-xs);
+}
+.eb-report-picker-group{
+  padding:10px 0;
+  border-top:1px solid var(--ft-border);
+}
+.eb-report-picker-group:first-child{border-top:0}
+.eb-report-picker-group-title{
+  margin-bottom:7px;
+  font-size:var(--ft-font-size-xs);
+  font-weight:900;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color:var(--ft-text-muted);
+}
+.eb-report-finding-option{
+  display:flex;
+  align-items:flex-start;
+  gap:9px;
+  padding:7px 8px;
+  border-radius:var(--ft-radius-xs);
+}
+.eb-report-finding-option:hover{
+  background:var(--ft-surface);
+}
+.eb-report-finding-option input{
+  margin-top:3px;
+  flex:0 0 auto;
+}
+.eb-report-finding-option>span{
+  display:flex;
+  justify-content:space-between;
+  gap:14px;
+  width:100%;
+}
+.eb-report-finding-option .eb-help{
+  white-space:nowrap;
+}
+.eb-report-pass-toggle{
+  margin-top:10px;
+  padding-top:12px;
+  border-top:1px solid var(--ft-border);
+}
+.eb-report-pass-toggle label{
+  display:flex;
+  align-items:flex-start;
+  gap:9px;
+}
+.eb-report-pass-toggle label>span{
+  display:grid;
+  gap:2px;
+}
+.eb-report-picker-empty{
+  padding:12px;
+  border:1px dashed var(--ft-border);
+  border-radius:var(--ft-radius-sm);
+  color:var(--ft-text-muted);
+}
+.eb-report-scope{
+  margin:0 0 20px;
+  padding:12px 14px;
+  border:1px solid #dbe2ea;
+  border-left:4px solid #7c3aed;
+  border-radius:10px;
+  background:#f8fafc;
+  font-size:13px;
+  line-height:1.5;
+}
+.eb-report-scope-list{
+  margin-top:4px;
+}
+@media(max-width:620px){
+  .eb-report-picker-head{align-items:flex-start;flex-direction:column}
+  .eb-report-finding-option>span{display:grid;gap:2px}
+  .eb-report-finding-option .eb-help{white-space:normal}
+}
