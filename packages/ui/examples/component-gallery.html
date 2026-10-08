@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Faculty Tools UI — Component Gallery</title>
+  <link rel="stylesheet" href="../tokens.css">
+  <link rel="stylesheet" href="../themes.css">
+  <link rel="stylesheet" href="../components.css">
+  <link rel="stylesheet" href="../utilities.css">
+  <style>
+    .gallery-section { margin-top: 18px; padding: 24px; }
+    .swatches { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+    .swatch { border:1px solid var(--ft-border); border-radius:14px; overflow:hidden; background:var(--ft-surface); }
+    .swatch-color { height:72px; }
+    .swatch-label { padding:10px 12px; font-size:12px; }
+    .demo-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+    @media(max-width:850px){.demo-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div class="ft-app">
+  <header class="ft-topbar">
+    <div class="ft-brand"><div class="ft-brand-mark">F</div><div><div class="ft-brand-suite">Faculty Tools</div><div>UI Framework</div></div></div>
+    <div class="ft-steps"><button class="ft-step is-active">Components</button><button class="ft-step">Patterns</button><button class="ft-step">Accessibility</button></div>
+    <button class="ft-icon-btn" id="themeToggle" aria-label="Toggle dark mode">◐</button>
+  </header>
+
+  <section class="ft-card gallery-section">
+    <div class="ft-eyebrow">Visual reference</div>
+    <h1 class="ft-page-title">Faculty Tools Component Gallery</h1>
+    <p class="ft-muted">A live reference for the shared UI language used across Faculty Tools.</p>
+  </section>
+
+  <section class="ft-card gallery-section">
+    <div class="ft-eyebrow">Foundations</div><h2>Palette</h2>
+    <div class="swatches">
+      <div class="swatch"><div class="swatch-color" style="background:var(--ft-green-900)"></div><div class="swatch-label">Primary / --ft-green-900</div></div>
+      <div class="swatch"><div class="swatch-color" style="background:var(--ft-green-700)"></div><div class="swatch-label">Secondary green</div></div>
+      <div class="swatch"><div class="swatch-color" style="background:var(--ft-lime-500)"></div><div class="swatch-label">Accent lime</div></div>
+      <div class="swatch"><div class="swatch-color" style="background:var(--ft-lime-200)"></div><div class="swatch-label">Soft lime</div></div>
+      <div class="swatch"><div class="swatch-color" style="background:var(--ft-warning)"></div><div class="swatch-label">Warning</div></div>
+      <div class="swatch"><div class="swatch-color" style="background:var(--ft-danger)"></div><div class="swatch-label">Danger</div></div>
+    </div>
+  </section>
+
+  <section class="ft-card gallery-section">
+    <div class="ft-eyebrow">Actions</div><h2>Buttons & statuses</h2>
+    <div class="ft-btn-row">
+      <button class="ft-btn ft-btn-primary">Primary action</button>
+      <button class="ft-btn ft-btn-accent">Accent action</button>
+      <button class="ft-btn">Secondary</button>
+      <button class="ft-btn ft-btn-danger">Destructive</button>
+    </div>
+    <div class="ft-cluster ft-mt-6">
+      <span class="ft-badge ft-status-ready">✓ Ready</span>
+      <span class="ft-badge ft-status-warning">! Needs review</span>
+      <span class="ft-badge ft-status-error">× Error</span>
+      <span class="ft-badge ft-status-info">i Information</span>
+    </div>
+  </section>
+
+  <section class="ft-card gallery-section">
+    <div class="ft-eyebrow">Workflow</div><h2>Stepper</h2>
+    <div class="ft-steps" style="justify-content:flex-start">
+      <button class="ft-step is-done">1 Upload</button>
+      <button class="ft-step is-active">2 Review</button>
+      <button class="ft-step">3 Validate</button>
+      <button class="ft-step">4 Export</button>
+    </div>
+  </section>
+
+  <section class="ft-card gallery-section">
+    <div class="ft-eyebrow">Forms</div><h2>Inputs</h2>
+    <div class="ft-grid-2">
+      <div class="ft-field"><label for="title">Title</label><input id="title" class="ft-input" value="Exam 1"></div>
+      <div class="ft-field"><label for="type">Type</label><select id="type" class="ft-select"><option>Multiple Choice</option><option>True / False</option></select></div>
+    </div>
+    <div class="ft-field"><label for="notes">Notes</label><textarea id="notes" class="ft-textarea">Faculty can preview and edit content here.</textarea></div>
+  </section>
+
+  <section class="ft-card gallery-section">
+    <div class="ft-eyebrow">Containers</div><h2>Cards & notices</h2>
+    <div class="demo-grid">
+      <div class="ft-card-soft ft-p-6"><strong>Standard card</strong><p class="ft-muted">Use for grouped secondary content.</p></div>
+      <div class="ft-notice ft-notice-success"><strong>✓ Ready</strong><br><span class="ft-muted">Everything required is complete.</span></div>
+      <div class="ft-notice ft-notice-warning"><strong>! Needs review</strong><br><span class="ft-muted">A user decision is required.</span></div>
+    </div>
+  </section>
+
+  <section class="ft-card gallery-section">
+    <div class="ft-eyebrow">Import</div><h2>Upload zone</h2>
+    <div class="ft-upload-zone"><div><div class="ft-empty-icon">↑</div><h3>Drop a file here</h3><p class="ft-muted">Or choose a supported file from your computer.</p><button class="ft-btn ft-btn-primary">Choose file</button></div></div>
+  </section>
+
+  <section class="ft-card gallery-section">
+    <div class="ft-eyebrow">Data</div><h2>Table</h2>
+    <div class="ft-table-wrap"><table class="ft-table"><thead><tr><th>Item</th><th>Status</th><th>Destination</th></tr></thead><tbody><tr><td>Question 1</td><td><span class="ft-status-ready">✓ Ready</span></td><td>Brightspace</td></tr><tr><td>Question 2</td><td><span class="ft-status-warning">! Review</span></td><td>Kahoot</td></tr><tr><td>Question 3</td><td><span class="ft-status-error">× Blocked</span></td><td>ExamSoft</td></tr></tbody></table></div>
+  </section>
+
+  <section class="ft-card gallery-section">
+    <div class="ft-eyebrow">Empty state</div>
+    <div class="ft-empty-state"><div class="ft-empty-icon">＋</div><h2>No project loaded</h2><p class="ft-muted">Upload a file or open a saved project to get started.</p><button class="ft-btn ft-btn-primary">Start a project</button></div>
+  </section>
+</div>
+<script>
+const root=document.documentElement;const saved=localStorage.getItem('ft-theme');if(saved==='dark')root.dataset.ftTheme='dark';document.getElementById('themeToggle').onclick=()=>{const dark=root.dataset.ftTheme==='dark';root.dataset.ftTheme=dark?'light':'dark';localStorage.setItem('ft-theme',dark?'light':'dark')};
+</script>
+</body>
+</html>

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en" data-ft-tool="groupbridge">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GroupBridge v1.2.1 — Faculty Tools</title>
+
+<link rel="stylesheet" href="../../packages/ui/tokens.css">
+<link rel="stylesheet" href="../../packages/ui/themes.css">
+<link rel="stylesheet" href="../../packages/ui/components.css">
+<link rel="stylesheet" href="../../packages/ui/utilities.css">
+<link rel="stylesheet" href="groupbridge.css">
+</head>
+<body>
+<div class="app ft-app">
+<header class="topbar ft-topbar">
+  <div class="brand ft-brand"><div class="mark">G</div><div><div class="suite ft-brand-suite">Faculty Tools</div><div class="name">GroupBridge <span class="version">v1.2.1</span></div></div></div>
+  <nav class="steps ft-steps" aria-label="Workflow">
+    <button class="step active ft-step" data-step="1">1 Upload</button><button class="step ft-step" data-step="2">2 Configure</button><button class="step ft-step" data-step="3">3 Groups</button><button class="step ft-step" data-step="4">4 Export</button>
+  </nav>
+  <div class="util"><button class="iconbtn ft-icon-btn" id="themeBtn" title="Toggle dark mode" aria-label="Toggle dark mode">◐</button></div>
+</header>
+<main class="main">
+<section class="hero"><div><div class="eyebrow ft-eyebrow">Balanced student groups</div><h1>Turn a Brightspace roster into groups you can actually use.</h1><p>Choose a size, balance by a grade if you want, keep specific students together or apart, review the result, then export group enrollments for Brightspace.</p></div><div class="privacy">Processed locally in your browser.<br>Nothing is uploaded to a server.</div></section>
+
+<section class="card ft-card" id="step1">
+<h2>1 · Upload a Brightspace roster</h2><p class="sub">Use a Brightspace grade export or roster CSV containing student names and usernames. Grade columns can be used later to balance groups.</p>
+<div class="upload" id="dropZone" tabindex="0" role="button" aria-label="Choose Brightspace roster CSV">
+ <div><div class="uploadIcon">⇧</div><h3>Drop your Brightspace CSV here</h3><p class="sub">or choose a file from your computer</p><button class="btn primary ft-btn ft-btn-primary" id="chooseBtn" type="button">Choose CSV</button><div class="small" style="margin-top:12px">Supported: .csv</div></div>
+</div><input class="fileInput" id="fileInput" type="file" accept=".csv,text/csv"><div id="uploadStatus" aria-live="polite"></div>
+<div class="actions"><button class="btn primary ft-btn ft-btn-primary" id="toConfig" disabled>Continue to Configure</button><button class="btn secondary ft-btn" id="resetBtn">Start Over</button></div>
+</section>
+
+<section class="card hidden ft-card" id="step2">
+<h2>2 · Configure the groups</h2><p class="sub">Set the group size or number of groups, then add only the constraints that matter.</p>
+<div class="grid2"><div>
+ <div class="field ft-field"><label>How should group size be set?</label><div class="radioRow"><div class="radioCard"><label><input type="radio" name="sizeMode" value="count" checked> Number of groups</label></div><div class="radioCard"><label><input type="radio" name="sizeMode" value="size"> Students per group</label></div></div></div>
+ <div class="grid2"><div class="field ft-field" id="countField"><label for="groupCount">Number of groups</label><input class="input ft-input" id="groupCount" type="number" min="1" max="500" value="4"></div><div class="field hidden ft-field" id="sizeField"><label for="groupSize">Students per group</label><input class="input ft-input" id="groupSize" type="number" min="2" value="4"></div></div>
+ <div class="field ft-field"><label>Assignment strategy</label><div class="radioRow"><div class="radioCard"><label><input type="radio" name="strategy" value="balanced" checked> Balanced</label><div class="small">Distribute the selected numeric measure as evenly as possible.</div></div><div class="radioCard"><label><input type="radio" name="strategy" value="random"> Random</label><div class="small">Shuffle students while respecting pair constraints.</div></div></div></div>
+ <div class="field ft-field"><label for="balanceCol">Balance by</label><select class="select ft-select" id="balanceCol"></select><div class="small" id="balanceHelp">Choose a numeric grade column from the roster.</div></div>
+ </div><div>
+ <h3>Roster summary</h3><div class="metrics"><div class="metric"><b id="mStudents">0</b><span>students</span></div><div class="metric"><b id="mUsernames">0</b><span>usernames found</span></div><div class="metric"><b id="mNumeric">0</b><span>numeric columns</span></div><div class="metric"><b id="mConstraints">0</b><span>pair constraints</span></div></div>
+ <div id="configNotice" class="notice good">✓ Roster is ready to configure.</div>
+ </div></div>
+<hr style="border:0;border-top:1px solid var(--ft-border);margin:22px 0">
+<div style="display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap"><div><h3>Pair constraints</h3><p class="sub" style="margin-bottom:0">Optional. Keep two students together or ensure they are assigned to different groups.</p></div><button class="btn secondary ft-btn" id="addConstraint">+ Add constraint</button></div>
+<div id="constraintList" style="margin-top:14px"></div>
+<div class="actions"><button class="btn secondary ft-btn" id="backUpload">Back</button><button class="btn primary ft-btn ft-btn-primary" id="generateBtn">Generate Groups</button><span id="generationStatus" aria-live="polite"></span></div>
+</section>
+
+<section class="card hidden ft-card" id="step3">
+<div style="display:flex;justify-content:space-between;align-items:start;gap:16px;flex-wrap:wrap"><div><h2>3 · Review the groups</h2><p class="sub">Move or swap individual students if needed. Group statistics update immediately.</p></div><button class="btn secondary ft-btn" id="regenerateBtn">↻ Regenerate</button></div>
+<div class="metrics"><div class="metric"><b id="gCount">0</b><span>groups</span></div><div class="metric"><b id="gMin">—</b><span>lowest mean</span></div><div class="metric"><b id="gMax">—</b><span>highest mean</span></div><div class="metric"><b id="gSpread">—</b><span>mean spread</span></div></div>
+<div class="meanSummary hidden" id="groupMeanSummary" aria-label="Mean for each group"></div>
+<div id="groupNotice" aria-live="polite"></div><div class="groupGrid" id="groupGrid"></div>
+<div class="actions"><button class="btn secondary ft-btn" id="backConfig">Back to Configure</button><button class="btn primary ft-btn ft-btn-primary" id="toExport">Continue to Export</button></div>
+</section>
+
+<section class="card hidden ft-card" id="step4">
+<h2>4 · Export the groups</h2><p class="sub">Create a printable PDF group roster, download a working group list, or prepare group enrollments for Brightspace.</p>
+<div class="notice warn"><strong>Before exporting:</strong> Create the group category and groups in Brightspace, then copy each group's code below. GroupBridge will create one <strong>ENROLL</strong> row per student.</div>
+<div class="codeGrid" id="codeGrid"></div>
+<div id="exportStatus" aria-live="polite"></div>
+<div class="pdfOption"><div><strong>PDF group report</strong><div class="small">Opens a print-ready report. Choose “Save as PDF” in your browser’s print dialog.</div></div><label class="checkRow"><input id="pdfIncludeScores" type="checkbox"> <span>Include balancing values and group means<div class="small">Leave unchecked for a student-facing group roster.</div></span></label></div>
+<div class="actions"><button class="btn secondary ft-btn" id="backGroups">Back to Groups</button><button class="btn secondary ft-btn" id="exportPdf">Export PDF</button><button class="btn secondary ft-btn" id="downloadPlan">Download Group List</button><button class="btn primary ft-btn ft-btn-primary" id="downloadBright" disabled>Download Brightspace Import CSV</button></div>
+<div class="small" style="margin-top:14px">Brightspace fields are written in this order: ACTION, Username, Org Defined ID, GroupName, GroupCode. GroupBridge does not add a header row because Brightspace reads each line as an action.</div>
+</section>
+</main>
+<footer class="footer">GroupBridge v1.2.1 · Faculty Tools · Local-only processing</footer>
+</div><div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="../../packages/ui/runtime.js"></script>
+<script src="groupbridge.js"></script>
+</body>
+</html>

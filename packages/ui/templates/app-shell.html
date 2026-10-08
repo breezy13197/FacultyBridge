@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Faculty Tool</title>
+  <link rel="stylesheet" href="../tokens.css">
+  <link rel="stylesheet" href="../themes.css">
+  <link rel="stylesheet" href="../components.css">
+  <link rel="stylesheet" href="../utilities.css">
+</head>
+<body>
+  <div class="ft-app">
+    <header class="ft-topbar">
+      <div class="ft-brand">
+        <div class="ft-brand-mark">F</div>
+        <div>
+          <div class="ft-brand-suite">Faculty Tools</div>
+          <div>YourTool</div>
+        </div>
+      </div>
+      <nav class="ft-steps" aria-label="Workflow">
+        <button class="ft-step is-active">Home</button>
+        <button class="ft-step">1 Start</button>
+        <button class="ft-step">2 Review</button>
+        <button class="ft-step">3 Finish</button>
+      </nav>
+      <button class="ft-icon-btn" id="themeToggle" aria-label="Toggle theme">◐</button>
+    </header>
+
+    <main class="ft-card ft-p-8 ft-mt-6">
+      <div class="ft-eyebrow">Faculty Tools</div>
+      <h1 class="ft-hero-title">Build a clear, calm workflow.</h1>
+      <p class="ft-muted">Replace this starter content with the tool-specific interface.</p>
+      <div class="ft-btn-row ft-mt-6">
+        <button class="ft-btn ft-btn-primary">Primary action</button>
+        <button class="ft-btn">Secondary action</button>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const root = document.documentElement;
+    const saved = localStorage.getItem('ft-theme');
+    if (saved === 'dark') root.dataset.ftTheme = 'dark';
+    document.getElementById('themeToggle').addEventListener('click', () => {
+      const dark = root.dataset.ftTheme === 'dark';
+      root.dataset.ftTheme = dark ? 'light' : 'dark';
+      localStorage.setItem('ft-theme', dark ? 'light' : 'dark');
+    });
+  </script>
+</body>
+</html>

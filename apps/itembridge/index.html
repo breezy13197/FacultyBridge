@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en" data-ft-tool="itembridge">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ItemBridge v1.9 — Faculty Tools</title>
+  
+<link rel="stylesheet" href="../../packages/ui/tokens.css">
+<link rel="stylesheet" href="../../packages/ui/themes.css">
+<link rel="stylesheet" href="../../packages/ui/components.css">
+<link rel="stylesheet" href="../../packages/ui/utilities.css">
+<link rel="stylesheet" href="itembridge.css">
+</head>
+<body>
+<div class="ft-app">
+  <header class="ft-topbar ib-topbar">
+    <div class="ft-brand">
+      <div class="ft-brand-mark ib-mark">I</div>
+      <div><div class="ft-brand-suite">Faculty Tools</div><div>ItemBridge <span class="ib-version-badge">v1.9</span></div></div>
+    </div>
+    <nav class="ft-steps" aria-label="Workflow">
+      <button class="ft-step is-active" data-view="upload">1 Upload</button>
+      <button class="ft-step" data-view="review" disabled>2 Review</button>
+      <button class="ft-step" data-view="history" disabled>3 Compare</button>
+    </nav>
+    <button class="ft-icon-btn" id="themeToggle" aria-label="Toggle theme">◐</button>
+  </header>
+
+  <main id="uploadView" class="ft-card ft-p-8 ft-mt-6">
+    <div class="ft-eyebrow ib-accent">Post-exam quality review</div>
+    <h1 class="ft-page-title" style="font-size:clamp(2rem,5vw,4rem);letter-spacing:-.05em;line-height:1;margin-top:10px">What should you review before using this exam again?</h1>
+    <p class="ft-muted" style="max-width:760px">Upload one or more ExamSoft Item Analysis CSV exports. ItemBridge prioritizes items that deserve faculty attention instead of presenting a wall of statistics.</p>
+    <div class="ft-upload-zone ib-upload ft-mt-6" id="dropZone">
+      <div>
+        <div class="ft-empty-icon" style="background:var(--ib-200);color:var(--ib-700)">↥</div>
+        <h2 style="margin:0 0 8px">Drop ExamSoft item analyses here</h2>
+        <p class="ft-muted" style="margin:0 0 8px">CSV files · multiple exams supported for repeated-item comparisons</p><p class="ib-privacy">🔒 Your exam file is read on this computer and is never sent anywhere.</p>
+        <input id="fileInput" type="file" accept=".csv,text/csv" multiple hidden>
+        <button class="ft-btn ib-primary" id="chooseFile">Choose CSV files</button>
+        <div id="fileList" class="ib-file-list"></div>
+      </div>
+    </div>
+    <div id="uploadNotice" class="ft-notice ft-notice-warning ft-mt-4 ib-hidden"></div>
+    <div class="ft-card-soft ft-p-6 ft-mt-4 ib-export-format-card">
+      <strong>Designed for ExamSoft exports</strong>
+      <p class="ft-muted" style="margin:5px 0 0">v1 recognizes choice, multiple-response, fill-in-the-blank, and true/false sections. Recommendations are psychometric review prompts—not automatic judgments that an item is defective.</p>
+    </div>
+  </main>
+
+  <div id="workspace" class="ib-shell ib-hidden">
+    <aside class="ft-card ib-sidebar">
+      <div class="ib-sidebar-title">Loaded exams</div>
+      <div id="examList"></div>
+      <button class="ft-btn" style="width:100%;margin-top:8px" id="addExam">+ Add exam</button>
+      <input id="addFileInput" type="file" accept=".csv,text/csv" multiple hidden>
+      <hr style="border:0;border-top:1px solid var(--ft-border);margin:17px 0">
+      <div id="examSnapshot"></div>
+    </aside>
+    <section class="ib-main">
+      <div id="workspaceNotice" class="ft-notice ft-notice-warning ib-hidden" style="margin-bottom:14px"></div>
+      <div id="reviewView"></div>
+      <div id="historyView" class="ib-hidden"></div>
+    </section>
+  </div>
+</div>
+<div id="toast" class="ft-toast"></div>
+<div id="ibModal" class="ib-modal-backdrop ib-hidden" role="presentation"><div class="ft-card ib-modal" role="dialog" aria-modal="true" aria-labelledby="ibModalTitle"><h2 id="ibModalTitle"></h2><p id="ibModalBody"></p><div class="ib-modal-actions"><button class="ft-btn" id="ibModalCancel">Cancel</button><button class="ft-btn ib-primary" id="ibModalConfirm">Confirm</button></div></div></div>
+
+<script src="../../packages/ui/runtime.js"></script>
+<script src="itembridge.js"></script>
+</body></html>
