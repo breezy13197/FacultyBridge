@@ -55,10 +55,14 @@ test('every referenced design token is defined and shared foundation is not copi
 test('recorded baseline logic hashes remain intact', () => {
   const baseline=JSON.parse(read(path.join(root,'tests/import-baseline.json')));
   // Whitelisted migration edits affect theme storage and CSS classes, never processing functions.
-  const normalize=s=>s.trim().replace(/'(?:qbTheme|groupbridge-theme|gradebridge_theme|itembridge-theme)'/g,"'ft-theme'").replace(/document.documentElement.dataset.ftTheme=t;/g,'').replace(/\sft-[\w-]+(?=[\s"'])/g,'');
+  const normalize=s=>s.replace(/\r\n?/g,'\n').trim().replace(/'(?:qbTheme|groupbridge-theme|gradebridge_theme|itembridge-theme)'/g,"'ft-theme'").replace(/document.documentElement.dataset.ftTheme=t;/g,'').replace(/\sft-[\w-]+(?=[\s"'])/g,'');
   for(const [id,expected] of Object.entries(baseline)) {
-    const s=normalize(read(path.join(root,'apps',id,`${id}.js`)));
-    assert.equal(crypto.createHash('sha256').update(s).digest('hex'),expected,`${id} logic changed outside the migration whitelist`);
+    const source=read(path.join(root,'apps',id,`${id}.js`));
+    // Windows checkouts may use CRLF; compare code using canonical LF line endings.
+    for (const variant of [source, source.replace(/\r\n?/g,'\n').replace(/\n/g,'\r\n')]) {
+      const s=normalize(variant);
+      assert.equal(crypto.createHash('sha256').update(s).digest('hex'),expected,`${id} logic changed outside the migration whitelist`);
+    }
   }
 });
 test('build is deterministic and checksum manifest covers every artifact', () => {
