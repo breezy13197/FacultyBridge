@@ -1,6 +1,6 @@
 # Migration QA — FacultyBridge build 1.3.0
 
-Verification performed on 2026-10-07 using Node.js 24 and headless Chromium 138 on Linux.
+Verification repeated on 2026-10-08 using Node.js 24 and headless Chromium 138 on Linux.
 
 | Check | Result |
 |---|---|
@@ -18,7 +18,8 @@ Verification performed on 2026-10-07 using Node.js 24 and headless Chromium 138 
 | Landing-page tool versions and links match the manifest | Pass |
 | Shared dark theme persists from landing page to GradeBridge | Pass |
 | Quoted CSV parsing preserves commas and leading-zero identifiers | Pass (GradeBridge/GroupBridge) |
-| GroupBridge synthetic roster generates two groups and exports four enrollment actions | Pass in both formats |
+| GroupBridge v1.2.1 synthetic roster generates two groups and exports four enrollment actions | Pass in both formats |
+| GroupBridge missing-value denominators, full-group swaps, invalid roster retention, replacement cleanup, duplicate identifiers and group-code/integrity export guards | Pass in both formats |
 | Local JSZip round trips work with external network requests blocked | Pass (CalendarBridge/QuestionBridge/SyllabusBridge) |
 | Synthetic Word schedule extracts three events/rows | Pass (CalendarBridge/SyllabusBridge) |
 | Pasted QuestionBridge question reaches the review editor | Pass in both formats |
@@ -31,6 +32,5 @@ Screenshots are generated into test-results/ (light, dark and 390-pixel mobile l
 
 - The original four exam exports and nine test syllabi were not supplied here. Run their recorded regression expectations, including CalendarBridge faculty/coordinator mapping.
 - Validate real file imports and final outputs on faculty-managed Windows/Edge machines.
-- Reconcile GroupBridge v1.2 with the independently reviewed v1.2.1 release. This build uses the supplied v1.2 attachment and does not claim its known QA findings are closed.
 - Review the QuestionBridge stepper completion state and other historical release gates against the actual imported versions.
 - Complete docs/RELEASE-CHECKLIST.md. Keep the migration pull request as a draft pending those checks.

@@ -45,10 +45,10 @@
     {
       "id": "groupbridge",
       "name": "GroupBridge",
-      "version": "1.2",
-      "sourceVersion": "1.2",
-      "sourceFile": "GroupBridge-v1.2.html",
-      "sourceSha256": "7b5e946928ff7f16f0b2b757e8fd530bee836ea3239d018140f9115c3dc9ea8d",
+      "version": "1.2.1",
+      "sourceVersion": "1.2.1",
+      "sourceFile": "GroupBridge-v1.2.1(1).html",
+      "sourceSha256": "2f315298ce44567258bdb14d143da49daffa21bf55103a9907b1e5740f7b1447",
       "route": "GroupBridge"
     },
     {

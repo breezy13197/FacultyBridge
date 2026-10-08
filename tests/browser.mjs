@@ -57,12 +57,55 @@ try {
       }
     }
     if(tool.id==='groupbridge') {
-      const csv='Last Name,First Name,Username,Org Defined ID,Exam 1 Points Grade\r\nAble,Anna,aable,00001,80\r\nBaker,Ben,bbaker,00002,70\r\nClark,Cara,cclark,00003,90\r\nDavis,Dan,ddavis,00004,60\r\n';
-      await page.locator('#fileInput').setInputFiles({name:'roster.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
-      await page.locator('#toConfig').click();await page.locator('#groupCount').fill('2');await page.locator('#generateBtn').click();
-      assert.equal(await page.locator('.member').count(),4);await page.locator('#toExport').click();
-      const exported=await page.evaluate(()=>{groups.forEach((g,i)=>g.code='G'+(i+1));return {plan:planCsv(),bright:brightCsv()};});
-      assert.ok(exported.plan.includes('00001'));assert.equal(exported.bright.trim().split(/\r?\n/).length,4);assert.ok(exported.bright.includes('ENROLL'));
+      const csv='Last Name,First Name,Username,Org Defined ID,Exam 1 Points Grade\r\nAble,Anna,#aable,00001,80\r\nBaker,Ben,bbaker,00002,70\r\nClark,Cara,cclark,00003,90\r\nDavis,Dan,ddavis,00004,\r\n';
+      const upload=async(name,text)=>page.locator('#fileInput').setInputFiles({name,mimeType:'text/csv',buffer:Buffer.from(text)});
+      await upload('roster.csv',csv);
+      await page.locator('#toConfig').click();await page.locator('#groupCount').fill('2');
+      await page.locator('#balanceCol').selectOption('Exam 1 Points Grade');
+      await page.locator('#generateBtn').click();await page.waitForFunction(()=>groups.length===2&&!isGenerating);
+      assert.equal(await page.locator('.member').count(),4);
+      assert.equal(await page.locator('.score.missing').count(),1);
+      assert.ok((await page.locator('#groupNotice').textContent()).includes('1 of 4'));
+      const stats=await page.evaluate(()=>groups.map(statsFor));
+      assert.equal(stats.reduce((n,g)=>n+g.valued,0),3);assert.equal(stats.reduce((n,g)=>n+g.missing,0),1);
+      for(const g of stats) assert.ok(Number.isFinite(g.mean));
+      assert.ok((await page.locator('#groupMeanSummary').textContent()).includes('1 of 2 students'));
+      // A full destination offers a swap and keeps every student enrolled exactly once.
+      const pair=await page.evaluate(()=>({a:groups[0].ids[0],b:groups[1].ids[0]}));
+      await page.locator(`.moveStudent[data-id="${pair.a}"]`).selectOption('1');
+      await page.locator('#swapChoice').selectOption(String(pair.b));await page.locator('#confirmSwap').click();
+      assert.deepEqual(await page.evaluate(({a,b})=>[groups[1].ids.includes(a),groups[0].ids.includes(b),...groups.map(g=>g.ids.length)],pair),[true,true,2,2]);
+      // Together constraints prevent a manual swap that would split the pair.
+      const blocked=await page.evaluate(()=>{constraints=[{type:'together',a:groups[0].ids[0],b:groups[0].ids[1]}];return {a:groups[0].ids[0],b:groups[1].ids[0],signature:assignmentSignature(groups)};});
+      await page.locator(`.moveStudent[data-id="${blocked.a}"]`).selectOption('1');
+      await page.locator('#swapChoice').selectOption(String(blocked.b));await page.locator('#confirmSwap').click();
+      assert.ok(await page.locator('.inlineError').count());assert.equal(await page.evaluate(()=>assignmentSignature(groups)),blocked.signature);
+      await page.locator('#cancelSwap').click();await page.locator('#toExport').click();
+      await page.locator('#gCode0').fill('G1');await page.locator('#gCode1').fill('G1');
+      assert.equal(await page.locator('#downloadBright').isDisabled(),true);
+      assert.ok((await page.locator('#exportStatus').textContent()).includes('unique'));
+      await page.locator('#gCode1').fill('G2');assert.equal(await page.locator('#downloadBright').isEnabled(),true);
+      const exported=await page.evaluate(()=>({plan:planCsv(),bright:brightCsv(),report:pdfReportHtml(true)}));
+      assert.ok(exported.plan.includes('00001'));assert.equal(exported.bright.trim().split(/\r?\n/).length,4);
+      assert.ok(exported.bright.includes('ENROLL,aable,00001'));assert.ok(!exported.bright.includes('#aable'));
+      assert.ok(exported.report.includes('means exclude those records'));assert.ok(exported.report.includes('No value'));
+      const downloadEvent=page.waitForEvent('download');await page.locator('#downloadBright').click();
+      const downloaded=await downloadEvent;const bytes=fs.readFileSync(await downloaded.path());
+      assert.equal(bytes.subarray(0,6).toString(),'ENROLL'); // Brightspace import has no BOM/header.
+      assert.match(downloaded.suggestedFilename(),/^GroupBridge-Brightspace-Group-Import-\d{4}-\d{2}-\d{2}\.csv$/);
+      const integrity=await page.evaluate(()=>{const id=groups[0].ids[0];groups[1].ids.push(id);validateExport();let rejected=false;try{brightCsv()}catch{rejected=true}groups[1].ids.pop();validateExport();return rejected;});
+      assert.equal(integrity,true);
+      // Rejected replacement retains the current roster/groups; a valid replacement clears them.
+      await page.locator('.step[data-step="1"]').click();
+      await upload('duplicate.csv',csv.replace('bbaker','aable'));
+      await page.waitForFunction(()=>document.getElementById('uploadStatus').textContent.includes('duplicate Username'));
+      assert.equal(await page.evaluate(()=>students.length),4);assert.equal(await page.evaluate(()=>groups.length),2);
+      await upload('replacement.csv','Last Name,First Name,Username,Org Defined ID\nNew,Nina,nnew,00100\nOther,Omar,oother,00101\n');
+      await page.waitForFunction(()=>fileName==='replacement.csv');
+      assert.deepEqual(await page.evaluate(()=>[students.length,groups.length,constraints.length]),[2,0,0]);
+      assert.equal(await page.locator('#downloadBright').isDisabled(),true);
+      assert.equal(await page.locator('.step[data-step="4"]').isDisabled(),true);
+      assert.equal(await page.locator('#codeGrid').textContent(),'');
     }
     if(['gradebridge','groupbridge'].includes(tool.id)) {
       const parsed=await page.evaluate(()=>parseCSV('Name,ID,Score\r\n"A, B",0000123,89\r\n'));

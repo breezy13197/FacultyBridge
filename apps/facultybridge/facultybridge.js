@@ -80,7 +80,7 @@ const FB_TOOLS = [
   {
     id: 'groupbridge',
     name: 'GroupBridge',
-    version: 'v1.2',
+    version: 'v1.2.1',
     category: 'Class management',
     description: 'Create random or grade-balanced student groups from a Brightspace roster, respect pair constraints, review the result, and export enrollments.',
     input: 'Brightspace roster',
