@@ -18,7 +18,7 @@
 <header class="ft-topbar">
   <div class="ft-brand"><div class="ft-brand-mark">Q</div><div><div>QuestionBridge</div><div class="ft-brand-suite">Faculty Tools</div></div></div>
   <nav class="ft-steps" aria-label="QuestionBridge workflow">
-    <button class="ft-step is-active" data-screen="home">Home</button><button class="ft-step" data-screen="upload">1 Upload</button><button class="ft-step" data-screen="review">2 Review</button><button class="ft-step" data-screen="validate">3 Validate</button><button class="ft-step" data-screen="export">4 Export</button>
+    <button class="ft-step is-active" data-screen="home">Home</button><button class="ft-step" data-screen="upload">1 Upload</button><button class="ft-step" data-screen="review" disabled>2 Review</button><button class="ft-step" data-screen="validate" disabled>3 Validate</button><button class="ft-step" data-screen="export" disabled>4 Export</button>
   </nav>
   <div class="qb-actions"><button class="ft-icon-btn" id="themeBtn" title="Toggle dark mode">◐</button><button class="ft-btn" id="openProjectBtn">Open</button><button class="ft-btn" id="saveProject"><span class="qb-action-label">Save project</span> ↓</button><input type="file" id="projectInput" accept=".questionbridge,application/json" hidden></div>
 </header>
@@ -57,5 +57,6 @@ D. Threonine"></textarea></div><button class="ft-btn ft-btn-primary" id="parsePa
 <script src="../../packages/ui/runtime.js"></script>
 <script src="../../vendor/jszip-3.10.1.min.js"></script>
 <script src="questionbridge.js"></script>
+<script src="navigation.js"></script>
 </body>
 </html>
