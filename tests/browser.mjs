@@ -149,11 +149,42 @@ try {
       await page.evaluate(()=>document.documentElement.setAttribute('data-ft-theme','light'));
     }
     if(tool.id==='questionbridge') {
+      for (const step of ['review','validate','export']) {
+        assert.equal(await page.locator(`[data-screen="${step}"]`).isDisabled(),true);
+        await page.evaluate(id=>show(id),step);
+        assert.equal(await page.locator('#upload').isVisible(),true);
+      }
+      await page.locator('#fileInput').setInputFiles({name:'empty.txt',mimeType:'text/plain',buffer:Buffer.from('')});
+      await page.waitForFunction(()=>document.getElementById('parseStatus').textContent.includes('could not read'));
+      assert.equal(await page.locator('[data-screen="review"]').isDisabled(),true);
       await page.locator('[data-screen="upload"]').click();
       await page.locator('#pasteText').fill('1. Which molecule transports oxygen?\nA. Hemoglobin *\nB. Glycogen\nC. DNA\nD. ATP');
       await page.locator('#parsePaste').click();
       assert.equal(await page.evaluate(()=>state.questions.length),1);
       assert.ok(await page.locator('#stem').inputValue());
+      for (const step of ['review','validate','export']) {
+        assert.equal(await page.locator(`[data-screen="${step}"]`).isDisabled(),false);
+        await page.locator(`[data-screen="${step}"]`).click();
+        assert.equal(await page.locator(`#${step}`).isVisible(),true);
+      }
+      await page.reload();
+      assert.equal(await page.locator('[data-screen="review"]').isDisabled(),false);
+      await page.locator('[data-screen="review"]').click();
+      page.once('dialog',dialog=>dialog.accept());
+      await page.locator('#deleteQuestion').click();
+      assert.equal(await page.locator('#upload').isVisible(),true);
+      for (const step of ['review','validate','export']) assert.equal(await page.locator(`[data-screen="${step}"]`).isDisabled(),true);
+      await page.locator('#fileInput').setInputFiles({name:'questions.txt',mimeType:'text/plain',buffer:Buffer.from('1. Synthetic question?\nA. Yes *\nB. No')});
+      await page.waitForFunction(()=>document.getElementById('review').classList.contains('is-active'));
+      assert.equal(await page.locator('[data-screen="export"]').isDisabled(),false);
+      page.once('dialog',dialog=>dialog.accept());
+      await page.locator('[data-screen="upload"]').click();
+      await page.locator('#startNew').click();
+      for (const step of ['review','validate','export']) assert.equal(await page.locator(`[data-screen="${step}"]`).isDisabled(),true);
+      await page.locator('[data-screen="upload"]').focus();
+      await page.keyboard.press('Tab');
+      assert.equal(await page.locator('#themeBtn').evaluate(el=>el===document.activeElement),true);
+      await page.locator('[data-screen="upload"]').focus();
     }
     if(tool.id==='exambridge') {
       await page.locator('#fileInput').setInputFiles({name:'invalid.doc',mimeType:'application/msword',buffer:Buffer.from('invalid export')});

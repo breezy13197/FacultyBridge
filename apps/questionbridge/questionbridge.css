@@ -17,3 +17,6 @@
 @media(max-width:700px){.qb-hero{padding:var(--ft-space-6)}.qb-visual{display:none}.qb-platform-grid,.qb-export-grid,.qb-metrics,.qb-workspace{grid-template-columns:1fr}.qb-meta{grid-column:auto}.qb-savebar{flex-direction:column}}
 
 .qb-blank-row{border:1px solid var(--ft-border);border-radius:var(--ft-radius-md);padding:12px;margin:9px 0;background:var(--ft-surface-soft)}.qb-blank-row .qb-mini-row{align-items:center}.qb-blank-token{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:800;background:var(--ft-brand-200);padding:5px 8px;border-radius:8px}.qb-convert-note{border-left:4px solid var(--ft-brand-500);padding-left:12px}.qb-image-missing{min-height:92px;display:grid;place-items:center;border:1px dashed var(--ft-border);border-radius:10px;padding:10px;text-align:center}.qb-source-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}.qb-source-grid span{border:1px solid var(--ft-border);border-radius:10px;padding:8px;text-align:center;font-size:.8rem;font-weight:700}@media(max-width:700px){.qb-source-grid{grid-template-columns:1fr 1fr}}
+
+/* Locked workflow stages match the shared disabled controls. */
+.ft-step:disabled { opacity: .5; cursor: not-allowed; }
