@@ -131,6 +131,23 @@ try {
       },tool.id);
       assert.equal(parsed,3,`${tool.id} synthetic Word schedule extraction`);
     }
+    if(tool.id==='syllabusbridge') {
+      // Report filters are generated dynamically after parsing the synthetic syllabus.
+      await page.evaluate(()=>{renderReport();go('report');});
+      assert.equal(await page.locator('#filters .ft-btn').count(),5);
+      for(const mode of ['light','dark']) {
+        await page.evaluate(mode=>document.documentElement.setAttribute('data-ft-theme',mode),mode);
+        const styles=await page.locator('#filters button').evaluateAll(buttons=>buttons.map(b=>{const c=getComputedStyle(b);return {radius:parseFloat(c.borderRadius),height:b.getBoundingClientRect().height,padding:parseFloat(c.paddingLeft)};}));
+        for(const style of styles) {assert.ok(style.radius>=10);assert.ok(style.height>=42);assert.ok(style.padding>=12);}
+        await page.locator('#filters button').nth(2).click();
+        assert.equal(await page.locator('#filters .active').textContent(),'Warnings');
+        assert.equal(await page.locator('#results .result:not(.warning-status)').count(),0);
+        await page.locator('#filters button').first().click();
+        assert.ok(await page.locator('#results .result').count());
+        await page.screenshot({path:path.join(output,`syllabusbridge-${format}-report-${mode}.png`),fullPage:true,animations:'disabled'});
+      }
+      await page.evaluate(()=>document.documentElement.setAttribute('data-ft-theme','light'));
+    }
     if(tool.id==='questionbridge') {
       await page.locator('[data-screen="upload"]').click();
       await page.locator('#pasteText').fill('1. Which molecule transports oxygen?\nA. Hemoglobin *\nB. Glycogen\nC. DNA\nD. ATP');
