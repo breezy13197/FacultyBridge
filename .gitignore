@@ -2,3 +2,14 @@ node_modules/
 dist/
 test-results/
 *.log
+
+# Playwright
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+
+# Local course material and reviewed regression counts
+/tests/test files/
+/tests/test-files/
+/tests/local-baselines/
