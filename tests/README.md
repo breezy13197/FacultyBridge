@@ -4,10 +4,22 @@ Use Node 22 or later. Install dependencies with `npm ci` and browsers with
 `npx playwright install` (Linux CI: add `--with-deps`).
 
 ```sh
-npm run check
-npm run test:browser
-npm run test:e2e
+npm run validate:quick  # build/structural tests + Chromium browser smoke
+npm run validate       # quick checks + all six E2E projects
 ```
+
+The individual `check`, `test:browser`, and `test:e2e` commands remain available.
+For a focused E2E run, for example:
+
+```sh
+npm run test:e2e -- --project=chromium --grep QuestionBridge
+```
+
+Focused runs give fast development feedback; they do not replace full pre-merge
+validation. CI runs the quick stage in `verify`, then E2E in `test`, without
+duplicating smoke checks in a second workflow. The tag workflow reuses these
+same two jobs before preparing draft release assets. See
+[development](../docs/DEVELOPMENT.md) and [releases](../docs/RELEASING.md).
 
 `test:e2e` builds the site, starts its own server on port 4173, and runs
 Chromium, Firefox, and WebKit twice each: against the served site and against
