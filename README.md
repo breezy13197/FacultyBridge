@@ -20,7 +20,9 @@ npm run test:browser
 ```
 
 For cross-browser Playwright tests, run `npx playwright install` followed by
-`npm run test:e2e`. Uploaded course-file regression tests run locally with
+`npm run validate` (build checks, browser smoke, then the six-project E2E suite).
+Use `npm run validate:quick` for build checks and browser smoke while developing.
+Uploaded course-file regression tests run locally with
 `npm run test:e2e:local`; see [the testing guide](tests/README.md) for baseline
 capture, privacy, coverage, and review requirements.
 
@@ -59,6 +61,10 @@ Suite 1.3.1 (shared UI 1.0.1) is a shared fix release; no tool's processing chan
 
 Use one branch/pull request per change. In the GitHub web UI, review and merge the migration pull request into main. Future releases use the tag facultybridge-v<the suiteVersion>, e.g. facultybridge-v1.3.0. The tag-triggered workflow validates the matching version, runs checks, and creates a GitHub Release with website ZIP, standalone ZIP, and checksums. Per-tool source versions remain independently tracked in suite.json. No website is deployed by this migration.
 
-Pull requests and pushes run the same checks and upload downloadable build/QA artifacts. Review docs/RELEASE-CHECKLIST.md and use actual course files before distributing a release to colleagues. Automated migration checks do not replace the recorded exam and syllabus regression suites.
+For current development, start each coherent change from updated main, define acceptance criteria in an issue, use the PR template, and follow [the development guide](docs/DEVELOPMENT.md).
+
+Releases use the tag `facultybridge-v<the suiteVersion>`, e.g. `facultybridge-v1.3.0`, on a commit already merged into main. The tag workflow runs the same full validation as PRs and prepares a **draft** GitHub Release with website ZIP, standalone ZIP, and checksums from the validated build. Review the downloaded artifacts, complete private/manual regression and the release record, then explicitly publish the draft. See [the release guide](docs/RELEASING.md); no website is automatically deployed.
+
+One **Suite checks** workflow runs on PRs into main/master and pushes to those branches, with required jobs `verify` and `test`. It is also reused by tagged releases. Feature-branch pushes with an open PR run once through the PR event. Build artifacts and synthetic E2E reports are retained for 14 days. Automated checks do not replace actual course-file regressions or receiving-system/managed-machine checks from [the release checklist](docs/RELEASE-CHECKLIST.md).
 
 See docs/MIGRATION.md and docs/QA-MIGRATION.md for scope and remaining checks.

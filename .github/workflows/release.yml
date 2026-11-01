@@ -1,31 +1,50 @@
-name: Tagged suite release
+name: Tagged suite draft release
 on:
   push:
     tags: ['facultybridge-v*']
 permissions:
-  contents: write
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
-  release:
+  prepare:
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
-      - run: npm ci
       - name: Check tag agrees with manifest
         run: node -e "const m=require('./suite.json');if(process.env.GITHUB_REF_NAME !== 'facultybridge-v'+m.suiteVersion)process.exit(1)"
-      - run: npm run check
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:browser
+      - name: Require a commit already merged into main
+        run: git merge-base --is-ancestor HEAD origin/main
+  validate:
+    needs: prepare
+    uses: ./.github/workflows/ci.yml
+  release:
+    needs: validate
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download validated build from this run
+        uses: actions/download-artifact@v4
+        with:
+          name: facultybridge-build
+          path: dist/
       - name: Package downloads
         run: |
           cd dist/site
           zip -r ../../FacultyBridge-website.zip .
           cd ../standalone
           zip -r ../../FacultyBridge-standalone.zip .
-      - name: Create release
+      - name: Create draft for artifact review and manual sign-off
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" FacultyBridge-website.zip FacultyBridge-standalone.zip dist/build-manifest.json --generate-notes --verify-tag
+        run: gh release create "$GITHUB_REF_NAME" FacultyBridge-website.zip FacultyBridge-standalone.zip dist/build-manifest.json --generate-notes --verify-tag --draft
