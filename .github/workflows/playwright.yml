@@ -26,12 +26,12 @@ jobs:
         if [ -n "$(git ls-files 'tests/test files' 'tests/test-files' 'tests/local-baselines')" ]; then
           echo "Local course fixtures or baselines must not be committed."; exit 1
         fi
+    - name: Install Playwright browsers
+      run: npx playwright install --with-deps
     - name: Check source and build
       run: npm run check
     - name: Check site and standalone browser workflows
       run: npm run test:browser
-    - name: Install Playwright browsers
-      run: npx playwright install --with-deps
     - name: Run Playwright tests
       run: npm run test:e2e
     - uses: actions/upload-artifact@v4
