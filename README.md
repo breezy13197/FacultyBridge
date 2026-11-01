@@ -19,6 +19,11 @@ npx playwright install chromium
 npm run test:browser
 ```
 
+For cross-browser Playwright tests, run `npx playwright install` followed by
+`npm run test:e2e`. Uploaded course-file regression tests run locally with
+`npm run test:e2e:local`; see [the testing guide](tests/README.md) for baseline
+capture, privacy, coverage, and review requirements.
+
 ## Structure
 
 | Location | Purpose |
