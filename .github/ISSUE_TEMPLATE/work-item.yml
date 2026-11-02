@@ -1,0 +1,46 @@
+name: Development work item
+description: Define a bug or improvement with observable acceptance criteria.
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - Bug
+        - Improvement
+        - Maintenance
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: High blocks a safe workflow/release; normal is planned work; low can wait.
+      options:
+        - Normal
+        - High
+        - Low
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and affected tool
+      description: Describe the impact, tool/build, and reproduction steps where applicable. Use synthetic examples; do not attach student records or real exams.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior and acceptance criteria
+      description: List observable outcomes that will establish the work is complete.
+      placeholder: "- [ ] Given ..., when ..., then ..."
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation and scope
+      description: Identify useful tests, required receiving-system/manual checks, and anything outside this change.
+    validations:
+      required: true

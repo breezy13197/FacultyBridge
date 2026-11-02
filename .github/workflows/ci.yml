@@ -1,12 +1,20 @@
 name: Suite checks
 on:
   push:
+    branches: [main, master]
   pull_request:
+    branches: [main, master]
   workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
+concurrency:
+  group: suite-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
+  # Keep these job IDs/names: the main branch ruleset requires verify and test.
   verify:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,13 +23,45 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: npm run check
+      - name: Guard against committed course fixtures
+        run: |
+          if [ -n "$(git ls-files 'tests/test files' 'tests/test-files' 'tests/local-baselines')" ]; then
+            echo "Local course fixtures or baselines must not be committed."
+            exit 1
+          fi
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:browser
+      - run: npm run validate:quick
+      - uses: actions/upload-artifact@v4
+        with:
+          name: facultybridge-build
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-smoke-results
+          path: test-results/
+          retention-days: 14
+  test:
+    needs: verify
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps
+      - run: npm run test:e2e
+      # Retain synthetic reports even on success so retries/flakes stay visible.
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: facultybridge-build-and-qa
+          name: playwright-report
           path: |
-            dist/
+            playwright-report/
             test-results/
+          retention-days: 14

@@ -8,6 +8,8 @@
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.mjs",
     "check": "npm run build && npm test",
+    "validate:quick": "npm run check && npm run test:browser",
+    "validate": "npm run validate:quick && npm run test:e2e",
     "test:browser": "node tests/browser.mjs",
     "preview": "node scripts/serve.mjs",
     "test:e2e": "playwright test",
