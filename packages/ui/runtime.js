@@ -1,6 +1,34 @@
 /* Shared runtime handles suite preferences and build identification only. */
 (() => {
   'use strict';
+  /*
+   * Storage fallback. Strict privacy settings, managed browsers, and embedded
+   * previews (email, Teams, LMS) can block browser storage, and any access then
+   * throws. Tools read their theme at startup, so an unguarded read stopped some
+   * tools before their upload buttons were wired. When storage is unavailable,
+   * substitute a temporary in-memory store: the tool works normally and settings
+   * last until the tab closes. Runs before every tool script.
+   */
+  const memoryStorage = () => {
+    const items = new Map();
+    return {
+      getItem: key => (items.has(String(key)) ? items.get(String(key)) : null),
+      setItem: (key, value) => { items.set(String(key), String(value)); },
+      removeItem: key => { items.delete(String(key)); },
+      clear: () => { items.clear(); },
+      key: index => [...items.keys()][index] ?? null,
+      get length() { return items.size; }
+    };
+  };
+  for (const name of ['localStorage', 'sessionStorage']) {
+    try {
+      const store = window[name];
+      if (!store) throw new Error('unavailable');
+      store.getItem('ft-storage-check');
+    } catch (_) {
+      try { Object.defineProperty(window, name, { configurable: true, value: memoryStorage() }); } catch (__) { /* leave as-is */ }
+    }
+  }
   const root = document.documentElement;
   try {
     let theme = localStorage.getItem('ft-theme');

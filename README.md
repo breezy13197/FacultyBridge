@@ -57,6 +57,8 @@ Dark/light preferences now use ft-theme across all tools. The shared runtime can
 
 Suite 1.3.0 imports the provided baseline tool versions. This is a build/UI migration, not a replacement claim for a tool's feature release. Tool labels retain their supplied versions, with a visible Build 1.3.0 identifier; filenames include both. The landing-page version and seven tool labels/routes come from suite.json.
 
+Suite 1.3.1 (shared UI 1.0.1) is a shared fix release; no tool's processing changed and tool versions are unchanged. Every tool now keeps working when the browser blocks saved settings (for example strict privacy settings, managed computers, or a file opened inside an email or Teams preview). Previously CalendarBridge and ExamBridge could not open a file in that situation. In that case, settings such as dark mode last only until the tab is closed. It also connects form labels to their fields, announces upload status and errors to screen readers, adds a main-content landmark to GradeBridge, and raises the contrast of the hub's tool-category labels and SyllabusBridge's gold buttons.
+
 Use one branch/pull request per change. In the GitHub web UI, review and merge the migration pull request into main. Future releases use the tag facultybridge-v<the suiteVersion>, e.g. facultybridge-v1.3.0. The tag-triggered workflow validates the matching version, runs checks, and creates a GitHub Release with website ZIP, standalone ZIP, and checksums. Per-tool source versions remain independently tracked in suite.json. No website is deployed by this migration.
 
 For current development, start each coherent change from updated main, define acceptance criteria in an issue, use the PR template, and follow [the development guide](docs/DEVELOPMENT.md).

@@ -40,7 +40,7 @@
         <div id="fileList" class="ib-file-list"></div>
       </div>
     </div>
-    <div id="uploadNotice" class="ft-notice ft-notice-warning ft-mt-4 ib-hidden"></div>
+    <div id="uploadNotice" class="ft-notice ft-notice-warning ft-mt-4 ib-hidden" role="alert"></div>
     <div class="ft-card-soft ft-p-6 ft-mt-4 ib-export-format-card">
       <strong>Designed for ExamSoft exports</strong>
       <p class="ft-muted" style="margin:5px 0 0">v1 recognizes choice, multiple-response, fill-in-the-blank, and true/false sections. Recommendations are psychometric review prompts—not automatic judgments that an item is defective.</p>
@@ -57,13 +57,13 @@
       <div id="examSnapshot"></div>
     </aside>
     <section class="ib-main">
-      <div id="workspaceNotice" class="ft-notice ft-notice-warning ib-hidden" style="margin-bottom:14px"></div>
+      <div id="workspaceNotice" class="ft-notice ft-notice-warning ib-hidden" role="status" style="margin-bottom:14px"></div>
       <div id="reviewView"></div>
       <div id="historyView" class="ib-hidden"></div>
     </section>
   </div>
 </div>
-<div id="toast" class="ft-toast"></div>
+<div id="toast" class="ft-toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="ibModal" class="ib-modal-backdrop ib-hidden" role="presentation"><div class="ft-card ib-modal" role="dialog" aria-modal="true" aria-labelledby="ibModalTitle"><h2 id="ibModalTitle"></h2><p id="ibModalBody"></p><div class="ib-modal-actions"><button class="ft-btn" id="ibModalCancel">Cancel</button><button class="ft-btn ib-primary" id="ibModalConfirm">Confirm</button></div></div></div>
 
 <script src="../../packages/ui/runtime.js"></script>

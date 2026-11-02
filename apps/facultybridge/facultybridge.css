@@ -121,6 +121,6 @@ body { min-height: 100vh; }
 }
 
 /* FacultyBridge v1.2 */
-.fb-tool-badges{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}.fb-version{background:var(--ft-surface-soft);border:1px solid var(--ft-border);color:var(--ft-text-muted)}.fb-tool-card .fb-tool-category{color:color-mix(in srgb,var(--fb-accent) 78%,var(--ft-text))}.fb-tool-card .fb-tool-icon{color:color-mix(in srgb,var(--fb-accent) 72%,var(--ft-text))}.fb-suite-count{display:inline-flex;align-items:center;gap:7px;margin-top:16px;font-size:var(--ft-font-size-sm);font-weight:850;color:var(--ft-text-muted)}.fb-suite-count strong{color:var(--ft-text)}
+.fb-tool-badges{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}.fb-version{background:var(--ft-surface-soft);border:1px solid var(--ft-border);color:var(--ft-text-muted)}.fb-tool-card .fb-tool-category{color:color-mix(in srgb,var(--fb-accent) 60%,var(--ft-text))}.fb-tool-card .fb-tool-icon{color:color-mix(in srgb,var(--fb-accent) 72%,var(--ft-text))}.fb-suite-count{display:inline-flex;align-items:center;gap:7px;margin-top:16px;font-size:var(--ft-font-size-sm);font-weight:850;color:var(--ft-text-muted)}.fb-suite-count strong{color:var(--ft-text)}
 @media(max-width:480px){.fb-tool-badges{justify-content:flex-start}.fb-tool-top{flex-direction:column}.fb-tool-card{min-height:0}}
 .fb-version-label{font-size:var(--ft-font-size-xs);color:var(--ft-text-muted);font-weight:750;margin-left:4px}

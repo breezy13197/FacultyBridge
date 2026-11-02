@@ -127,8 +127,8 @@
         </section>
 
         <section class="ft-card eb-section">
-          <div class="eb-section-head"><div><h2>Report notes</h2><p class="ft-muted">Optional notes are included when you print or save the report as PDF.</p></div></div>
-          <textarea class="ft-textarea" id="reportNotes" placeholder="Add notes about revisions, exemptions, or follow-up..."></textarea>
+          <div class="eb-section-head"><div><h2 id="reportNotesTitle">Report notes</h2><p class="ft-muted" id="reportNotesHelp">Optional notes are included when you print or save the report as PDF.</p></div></div>
+          <textarea class="ft-textarea" id="reportNotes" aria-labelledby="reportNotesTitle" aria-describedby="reportNotesHelp" placeholder="Add notes about revisions, exemptions, or follow-up..."></textarea>
           <div class="eb-print-only" id="printedNotes"></div>
         </section>
       </div>

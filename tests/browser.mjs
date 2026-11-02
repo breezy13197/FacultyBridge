@@ -29,6 +29,12 @@ try {
     assert.deepEqual(remote,[],`${tool.id} ${format} remote requests`);
     assert.ok((await page.locator('.ft-build-label').textContent()).includes(`Build ${manifest.suiteVersion}`));
     assert.ok((await page.locator('header, .ft-topbar').first().textContent()).includes(`v${tool.version}`));
+    // Accessibility basics: every form control in the page markup has a name a screen reader can announce,
+    // and the visible page has exactly one main-content landmark.
+    const unlabeled=await page.evaluate(()=>[...document.querySelectorAll('input:not([type=hidden]):not([type=file]),select,textarea')]
+      .filter(e=>!(e.getAttribute('aria-label')||e.getAttribute('aria-labelledby')||e.labels?.length||e.title)).map(e=>e.id||e.name||e.tagName));
+    assert.deepEqual(unlabeled,[],`${tool.id} ${format} form controls without labels`);
+    assert.equal(await page.locator('main:visible, [role="main"]:visible').count(),1,`${tool.id} ${format} main landmark`);
     const oldTheme=await page.locator('html').getAttribute('data-ft-theme');
     const theme=page.locator('#themeToggle, #themeBtn, #theme, #themeBtn');
     await theme.first().click();
@@ -231,6 +237,27 @@ try {
     await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(output,`${tool.id}-${format}-mobile.png`),fullPage:true,animations:'disabled'});
     assert.deepEqual(errors,[],`${tool.id} ${format} interactions: ${errors.join('; ')}`);
     results.push({tool:tool.id,format,status:'passed'});console.log(`PASS ${tool.name} ${format}`);
+    await context.close();
+  }
+  // Browsers with storage blocked (strict privacy settings, managed computers, embedded previews) must still
+  // start every tool. The shared runtime substitutes temporary in-memory storage.
+  const uploadButtons={calendarbridge:'#chooseFile',exambridge:'#chooseBtn',gradebridge:'button:has-text("Choose ExamSoft File")',syllabusbridge:'#choose'};
+  for(const tool of manifest.tools) {
+    const context=await browser.newContext();
+    await context.addInitScript(()=>{for(const name of ['localStorage','sessionStorage'])Object.defineProperty(window,name,{configurable:true,get(){throw new DOMException('The operation is insecure.','SecurityError');}});});
+    const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+    await page.goto(pathToFileURL(path.join(root,'dist/standalone',`${tool.name}-v${tool.version}-build${manifest.suiteVersion}.html`)).href);
+    await page.waitForLoadState('load');
+    const theme=page.locator('#themeToggle, #themeBtn, #theme');const before=await page.locator('html').getAttribute('data-ft-theme');
+    await theme.first().click();
+    assert.notEqual(await page.locator('html').getAttribute('data-ft-theme'),before,`${tool.id} theme toggle with storage blocked`);
+    if(uploadButtons[tool.id]) {
+      const chooser=page.waitForEvent('filechooser',{timeout:3000});
+      await page.locator(uploadButtons[tool.id]).first().click();
+      await chooser;
+    }
+    assert.deepEqual(errors,[],`${tool.id} with storage blocked: ${errors.join('; ')}`);
+    console.log(`PASS ${tool.name} storage blocked`);
     await context.close();
   }
   const context=await browser.newContext();const page=await context.newPage();await page.goto(origin);await page.locator('#themeToggle').click();await Promise.all([page.waitForURL('**/GradeBridge/index.html'),page.locator('[data-tool-link="gradebridge"]').click()]);await page.waitForLoadState('load');assert.equal(await page.locator('html').getAttribute('data-ft-theme'),'dark');await context.close();
