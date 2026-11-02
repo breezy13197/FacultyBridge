@@ -23,7 +23,7 @@ function parseCSV(text){
   const rows=[];let row=[],field='',q=false;
   for(let i=0;i<text.length;i++){const c=text[i],n=text[i+1];
     if(q){if(c==='"'&&n==='"'){field+='"';i++}else if(c==='"')q=false;else field+=c}
-    else{if(c==='"')q=true;else if(c===','){row.push(field);field=''}else if(c==='\n'){row.push(field.replace(/\r$/,''));rows.push(row);row=[];field=''}else field+=c}}
+    else{if(c==='"')q=true;else if(c===','){row.push(field);field=''}else if(c==='\n'||(c==='\r'&&n!=='\n')){row.push(field.replace(/\r$/,''));rows.push(row);row=[];field=''}else field+=c}}
   if(field.length||row.length){row.push(field.replace(/\r$/,''));rows.push(row)}
   return rows;
 }
@@ -75,7 +75,8 @@ function inferMax(){
   return Math.abs(m-Math.round(m))<.05?Math.round(m):Math.round(m*100)/100;
 }
 function scientificId(v){return /^[+-]?\d+(?:\.\d+)?e[+-]?\d+$/i.test(String(v??'').trim())}
-function encodingLooksBad(text){return text.includes('\uFFFD')||/Ã.|Â.|â€|â€™|â€œ|â€\u009d/.test(text)}
+// Mojibake is a UTF-8 lead byte (A-tilde, A-circumflex) read as Latin-1/cp1252, so it is followed by a continuation-byte character, never a plain letter: a name like "Angela" with a circumflex A is valid.
+function encodingLooksBad(text){return text.includes('\uFFFD')||/[\u00C3\u00C2][\u0080-\u00BF\u0152\u0153\u0160\u0161\u0178\u017D\u017E\u0192\u02C6\u02DC\u2013-\u203A\u20AC\u2122]|\u00E2\u20AC/.test(text)}
 function existingPointItems(headers){
   return headers.filter(h=>/\sPoints Grade\s*$/i.test(h)).map(h=>h.replace(/\sPoints Grade\s*$/i,'').trim()).filter(Boolean);
 }
