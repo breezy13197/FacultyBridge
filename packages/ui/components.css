@@ -113,6 +113,33 @@ a { color: var(--ft-brand-700); }
 }
 .ft-modal.is-open { display: grid; }
 .ft-modal-card { max-width: 560px; width: 100%; background: var(--ft-surface); border: 1px solid var(--ft-border); border-radius: var(--ft-radius-xl); box-shadow: var(--ft-shadow-overlay); padding: 24px; }
+/* Shared pop-up (packages/ui/dialog.js). Built on the native <dialog> element. */
+.ft-dialog {
+  width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 40px); overflow: auto;
+  margin: auto; padding: var(--ft-space-6);
+  background: var(--ft-surface); color: var(--ft-text);
+  border: 1px solid var(--ft-border); border-radius: var(--ft-radius-xl); box-shadow: var(--ft-shadow-overlay);
+}
+.ft-dialog:not([open]) { display: none; }
+.ft-dialog.ft-dialog-wide { width: min(900px, calc(100vw - 32px)); }
+/* Literal color: ::backdrop does not inherit custom properties in every supported browser. */
+.ft-dialog::backdrop { background: rgba(0, 0, 0, .45); }
+/* Fallback for browsers without showModal(). */
+div.ft-dialog[open] { position: fixed; inset: 0; z-index: 80; height: fit-content; }
+.ft-dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--ft-space-4); margin-bottom: var(--ft-space-3); }
+.ft-dialog-title { margin: 4px 0 0; font-size: var(--ft-font-size-xl); line-height: 1.25; }
+.ft-dialog-close { flex: none; font-size: var(--ft-font-size-lg); line-height: 1; }
+.ft-dialog-body > p { margin: 0 0 var(--ft-space-3); }
+.ft-dialog-body > p:last-child { margin-bottom: 0; }
+.ft-dialog-field { margin: var(--ft-space-4) 0 0; }
+.ft-dialog-error { margin-top: var(--ft-space-2); font-weight: 700; font-size: var(--ft-font-size-sm); }
+.ft-dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: var(--ft-space-6); }
+.ft-btn.ft-dialog-danger { background: var(--ft-danger); color: var(--ft-on-primary); border-color: var(--ft-danger); }
+@media (max-width: 520px) {
+  .ft-dialog { padding: var(--ft-space-5); }
+  .ft-dialog-actions { flex-direction: column-reverse; }
+  .ft-dialog-actions .ft-btn { width: 100%; }
+}
 .ft-toast { position: fixed; bottom: 24px; right: 24px; background: var(--ft-text); color: var(--ft-surface); padding: 12px 16px; border-radius: var(--ft-radius-sm); opacity: 0; transform: translateY(15px); transition: var(--ft-transition); z-index: 100; }
 .ft-toast.is-visible { opacity: 1; transform: none; }
 

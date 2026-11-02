@@ -102,9 +102,35 @@
     <div class="ft-eyebrow">Empty state</div>
     <div class="ft-empty-state"><div class="ft-empty-icon">＋</div><h2>No project loaded</h2><p class="ft-muted">Upload a file or open a saved project to get started.</p><button class="ft-btn ft-btn-primary">Start a project</button></div>
   </section>
+  <section class="ft-card gallery-section">
+    <div class="ft-eyebrow">Pop-ups</div><h2>Shared pop-up and unsaved-work warning</h2>
+    <p class="ft-muted">Use <code>FTDialog</code> from <code>dialog.js</code> instead of the browser's built-in alert, confirm, and prompt boxes. Escape, the × button, and clicking outside all act as Cancel; focus returns to the button that opened the pop-up.</p>
+    <div class="ft-btn-row">
+      <button class="ft-btn ft-btn-danger" id="demoConfirm" type="button">Delete a question…</button>
+      <button class="ft-btn" id="demoAlert" type="button">Show a notice…</button>
+      <button class="ft-btn" id="demoPrompt" type="button">Set point value…</button>
+      <button class="ft-btn" id="demoManaged" type="button">Open a page pop-up…</button>
+    </div>
+    <h3 class="ft-mt-6">Unsaved-work warning</h3>
+    <p class="ft-cluster"><input type="checkbox" id="demoUnsaved"><label for="demoUnsaved">Pretend this page has unsaved edits, then try refreshing. The browser asks before leaving.</label></p>
+    <p class="ft-muted" id="demoResult" role="status" aria-live="polite">Choose a pop-up to try it.</p>
+  </section>
+
+  <dialog class="ft-dialog ft-dialog-wide" id="demoDialog" aria-labelledby="demoDialogTitle">
+    <div class="ft-dialog-head"><div><div class="ft-eyebrow">Calendar preview</div><h2 class="ft-dialog-title" id="demoDialogTitle">A pop-up written into the page</h2></div><button class="ft-icon-btn ft-dialog-close" type="button" data-ft-dialog-close aria-label="Close">×</button></div>
+    <p class="ft-muted">For richer content, write a <code>&lt;dialog class="ft-dialog"&gt;</code> into the page and wire it with <code>FTDialog.manage()</code>.</p>
+    <div class="ft-dialog-actions"><button class="ft-btn ft-btn-primary" type="button" data-ft-dialog-close>Close</button></div>
+  </dialog>
 </div>
+<script src="../dialog.js"></script>
 <script>
 const root=document.documentElement;const saved=localStorage.getItem('ft-theme');if(saved==='dark')root.dataset.ftTheme='dark';document.getElementById('themeToggle').onclick=()=>{const dark=root.dataset.ftTheme==='dark';root.dataset.ftTheme=dark?'light':'dark';localStorage.setItem('ft-theme',dark?'light':'dark')};
+const show=text=>{document.getElementById('demoResult').textContent=text};
+document.getElementById('demoConfirm').onclick=async()=>{const ok=await FTDialog.confirm('Delete Question 3? This cannot be undone.',{title:'Delete question?',confirmLabel:'Delete question',danger:true});show(ok?'Deleted (demo).':'Kept the question.')};
+document.getElementById('demoAlert').onclick=async()=>{await FTDialog.alert('Choose a Brightspace student first.',{title:'Student needed'});show('Notice acknowledged.')};
+document.getElementById('demoPrompt').onclick=async()=>{const v=await FTDialog.prompt('Every question will be given this point value.',{title:'Set point value',label:'Points per question',defaultValue:'1',inputMode:'decimal',validate:x=>x.trim()===''||Number.isNaN(Number(x))||Number(x)<0?'Enter a point value of 0 or greater.':''});show(v===null?'Cancelled.':`Point value set to ${v} (demo).`)};
+const managed=FTDialog.manage(document.getElementById('demoDialog'));document.getElementById('demoManaged').onclick=()=>managed.open();
+let demoDirty=false;FTUnsavedWork.watch(()=>demoDirty);document.getElementById('demoUnsaved').onchange=e=>{demoDirty=e.target.checked};
 </script>
 </body>
 </html>

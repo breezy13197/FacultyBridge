@@ -6,6 +6,7 @@ A lightweight shared design system for Faculty Tools applications such as GradeB
 
 - `themes.css` — centralized identity themes and compatibility aliases
 - `runtime.js` — shared theme preference and visible build identity
+- `dialog.js` — shared pop-up (`FTDialog`) and unsaved-work warning (`FTUnsavedWork`)
 - `tokens.css` — colors, type scale, spacing, radii, shadows, layout, dark-mode tokens
 - `components.css` — reusable Faculty Tools UI components
 - `utilities.css` — small layout helpers
@@ -36,6 +37,37 @@ Then use shared classes:
   <button class="ft-btn ft-btn-primary">Choose file</button>
 </div>
 ```
+
+## Pop-ups and unsaved work
+
+Load `dialog.js` after `runtime.js`. It replaces the browser's built-in `alert()`, `confirm()`, and `prompt()` boxes with one shared pop-up that matches the tool's theme, is announced to screen readers, closes with Escape, and returns focus afterward.
+
+```js
+// Ask before a destructive action. Resolves true or false.
+if (!await FTDialog.confirm('The question and its answers will be removed.', {
+  title: 'Delete question?', confirmLabel: 'Delete question', danger: true
+})) return;
+
+// Something that must be acknowledged.
+await FTDialog.alert('Choose a Brightspace student first.', { title: 'Choose a student' });
+
+// Typed input. Resolves with the text, or null if cancelled.
+const points = await FTDialog.prompt('Every question will get this point value.', {
+  title: 'Set points', label: 'Points per question', defaultValue: '1',
+  validate: v => Number(v) >= 0 ? '' : 'Enter a point value of 0 or greater.'
+});
+
+// A richer pop-up written into the page as <dialog class="ft-dialog">.
+const help = FTDialog.manage(document.getElementById('helpDialog'));
+help.open();
+
+// Warn before the page closes while there is unsaved work.
+FTUnsavedWork.watch(() => groups.length > 0);
+const work = FTUnsavedWork.track(() => JSON.stringify(state)); // compares to the last save
+work.markSaved();
+```
+
+See the "Pop-ups" section of `examples/component-gallery.html` for a live example.
 
 ## Theme
 
