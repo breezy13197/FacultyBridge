@@ -176,16 +176,16 @@ try {
       await page.reload();
       assert.equal(await page.locator('[data-screen="review"]').isDisabled(),false);
       await page.locator('[data-screen="review"]').click();
-      page.once('dialog',dialog=>dialog.accept());
       await page.locator('#deleteQuestion').click();
+      await page.locator('dialog.ft-dialog[open] [data-ft-dialog-action="confirm"]').click();
       assert.equal(await page.locator('#upload').isVisible(),true);
       for (const step of ['review','validate','export']) assert.equal(await page.locator(`[data-screen="${step}"]`).isDisabled(),true);
       await page.locator('#fileInput').setInputFiles({name:'questions.txt',mimeType:'text/plain',buffer:Buffer.from('1. Synthetic question?\nA. Yes *\nB. No')});
       await page.waitForFunction(()=>document.getElementById('review').classList.contains('is-active'));
       assert.equal(await page.locator('[data-screen="export"]').isDisabled(),false);
-      page.once('dialog',dialog=>dialog.accept());
       await page.locator('[data-screen="upload"]').click();
       await page.locator('#startNew').click();
+      await page.locator('dialog.ft-dialog[open] [data-ft-dialog-action="confirm"]').click();
       for (const step of ['review','validate','export']) assert.equal(await page.locator(`[data-screen="${step}"]`).isDisabled(),true);
       await page.locator('[data-screen="upload"]').focus();
       await page.keyboard.press('Tab');
