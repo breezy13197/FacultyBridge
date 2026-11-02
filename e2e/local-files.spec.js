@@ -30,7 +30,7 @@ test.describe('local course-file regression', () => {
     const dir = path.join(root, group.folder);
     const files = enabled && fs.existsSync(dir) ? fs.readdirSync(dir).filter(n => n.toLowerCase().endsWith(group.extension)).sort() : [];
     for (const [index, name] of files.entries()) {
-      test(`${group.route} ${group.folder} fixture ${index + 1}`, async ({ page }) => {
+      test(`${group.route} ${group.folder} fixture ${index + 1}`, async ({ page, guard }) => {
         await page.goto(`/${group.route}/`);
         await page.locator(group.input).setInputFiles(path.join(dir, name));
         // Boolean assertions keep course content out of failed locator diffs.
@@ -86,6 +86,9 @@ test.describe('local course-file regression', () => {
             }
           } else {
             expect(await page.locator('#uploadError').evaluate(el => el.textContent.length > 20)).toBe(true);
+            // CalendarBridge also logs this on-screen rejection to the console. A rejection is an
+            // allowed, recorded outcome, so forgive only that exact logged message.
+            guard.allowConsoleError(await page.locator('#uploadError').evaluate(el => el.lastChild?.textContent?.trim() || ''));
           }
         } else {
           summary = await page.evaluate(() => ({ sections: state.sections.length, faculty: state.faculty.length,
