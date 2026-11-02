@@ -2,13 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test, expect } from './fixtures.js';
 
-// GradeBridge QA fixtures: synthetic Brightspace rosters and ExamSoft exports kept in
-// tests/test files/rosters (ignored by Git, like the other local fixtures). The suite
-// skips when the folder is absent, so CI without the files is unaffected.
-const dir = path.resolve(process.env.BRIDGE_FIXTURE_DIR || 'tests/test files', 'rosters');
-const present = fs.existsSync(dir);
+// Normal runs, including CI, require the committed synthetic fixtures. Private
+// runs can select the ignored QA roster set with traces and HTML reports disabled.
+const localDir = path.resolve(process.env.BRIDGE_FIXTURE_DIR || 'tests/test files', 'rosters');
+const useLocal = !process.env.CI && process.env.BRIDGE_LOCAL_FILES === '1' && fs.existsSync(localDir);
+const dir = useLocal ? localDir : path.resolve(import.meta.dirname, 'data/gradebridge');
 const file = name => path.join(dir, name);
-test.skip(!present, 'No tests/test files/rosters folder; see tests/README.md.');
+test.use({ redact: useLocal });
 
 const ROSTER = 'brightspace_roster_WITH_GRADE_ITEMS.csv';
 async function load(page, openTool, exam, bright = ROSTER) {
