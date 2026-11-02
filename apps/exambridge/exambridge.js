@@ -27,9 +27,6 @@
   fileInput.addEventListener('change', () => { if(fileInput.files?.[0]) loadFile(fileInput.files[0]); });
   $('#changeFileBtn').addEventListener('click', () => requestReset());
   $('#printBtn').addEventListener('click', openReportModal);
-  $('#closeReportModal').addEventListener('click', closeReportModal);
-  $('#cancelReportBtn').addEventListener('click', closeReportModal);
-  $('#reportModal').addEventListener('click', e => { if(e.target === $('#reportModal')) closeReportModal(); });
   $('#generateReportBtn').addEventListener('click', () => {
     const scope=$('#reportFaculty').value;
     const selected=new Set($$('[data-report-finding]:checked',$('#reportFindingOptions')).map(x=>x.dataset.reportFinding));
@@ -110,14 +107,14 @@
       render();
     } catch {}
   }
-  function requestReset(){
+  async function requestReset(){
     if(state.exam){
       saveSession();
       const hasWork=Object.keys(state.exceptions).length>0 || !!($('#reportNotes')?.value||'').trim();
       const msg=hasWork
-        ? 'Your exceptions and report notes are saved for this exam. Choose another exam?'
-        : 'Choose another exam?';
-      if(!window.confirm(msg)) return;
+        ? 'Your exceptions and report notes are saved for this exam.'
+        : 'The results for the current exam will be cleared from the screen.';
+      if(!await FTDialog.confirm(msg,{title:'Choose another exam?',confirmLabel:'Choose another exam'})) return;
     }
     resetApp();
   }
@@ -944,14 +941,10 @@ with would you your following answer answers choice choices correct best appropr
     }).filter(x=>x.applicable);
   }
 
-  let reportModalReturnFocus=null;
+  // Shared pop-up: the × and Cancel buttons, Escape, and outside clicks close it; focus returns to the opener.
+  const reportDialog=FTDialog.manage($('#reportModal'));
   let reportSelectedKeys=null;
   let reportKnownKeys=new Set();
-
-  function reportModalFocusable(){
-    return $$('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])',$('#reportModal'))
-      .filter(el=>!el.disabled && el.offsetParent!==null);
-  }
 
   function updateReportFindingSummary(infos){
     const selected=infos.filter(x=>reportSelectedKeys?.has(x.key)).length;
@@ -1003,21 +996,16 @@ with would you your following answer answers choice choices correct best appropr
 
   function openReportModal(){
     if(!state.exam) return;
-    reportModalReturnFocus=document.activeElement;
     $('#reportFaculty').innerHTML=facultySelectHTML(state.facultyFilter);
     reportSelectedKeys=null;
     reportKnownKeys=new Set();
     $('#reportIncludePassed').checked=false;
     renderReportFindingOptions(false);
-    $('#reportModal').classList.remove('eb-hidden');
-    const focusables=reportModalFocusable();
-    (focusables[0]||$('#reportModal')).focus();
+    reportDialog.open();
   }
 
   function closeReportModal(){
-    $('#reportModal').classList.add('eb-hidden');
-    if(reportModalReturnFocus && typeof reportModalReturnFocus.focus==='function') reportModalReturnFocus.focus();
-    reportModalReturnFocus=null;
+    reportDialog.close();
   }
 
   $('#reportFaculty').addEventListener('change',()=>renderReportFindingOptions(true));
@@ -1029,16 +1017,6 @@ with would you your following answer answers choice choices correct best appropr
   $('#reportClearAllBtn').addEventListener('click',()=>{
     reportSelectedKeys=new Set();
     renderReportFindingOptions(true);
-  });
-
-  $('#reportModal').addEventListener('keydown',e=>{
-    if(e.key==='Escape'){ e.preventDefault(); closeReportModal(); return; }
-    if(e.key!=='Tab') return;
-    const focusables=reportModalFocusable();
-    if(!focusables.length){ e.preventDefault(); return; }
-    const first=focusables[0], last=focusables[focusables.length-1];
-    if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
-    else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
   });
 
   function ruleReportRow(key,r){

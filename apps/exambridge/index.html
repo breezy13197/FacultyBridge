@@ -136,11 +136,10 @@
   </main>
 </div>
 
-<div class="eb-modal-backdrop eb-hidden" id="reportModal" role="dialog" aria-modal="true" aria-labelledby="reportModalTitle">
-  <div class="ft-card eb-report-dialog">
-    <div class="eb-section-head">
-      <div><div class="ft-eyebrow">Create report</div><h2 id="reportModalTitle">Choose the report scope</h2><p class="ft-muted">The report focuses on clear action items rather than reproducing the ExamBridge screen.</p></div>
-      <button class="ft-icon-btn" id="closeReportModal" aria-label="Close report options">×</button>
+<dialog class="ft-dialog eb-report-dialog" id="reportModal" aria-labelledby="reportModalTitle">
+    <div class="ft-dialog-head">
+      <div><div class="ft-eyebrow">Create report</div><h2 class="ft-dialog-title" id="reportModalTitle">Choose the report scope</h2><p class="ft-muted">The report focuses on clear action items rather than reproducing the ExamBridge screen.</p></div>
+      <button class="ft-icon-btn ft-dialog-close" type="button" id="closeReportModal" data-ft-dialog-close aria-label="Close report options">×</button>
     </div>
     <div class="ft-field">
       <label for="reportFaculty">Faculty</label>
@@ -163,12 +162,11 @@
       </div>
     </fieldset>
 
-    <div class="ft-btn-row ft-mt-4" style="justify-content:flex-end">
-      <button class="ft-btn" id="cancelReportBtn">Cancel</button>
-      <button class="ft-btn ft-btn-accent" id="generateReportBtn">Generate printable report</button>
+    <div class="ft-dialog-actions">
+      <button class="ft-btn" type="button" id="cancelReportBtn" data-ft-dialog-close>Cancel</button>
+      <button class="ft-btn ft-btn-accent" type="button" id="generateReportBtn">Generate printable report</button>
     </div>
-  </div>
-</div>
+</dialog>
 
 <section class="eb-report-output" id="reportOutput" aria-hidden="true"></section>
 <div class="ft-toast" id="toast" role="status"></div>
