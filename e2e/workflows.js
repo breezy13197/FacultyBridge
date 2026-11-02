@@ -180,8 +180,11 @@ export const workflows = {
     await expect(page.locator('#mSchedule')).toHaveText('3');
     await page.locator('#runValidation').click();
     await expect(page.locator('#screen-report')).toBeVisible();
-    page.once('dialog', dialog => dialog.accept());
-    const { text } = await downloadFrom(page, () => page.locator('#exportCourseJsonReport').click());
+    const { text } = await downloadFrom(page, async () => {
+      await page.locator('#exportCourseJsonReport').click();
+      // The synthetic syllabus has non-blocking validation issues, so export asks first.
+      await page.getByRole('dialog', { name: 'Export with validation issues?' }).getByRole('button', { name: 'Export anyway' }).click();
+    });
     const course = JSON.parse(text);
     expect(course.schema).toBe('facultybridge.course');
     expect(course.course).toMatchObject({ code: 'PHA9999', title: 'Synthetic Course', year: 2026 });
