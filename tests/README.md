@@ -47,6 +47,11 @@ drift apart. Any new tool or export format should add one entry there. The
 existing `test:browser` also covers site and standalone builds, UI contrast,
 and synthetic Word parsing.
 
+- `gradebridge-rosters.spec.js`: the synthetic Brightspace rosters and ExamSoft
+  exports in `tests/test files/rosters/` (Git-ignored; the spec skips when the
+  folder is missing). Covers encoding, line-ending, Excel-mangled, percent-only,
+  banner-row, duplicate, name-variant, and missing-score files.
+
 ## Uploaded files: local regression only
 
 Keep course material in `tests/test files/` with `exams/`, `item analysis/`,
