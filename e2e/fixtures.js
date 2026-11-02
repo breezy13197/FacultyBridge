@@ -10,7 +10,8 @@ export { suite };
 export const toolById = id => suite.tools.find(t => t.id === id);
 
 // Auto fixture shared by every spec: blocks external requests and fails the test
-// on uncaught errors, console errors, or failed same-origin requests.
+// on uncaught errors, console errors, or failed same-origin requests. A test can
+// call guard.allowConsoleError(message) for an expected, explained rejection.
 // Set `redact: true` for real course files so failures never echo page content.
 export const test = base.extend({
   redact: [false, { option: true }],
@@ -27,8 +28,9 @@ export const test = base.extend({
     });
   },
   guard: [async ({ page, context, baseURL, redact }, use) => {
+    // Details are kept in memory for matching but only reported when not redacted.
     const problems = [];
-    const note = (kind, detail) => problems.push(redact ? kind : `${kind}: ${detail}`);
+    const note = (kind, detail) => problems.push({ kind, detail: String(detail) });
     page.on('pageerror', error => note('Uncaught browser error', error.message));
     page.on('console', message => { if (message.type() === 'error') note('Console error', message.text()); });
     page.on('response', response => {
@@ -44,8 +46,16 @@ export const test = base.extend({
       }
       return route.continue();
     });
-    await use(problems);
-    expect(problems).toEqual([]);
+    await use({
+      // A rejection the tool explains on screen may also be logged to the console.
+      // Forgive only console errors that contain that exact on-screen message.
+      allowConsoleError: text => {
+        if (!text) return;
+        for (let i = problems.length - 1; i >= 0; i--)
+          if (problems[i].kind === 'Console error' && problems[i].detail.includes(text)) problems.splice(i, 1);
+      },
+    });
+    expect(problems.map(p => redact ? p.kind : `${p.kind}: ${p.detail}`)).toEqual([]);
   }, { auto: true }],
 });
 export { expect };
