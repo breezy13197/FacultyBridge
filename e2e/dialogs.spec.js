@@ -277,3 +277,16 @@ test('QuestionBridge: working storage reports itself as persistent', async ({ pa
   await openTool('questionbridge');
   expect(await page.evaluate(() => FTStorage.persistent)).toBe(true);
 });
+
+test('CalendarBridge: deleting every event still counts as an unsaved change', async ({ page, openTool }) => {
+  await openTool('calendarbridge');
+  await page.locator('#fileInput').setInputFiles({ name: 'syllabus.docx', mimeType: DOCX_MIME, buffer: await syntheticDocx(syntheticSyllabus) });
+  await expect(page.locator('#screen-review')).toBeVisible();
+  expect(await warnsBeforeLeaving(page)).toBe(false);
+  const deleteButtons = page.locator('#reviewBody .ev-delete, #scheduleBody .ev-delete');
+  while (await page.evaluate(() => state.events.length)) await deleteButtons.first().click();
+  expect(await warnsBeforeLeaving(page)).toBe(true);
+  // Saving the now-empty project is what clears it.
+  await downloadFrom(page, () => page.evaluate(() => saveProject()));
+  expect(await warnsBeforeLeaving(page)).toBe(false);
+});
