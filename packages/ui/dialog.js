@@ -31,6 +31,24 @@
   const supportsModal = typeof HTMLDialogElement === 'function' && typeof HTMLDialogElement.prototype.showModal === 'function';
   const controllers = new WeakMap();
 
+  // Safari does not move focus to a button when it is clicked, so "the focused
+  // element" is often the page itself when a pop-up opens. Remember the last
+  // control that was clicked (capture phase runs before the click opens anything)
+  // so focus can still go back to it when the pop-up closes.
+  let lastClicked = null;
+  document.addEventListener('click', event => {
+    const control = event.target instanceof Element
+      ? event.target.closest('button, [href], input, select, textarea, summary, [tabindex]')
+      : null;
+    if (control) lastClicked = control;
+  }, true);
+  function openerFor(explicit) {
+    if (explicit) return explicit;
+    const active = document.activeElement;
+    if (active && active !== document.body && active !== document.documentElement) return active;
+    return lastClicked && lastClicked.isConnected ? lastClicked : null;
+  }
+
   function focusable(root) {
     return [...root.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
       .filter(el => !el.disabled && !el.hidden && el.getClientRects().length);
@@ -70,7 +88,7 @@
       get isOpen() { return open; },
       open(opener) {
         if (open) return controller;
-        returnFocus = opener || document.activeElement;
+        returnFocus = openerFor(opener);
         open = true;
         if (dialog.localName === 'dialog' && supportsModal) {
           if (!dialog.open) dialog.showModal();

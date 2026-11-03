@@ -233,3 +233,22 @@ test('GroupBridge: generated groups warn before leaving', async ({ page, openToo
   await expect(page.locator('.member')).toHaveCount(4);
   expect(await warnsBeforeLeaving(page)).toBe(true);
 });
+
+// Safari (WebKit) does not move focus to a button when it is clicked, so the pop-up
+// cannot rely on "the focused element" to know where to return focus. Reproduce that
+// in every browser by stopping clicks from focusing buttons.
+test('focus returns to the opening button even when clicking does not focus it (Safari behavior)', async ({ page, openTool }) => {
+  await page.addInitScript(() => document.addEventListener('mousedown', e => {
+    if (e.target.closest?.('button')) e.preventDefault();
+  }, true));
+  await openTool('questionbridge');
+  await page.locator('[data-screen="upload"]').click();
+  await page.locator('#pasteText').fill('1. Which molecule transports oxygen?\n*A. Hemoglobin\nB. Glycogen');
+  await page.locator('#parsePaste').click();
+  await page.locator('#deleteQuestion').click();
+  const confirmDelete = sharedDialog(page, 'Delete question?');
+  await expect(confirmDelete).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(confirmDelete).toBeHidden();
+  await expect(page.locator('#deleteQuestion')).toBeFocused();
+});
