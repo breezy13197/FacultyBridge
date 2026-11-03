@@ -252,3 +252,28 @@ test('focus returns to the opening button even when clicking does not focus it (
   await expect(confirmDelete).toBeHidden();
   await expect(page.locator('#deleteQuestion')).toBeFocused();
 });
+
+// Strict privacy settings or embedded previews can block browser storage. The shared
+// runtime then keeps settings in memory so the tool still works, but nothing survives
+// closing the tab, so QuestionBridge's autosave is not really saving anything.
+test('QuestionBridge: blocked storage shows the autosave banner and warns before leaving', async ({ page, openTool }) => {
+  await page.addInitScript(() => {
+    for (const name of ['localStorage', 'sessionStorage']) Object.defineProperty(window, name, {
+      configurable: true, get() { throw new DOMException('The operation is insecure.', 'SecurityError'); },
+    });
+  });
+  await openTool('questionbridge');
+  expect(await warnsBeforeLeaving(page)).toBe(false); // nothing to lose yet
+  await page.locator('[data-screen="upload"]').click();
+  await page.locator('#pasteText').fill('1. Which molecule transports oxygen?\n*A. Hemoglobin\nB. Glycogen');
+  await page.locator('#parsePaste').click();
+  await expect(page.locator('#stem')).toHaveValue(/transports oxygen/);
+  expect(await warnsBeforeLeaving(page)).toBe(true);
+  await expect(page.locator('#autosaveBanner')).toBeVisible();
+  expect(await page.evaluate(() => FTStorage.persistent)).toBe(false);
+});
+
+test('QuestionBridge: working storage reports itself as persistent', async ({ page, openTool }) => {
+  await openTool('questionbridge');
+  expect(await page.evaluate(() => FTStorage.persistent)).toBe(true);
+});

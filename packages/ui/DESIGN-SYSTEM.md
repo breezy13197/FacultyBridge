@@ -150,7 +150,7 @@ All pop-ups are announced to screen readers as dialogs, keep keyboard focus insi
 
 ## Unsaved work
 
-Leaving or refreshing the page must never silently discard work a faculty member cannot easily recreate. Register a check with `FTUnsavedWork.watch(() => hasEdits)` or `FTUnsavedWork.track(() => snapshot)` (then call `markSaved()` after saving or exporting). The browser then asks before the page closes. Tools that autosave reliably only need to warn when saving fails. For an intentional "Start over" reload, confirm with `FTDialog.confirm` first, then call `FTUnsavedWork.allowLeave()`.
+Leaving or refreshing the page must never silently discard work a faculty member cannot easily recreate. Register a check with `FTUnsavedWork.watch(() => hasEdits)` or `FTUnsavedWork.track(() => snapshot)` (then call `markSaved()` after saving or exporting). The browser then asks before the page closes. Tools that autosave only need to warn when saving fails or when `FTStorage.persistent` is false. In that case the browser has blocked storage, and saves reach only a temporary in-memory copy that is lost when the tab closes. For an intentional "Start over" reload, confirm with `FTDialog.confirm` first, then call `FTUnsavedWork.allowLeave()`.
 
 ## Accessibility
 

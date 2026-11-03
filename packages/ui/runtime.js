@@ -1,4 +1,4 @@
-/* Shared runtime handles suite preferences and build identification only. */
+/* Shared runtime handles suite preferences, storage availability, and build identification. */
 (() => {
   'use strict';
   /*
@@ -20,15 +20,25 @@
       get length() { return items.size; }
     };
   };
+  const persistent = {};
   for (const name of ['localStorage', 'sessionStorage']) {
     try {
       const store = window[name];
       if (!store) throw new Error('unavailable');
       store.getItem('ft-storage-check');
+      persistent[name] = true;
     } catch (_) {
+      persistent[name] = false;
       try { Object.defineProperty(window, name, { configurable: true, value: memoryStorage() }); } catch (__) { /* leave as-is */ }
     }
   }
+  /*
+   * Tools ask FTStorage.persistent before trusting that something "saved" to
+   * localStorage will still be there after the tab closes. False means saves
+   * only reach the temporary in-memory store above, so work must be warned
+   * about and saved to a file instead.
+   */
+  window.FTStorage = Object.freeze({ persistent: persistent.localStorage, sessionPersistent: persistent.sessionStorage });
   const root = document.documentElement;
   try {
     let theme = localStorage.getItem('ft-theme');

@@ -5,7 +5,7 @@ A lightweight shared design system for Faculty Tools applications such as GradeB
 ## Contents
 
 - `themes.css` — centralized identity themes and compatibility aliases
-- `runtime.js` — shared theme preference and visible build identity
+- `runtime.js` — shared theme preference, storage fallback (`FTStorage.persistent` is false when saves only last until the tab closes), and visible build identity
 - `dialog.js` — shared pop-up (`FTDialog`) and unsaved-work warning (`FTUnsavedWork`)
 - `tokens.css` — colors, type scale, spacing, radii, shadows, layout, dark-mode tokens
 - `components.css` — reusable Faculty Tools UI components
