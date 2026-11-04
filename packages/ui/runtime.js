@@ -58,17 +58,22 @@
   label.textContent = `Build ${build.suiteVersion}`;
   label.title = `Shared UI ${build.uiVersion}`;
   const header = document.querySelector('header, .ft-topbar');
-  if (header) {
-    const tool = build.tools.find(t => t.id === build.toolId);
-    if (tool && !header.textContent.includes(`v${tool.version}`)) label.textContent = `v${tool.version} · ${label.textContent}`;
-    header.appendChild(label);
-  }
+  if (!header) return;
+  const tool = build.tools.find(t => t.id === build.toolId);
+  if (tool && !header.textContent.includes(`v${tool.version}`)) label.textContent = `v${tool.version} · ${label.textContent}`;
+  /*
+   * In the published site, each tool's top bar gets a button back to the
+   * FacultyBridge home page, styled like the tool's other top-bar buttons and
+   * placed just before the build label. Standalone single-file copies have no
+   * home page to return to, so they get no link.
+   */
   if (build.toolId !== 'facultybridge' && build.output === 'site') {
     const link = document.createElement('a');
-    link.className = 'ft-suite-link';
+    link.className = 'ft-btn ft-suite-link';
     link.href = '../index.html';
     link.textContent = '← FacultyBridge';
-    const app = document.querySelector('.ft-app, .app, .container') || document.body;
-    app.appendChild(link);
+    link.title = 'Back to the FacultyBridge home page';
+    header.appendChild(link);
   }
+  header.appendChild(label);
 })();

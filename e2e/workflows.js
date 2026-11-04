@@ -233,5 +233,9 @@ export const workflows = {
     await page.locator('#toFaculty').click();
     await expect(page.locator('#toExport')).toBeDisabled();
     await expect(page.locator('#facultyValidation')).not.toContainText('Ready to export');
+    // The "4 Export" step in the header must not bypass the disabled Continue button.
+    await page.locator('.ft-step[data-step="export"]').click();
+    await expect(page.locator('#screen-export')).toBeHidden();
+    await expect(page.locator('#screen-review')).toBeVisible();
   },
 };
