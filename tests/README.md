@@ -55,16 +55,28 @@ and synthetic Word parsing.
 ## Uploaded files: local regression only
 
 Keep course material in `tests/test files/` with `exams/`, `item analysis/`,
-`syllabi/`, and `course schedule/` subfolders. Set `BRIDGE_FIXTURE_DIR` to use
-another root. These files and local baselines are ignored by Git; never commit
+`syllabi/`, and `course schedule/` subfolders, plus an optional `questions/`
+subfolder for QuestionBridge (`.docx`, `.txt`, `.csv`, `.xlsx`, or `.rtf`). Set
+`BRIDGE_FIXTURE_DIR` to use another root. These files and local baselines are ignored by Git; never commit
 real exams, student records, or credentials. CI uses synthetic tests only.
 
 ```sh
 # Record current numeric behavior, then review the results:
 npm run test:e2e:local -- --capture
+# After adding files, record baselines only for files that have none yet
+# (existing reviewed baselines are left untouched):
+npm run test:e2e:local -- --capture-missing
 # Compare subsequent runs against those reviewed counts:
 npm run test:e2e:local
 ```
+
+Tests are numbered by each folder's alphabetical file order, so adding a file can
+change which number a file has. Before running, the runner prints which file each
+numbered test uses (in your terminal only). Office temporary files whose names
+start with `~$` (created while a document is open in Word or Excel) and other
+hidden files are skipped and listed as skipped. A test failing with "Missing
+reviewed baseline" means the file is new or changed: review it, then run
+`--capture-missing`.
 
 The local runner uses Chromium and a single worker. It uploads each file through
 the UI, checks nonempty extraction, generates exam reports, verifies item CSV
@@ -73,7 +85,10 @@ date validation. CalendarBridge tests both syllabi and course schedules, recordi
 whether each document is accepted, the event count, and events needing review.
 Ready calendars also export a project; unresolved events must block export.
 Rejection by CalendarBridge is a recorded outcome, not a claim that the file was
-successfully converted.
+successfully converted. QuestionBridge records the question count, question
+types, image count, and blocked/warning counts for each export platform, then
+downloads each export that includes at least one question and checks it is not
+empty. A QuestionBridge file that cannot be read fails the test.
 
 Baselines in `tests/local-baselines/` use tool names and source SHA-256 hashes,
 with numeric counts and acceptance flags only. A changed source file requires a

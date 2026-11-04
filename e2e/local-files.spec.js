@@ -2,17 +2,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { test, expect } from './fixtures.js';
+import { fixtureRoot as root, groups, fixtureFiles, testTitle } from './local-fixtures.js';
 
 const enabled = process.env.BRIDGE_LOCAL_FILES === '1';
-const root = path.resolve(process.env.BRIDGE_FIXTURE_DIR || 'tests/test files');
 const baselineDir = path.resolve('tests/local-baselines');
-const groups = [
-  { folder: 'exams', extension: '.doc', route: 'ExamBridge', input: '#fileInput', ready: '#resultsView' },
-  { folder: 'item analysis', extension: '.csv', route: 'ItemBridge', input: '#fileInput', ready: '#workspace' },
-  { folder: 'syllabi', extension: '.docx', route: 'SyllabusBridge', input: '#file', ready: '#screen-review' },
-  { folder: 'syllabi', extension: '.docx', route: 'CalendarBridge', input: '#fileInput', ready: '#screen-review' },
-  { folder: 'course schedule', extension: '.docx', route: 'CalendarBridge', input: '#fileInput', ready: '#screen-review' },
-];
+// '1' records every baseline; 'missing' records only files that have none yet.
+const capture = process.env.BRIDGE_CAPTURE_BASELINE || '0';
 
 test.describe('local course-file regression', () => {
   // Failures must not echo course content.
@@ -20,17 +15,17 @@ test.describe('local course-file regression', () => {
   test.setTimeout(120_000);
   test.skip(!enabled, 'Run npm run test:e2e:local to include local course files.');
   test('fixture inventory is present', () => {
-    for (const group of groups) {
+    for (const group of groups.filter(g => !g.optional)) {
       const dir = path.join(root, group.folder);
       expect(fs.existsSync(dir), `Missing fixture folder: ${group.folder}`).toBe(true);
-      expect(fs.readdirSync(dir).filter(n => n.toLowerCase().endsWith(group.extension)).length).toBeGreaterThan(0);
+      expect(fixtureFiles(group).length, `No usable files in: ${group.folder}`).toBeGreaterThan(0);
     }
   });
   for (const group of groups) {
     const dir = path.join(root, group.folder);
-    const files = enabled && fs.existsSync(dir) ? fs.readdirSync(dir).filter(n => n.toLowerCase().endsWith(group.extension)).sort() : [];
+    const files = enabled ? fixtureFiles(group) : [];
     for (const [index, name] of files.entries()) {
-      test(`${group.route} ${group.folder} fixture ${index + 1}`, async ({ page, guard }) => {
+      test(testTitle(group, index), async ({ page, guard }) => {
         await page.goto(`/${group.route}/`);
         await page.locator(group.input).setInputFiles(path.join(dir, name));
         // Boolean assertions keep course content out of failed locator diffs.
@@ -90,6 +85,32 @@ test.describe('local course-file regression', () => {
             // allowed, recorded outcome, so forgive only that exact logged message.
             guard.allowConsoleError(await page.locator('#uploadError').evaluate(el => el.lastChild?.textContent?.trim() || ''));
           }
+        } else if (group.route === 'QuestionBridge') {
+          summary = await page.evaluate(() => {
+            const count = (list, key) => list.reduce((out, item) => { const k = key(item); out[k] = (out[k] || 0) + 1; return out; }, {});
+            return { questions: state.questions.length, types: count(state.questions, q => q.type),
+              images: state.questions.reduce((n, q) => n + (q.images?.length || 0), 0),
+              platforms: Object.fromEntries(Object.keys(platformDefs).map(k => {
+                const issues = state.questions.map(q => validateQuestion(q, k));
+                return [k, { blocked: issues.filter(i => i.some(x => x.level === 'error')).length,
+                  warned: issues.filter(i => !i.some(x => x.level === 'error') && i.some(x => x.level === 'warning')).length }];
+              })) };
+          });
+          expect(summary.questions).toBeGreaterThan(0);
+          await page.locator('[data-screen="export"]').click();
+          await expect.poll(() => page.locator('#export').isVisible()).toBe(true);
+          const cards = page.locator('#exportGrid .qb-export-card');
+          expect(await cards.count()).toBe(Object.keys(summary.platforms).length);
+          // Download every export that includes at least one question and check it is not empty.
+          // Brightspace with images first asks about the image folder, so it is not downloaded here.
+          for (const [i, [k, counts]] of Object.entries(summary.platforms).entries()) {
+            if (counts.blocked === summary.questions || (k === 'brightspace' && summary.images)) continue;
+            const pending = page.waitForEvent('download');
+            await cards.nth(i).locator('.downloadBtn').click();
+            const download = await pending;
+            expect(fs.statSync(await download.path()).size > 100).toBe(true);
+            await download.delete();
+          }
         } else {
           summary = await page.evaluate(() => ({ sections: state.sections.length, faculty: state.faculty.length,
             clos: state.clos.length, assessments: state.assessments.length, schedule: state.schedule.length }));
@@ -122,7 +143,7 @@ test.describe('local course-file regression', () => {
         }
         const hash = crypto.createHash('sha256').update(fs.readFileSync(path.join(dir, name))).digest('hex');
         const baseline = path.join(baselineDir, `${group.route}-${hash}.json`);
-        if (process.env.BRIDGE_CAPTURE_BASELINE === '1') {
+        if (capture === '1' || (capture === 'missing' && !fs.existsSync(baseline))) {
           fs.mkdirSync(baselineDir, { recursive: true });
           fs.writeFileSync(baseline, JSON.stringify(summary, null, 2) + '\n');
         } else {
