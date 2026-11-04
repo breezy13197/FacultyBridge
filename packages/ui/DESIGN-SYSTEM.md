@@ -139,6 +139,19 @@ Empty states should explain what is missing and provide a direct next action. Ke
 
 Dialogs use the same card radius and border system as the main UI. Toasts are for short confirmations, not critical warnings. Critical issues belong inline or in a dialog requiring acknowledgement.
 
+Every pop-up uses the shared `FTDialog` from `dialog.js` and the `.ft-dialog` styles. Never use the browser's built-in `alert()`, `confirm()`, or `prompt()` boxes: they cannot be styled, ignore the tool's theme, and read differently in every browser.
+
+- **Confirm** (`FTDialog.confirm`): a title phrased as a question ("Delete question?"), one sentence explaining the consequence, and buttons that name the action ("Delete question", not "OK"). Use `danger: true` for destructive actions; focus then starts on Cancel.
+- **Notice** (`FTDialog.alert`): only for something that must be acknowledged before continuing. Prefer inline messages otherwise.
+- **Typed input** (`FTDialog.prompt`): a visible field label, the current value prefilled, and a plain-language error shown in place when the value is not usable.
+- **Page pop-ups** (previews, settings, help): write `<dialog class="ft-dialog">` with `.ft-dialog-head`, an `h2.ft-dialog-title`, an × button marked `data-ft-dialog-close`, and optional `.ft-dialog-actions`; wire it with `FTDialog.manage()`. Add `.ft-dialog-wide` for previews.
+
+All pop-ups are announced to screen readers as dialogs, keep keyboard focus inside while open, close with Escape, the × button, or a click outside (all equal to Cancel), and return focus to the control that opened them.
+
+## Unsaved work
+
+Leaving or refreshing the page must never silently discard work a faculty member cannot easily recreate. Register a check with `FTUnsavedWork.watch(() => hasEdits)` or `FTUnsavedWork.track(() => snapshot)` (then call `markSaved()` after saving or exporting). The browser then asks before the page closes. Tools that autosave only need to warn when saving fails or when `FTStorage.persistent` is false. In that case the browser has blocked storage, and saves reach only a temporary in-memory copy that is lost when the tab closes. For an intentional "Start over" reload, confirm with `FTDialog.confirm` first, then call `FTUnsavedWork.allowLeave()`.
+
 ## Accessibility
 
 - Preserve keyboard navigation.

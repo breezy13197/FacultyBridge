@@ -176,27 +176,24 @@
   <div class="footer-note">GradeBridge v6.0.1 • local browser utility • no account or installation required</div>
 </div>
 
-<div class="modal hidden" id="savedModal" role="dialog" aria-modal="true" aria-labelledby="savedTitle">
-  <div class="modal-card">
-    <div class="modal-head"><div><h3 id="savedTitle">Saved Courses</h3><div class="helptext">Student information is stored only in this browser.</div></div><button class="close" id="closeSaved" type="button" aria-label="Close">×</button></div>
-    <div id="savedList"></div>
-    <div class="actions"><button class="btn btn-danger ft-btn ft-btn-danger" id="deleteAllBtn" type="button">Delete All Saved Data</button></div>
-  </div>
-</div>
+<dialog class="ft-dialog ft-dialog-wide" id="savedModal" aria-labelledby="savedTitle">
+  <div class="ft-dialog-head"><div><h2 class="ft-dialog-title" id="savedTitle">Saved Courses</h2><div class="helptext">Student information is stored only in this browser.</div></div><button class="ft-icon-btn ft-dialog-close" id="closeSaved" type="button" data-ft-dialog-close aria-label="Close">×</button></div>
+  <div id="savedList"></div>
+  <div class="ft-dialog-actions"><button class="btn btn-danger ft-btn ft-btn-danger" id="deleteAllBtn" type="button">Delete All Saved Data</button></div>
+</dialog>
 
-<div class="modal hidden" id="helpModal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
-  <div class="modal-card">
-    <div class="modal-head"><h3 id="helpTitle">How GradeBridge works</h3><button class="close" id="closeHelp" type="button" aria-label="Close">×</button></div>
-    <div class="status info"><strong>ExamSoft:</strong> Export assessment results as CSV with StudentID, First Name, Last Name, and raw points (Pts). GradeBridge does not support percentage-only exports.</div>
-    <div class="status info"><strong>Brightspace:</strong> Export course grades as CSV with OrgDefinedId, First Name, and Last Name. Existing columns ending in “Points Grade” will be offered as grade-item choices.</div>
-    <div class="status warn"><strong>Do not open these CSV files in Excel before uploading them.</strong> Excel can alter student identifiers. If that happens, GradeBridge will stop and tell you to download a fresh Brightspace export.</div>
-    <div class="status info"><strong>Saved courses:</strong> Reuse a roster for later exams when the class has not changed. GradeBridge warns when a saved roster is more than 60 days old.</div>
-    <div class="status info"><strong>Final check:</strong> GradeBridge imports raw points. Before downloading, you must confirm the Brightspace grade item has the same maximum points as the assessment.</div>
-  </div>
-</div>
+<dialog class="ft-dialog ft-dialog-wide" id="helpModal" aria-labelledby="helpTitle">
+  <div class="ft-dialog-head"><h2 class="ft-dialog-title" id="helpTitle">How GradeBridge works</h2><button class="ft-icon-btn ft-dialog-close" id="closeHelp" type="button" data-ft-dialog-close aria-label="Close">×</button></div>
+  <div class="status info"><strong>ExamSoft:</strong> Export assessment results as CSV with StudentID, First Name, Last Name, and raw points (Pts). GradeBridge does not support percentage-only exports.</div>
+  <div class="status info"><strong>Brightspace:</strong> Export course grades as CSV with OrgDefinedId, First Name, and Last Name. Existing columns ending in “Points Grade” will be offered as grade-item choices.</div>
+  <div class="status warn"><strong>Do not open these CSV files in Excel before uploading them.</strong> Excel can alter student identifiers. If that happens, GradeBridge will stop and tell you to download a fresh Brightspace export.</div>
+  <div class="status info"><strong>Saved courses:</strong> Reuse a roster for later exams when the class has not changed. GradeBridge warns when a saved roster is more than 60 days old.</div>
+  <div class="status info"><strong>Final check:</strong> GradeBridge imports raw points. Before downloading, you must confirm the Brightspace grade item has the same maximum points as the assessment.</div>
+</dialog>
 
 
 <script src="../../packages/ui/runtime.js"></script>
+<script src="../../packages/ui/dialog.js"></script>
 <script src="gradebridge.js"></script>
 </body>
 </html>

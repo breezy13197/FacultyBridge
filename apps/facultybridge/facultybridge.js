@@ -173,15 +173,9 @@ function setupToolLinks() {
 }
 
 function setupAboutDialog() {
-  const modal = document.getElementById('aboutModal');
-  const closeButton = document.getElementById('closeAbout');
-  const aboutButton = document.getElementById('aboutButton');
-  const open = () => { modal.classList.add('is-open'); closeButton.focus(); };
-  const close = () => { modal.classList.remove('is-open'); aboutButton.focus(); };
-  aboutButton.addEventListener('click', open);
-  closeButton.addEventListener('click', close);
-  modal.addEventListener('click', e => { if (e.target === modal) close(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && modal.classList.contains('is-open')) close(); });
+  // Shared pop-up: Escape, the × and Close buttons, and outside clicks close it; focus returns to About.
+  const about = FTDialog.manage(document.getElementById('aboutModal'), { initialFocus: '#closeAbout' });
+  document.getElementById('aboutButton').addEventListener('click', event => about.open(event.currentTarget));
 }
 
 renderTools();

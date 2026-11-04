@@ -102,13 +102,17 @@ test.describe('local course-file regression', () => {
           }, {}));
           expect(summary.checks).toBeGreaterThan(0);
           summary.handoffBlockers = await page.evaluate(() => handoffBlockingProblems().length);
-          page.once('dialog', dialog => dialog.accept());
+          // Export may ask a question in the shared pop-up (blocking dates or remaining issues); accept it.
+          const sharedDialog = page.locator('dialog.ft-dialog[open]');
+          const acceptIfAsked = async () => { if (await sharedDialog.count()) await sharedDialog.locator('[data-ft-dialog-action="confirm"]').click(); };
           if (summary.handoffBlockers) {
             await page.locator('#exportCourseJsonReport').click();
+            await acceptIfAsked();
             await expect.poll(() => page.locator('#screen-review').isVisible()).toBe(true);
           } else {
             const pending = page.waitForEvent('download');
             await page.locator('#exportCourseJsonReport').click();
+            await acceptIfAsked();
             const download = await pending;
             const course = JSON.parse(fs.readFileSync(await download.path(), 'utf8'));
             expect(course.schema === 'facultybridge.course').toBe(true);

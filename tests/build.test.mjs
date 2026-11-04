@@ -52,6 +52,20 @@ test('every referenced design token is defined and shared foundation is not copi
     assert.ok(!/--ft-(?:bg|surface|text|font-sans|radius-\w+|space-\w+)\s*:/.test(css),`Duplicate foundation in ${t.id}`);
   }
 });
+test('tools use the shared pop-up and unsaved-work warning, not browser boxes or home-made pop-ups', () => {
+  const browserBox=/(^|[^.\w$])(?:window\.)?(alert|confirm|prompt)\(/m;
+  for(const t of manifest.tools) {
+    const dir=path.join(root,'apps',t.id), html=read(path.join(dir,'index.html'));
+    assert.ok(html.includes('packages/ui/dialog.js'),`${t.id} must load packages/ui/dialog.js`);
+    assert.ok(!/role=["']dialog["']|aria-modal=/.test(html),`${t.id} has a home-made pop-up; use <dialog class="ft-dialog">`);
+    for(const tag of html.matchAll(/<dialog\b[^>]*>/g)) assert.ok(/class="[^"]*\bft-dialog\b/.test(tag[0]),`${t.id}: ${tag[0]} needs class ft-dialog`);
+    for(const file of fs.readdirSync(dir).filter(f=>f.endsWith('.js'))) {
+      const js=read(path.join(dir,file)), box=js.match(browserBox);
+      assert.ok(!box,`${t.id}/${file} calls the browser's ${box?.[2]}(); use FTDialog.${box?.[2]}()`);
+      assert.ok(!/beforeunload/.test(js),`${t.id}/${file} has its own leave warning; use FTUnsavedWork`);
+    }
+  }
+});
 test('recorded baseline logic hashes remain intact', () => {
   const baseline=JSON.parse(read(path.join(root,'tests/import-baseline.json')));
   // Whitelisted migration edits affect theme storage and CSS classes, never processing functions.

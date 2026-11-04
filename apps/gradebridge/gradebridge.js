@@ -235,7 +235,7 @@ function buildMatches(){
     const b=brightRows[i];
     return !examNameKeys.has(normName(b[brightCols.first])+'|'+normLastLoose(b[brightCols.last]));
   });
-  renderReview();
+  renderReview();gradeWork.markSaved();
 }
 function needsAttention(m){return !m.excluded && (m.matchStatus==='duplicate'||!m.matchConfirmed||m.scoreStatus==='missing')}
 function renderReview(){
@@ -268,18 +268,18 @@ function useDuplicateAttempt(idx){
 }
 function confirmManual(idx,bi){
   const m=matches[idx];
-  if(bi==null||bi===''){alert('Choose a Brightspace student first.');return}
+  if(bi==null||bi===''){FTDialog.alert('Choose a Brightspace student first, then confirm the match.',{title:'Choose a student'});return}
   bi=Number(bi);
   const dup=matches.find((x,j)=>j!==idx&&!x.excluded&&x.matchConfirmed&&x.bi===bi);
-  if(dup){alert(`That Brightspace student is already assigned to ${studentName(dup)}. Change or exclude that record first.`);return}
+  if(dup){FTDialog.alert(`That Brightspace student is already assigned to ${studentName(dup)}. Change or exclude that record first.`,{title:'Student already assigned'});return}
   m.bi=bi;m.matchConfirmed=true;m.matchStatus=(m.matchStatus==='exact'||m.matchStatus==='saved')?'corrected':'manual';renderReview();
 }
-function excludeRecord(idx,reason='Excluded by faculty'){
-  const m=matches[idx];if(!confirm(`Exclude ${studentName(m)} from this Brightspace import? The ExamSoft record will remain unchanged; it will simply be omitted from the generated CSV.`))return;
+async function excludeRecord(idx,reason='Excluded by faculty'){
+  const m=matches[idx];if(!await FTDialog.confirm(`The ExamSoft record will remain unchanged; ${studentName(m)} will simply be omitted from the generated CSV.`,{title:'Exclude from this import?',confirmLabel:'Exclude from import',danger:true}))return;
   m.excluded=true;m.matchConfirmed=true;m.bi=null;m.matchStatus='excluded';m.excludeReason=reason;renderReview();
 }
-function enterZero(idx){
-  const m=matches[idx];if(!confirm(`Enter a score of 0 for ${studentName(m)}? Use this only when zero is the intended grade, not merely because the ExamSoft score is blank.`))return;
+async function enterZero(idx){
+  const m=matches[idx];if(!await FTDialog.confirm(`${studentName(m)} will receive a score of 0. Use this only when zero is the intended grade, not merely because the ExamSoft score is blank.`,{title:'Enter a score of 0?',confirmLabel:'Enter 0'}))return;
   m.scoreValue=0;m.scoreStatus='zero-entered';renderReview();
 }
 function renderAttention(){
@@ -349,7 +349,7 @@ function percentageWarnings(max){
 function bonusWarnings(max){
   return matches.filter(m=>!m.excluded&&Number.isFinite(m.scoreValue)&&m.scoreValue>max).map(m=>`${studentName(m)}: ${m.scoreValue}/${max} (bonus/over-maximum score)`);
 }
-function prepareAudit(){
+async function prepareAudit(){
   try{
     const grade=selectedGradeName(),max=num($('maxPoints').value),errors=[];
     if(!grade)errors.push('Select or enter the Brightspace grade item name.');
@@ -359,7 +359,7 @@ function prepareAudit(){
     if(errors.length){$('reviewStatus').innerHTML=`<div class="status bad"><strong>Cannot prepare final audit.</strong><br>${errors.map(safe).join('<br>')}</div>`;return}
     if($('saveProfile').checked){
       const name=$('profileName').value.trim();if(!name){$('reviewStatus').innerHTML='<div class="status bad">Enter a saved-course profile name that includes the course and academic term, or turn off saving.</div>';return}
-      const store=courseStore();if(store[name]&&!confirm(`A saved course named "${name}" already exists. Replace it with the current roster and mappings?`))return;
+      const store=courseStore();if(store[name]&&!await FTDialog.confirm(`A saved course named "${name}" already exists. Replace it with the current roster and mappings?`,{title:'Replace saved course?',confirmLabel:'Replace saved course'}))return;
       const map={};matches.filter(m=>!m.excluded&&m.matchConfirmed&&m.bi!=null).forEach(m=>map[m.e[examCols.id]]=brightRows[m.bi][brightCols.org]);
       store[name]={savedAt:new Date().toISOString(),roster:brightRows.map(b=>({OrgDefinedId:b[brightCols.org],'First Name':b[brightCols.first],'Last Name':b[brightCols.last]})),map,gradeItems:[...new Set(gradeItems.concat([grade]))]};
       saveStore(store);activeSavedCourse=name;populateSaved();
@@ -389,8 +389,8 @@ function renderSavedModal(){
   if(!names.length){box.innerHTML='<div class="status info">No saved course data exists in this browser.</div>';return}
   names.forEach(name=>{const p=store[name],days=ageDays(p.savedAt),row=document.createElement('div');row.className='course-row';
     const info=document.createElement('div');info.innerHTML=`<strong>${safe(name)}</strong><small>${p.roster?.length||0} students • saved ${days} day${days===1?'':'s'} ago${days>60?' • roster age warning':''}</small>`;
-    const acts=document.createElement('div');acts.className='row-actions';const use=document.createElement('button');use.className='mini mini-primary';use.textContent='Use';use.onclick=()=>{$('savedModal').classList.add('hidden');$('savedSelect').value=name;loadSavedProfile(name)};
-    const del=document.createElement('button');del.className='mini mini-danger';del.textContent='Delete';del.onclick=()=>{if(confirm(`Delete the saved course "${name}" from this browser?`)){const s=courseStore();delete s[name];saveStore(s);if(activeSavedCourse===name)clearSavedSelection();populateSaved();renderSavedModal()}};
+    const acts=document.createElement('div');acts.className='row-actions';const use=document.createElement('button');use.className='mini mini-primary';use.textContent='Use';use.onclick=()=>{savedDialog.close();$('savedSelect').value=name;loadSavedProfile(name)};
+    const del=document.createElement('button');del.className='mini mini-danger';del.textContent='Delete';del.onclick=async()=>{if(await FTDialog.confirm(`The saved roster and student mappings for "${name}" will be removed from this browser.`,{title:'Delete saved course?',confirmLabel:'Delete saved course',danger:true})){const s=courseStore();delete s[name];saveStore(s);if(activeSavedCourse===name)clearSavedSelection();populateSaved();renderSavedModal()}};
     acts.append(use,del);row.append(info,acts);box.appendChild(row)
   })
 }
@@ -405,15 +405,15 @@ $('unlockBtn').onclick=()=>{autoUnlocked=!autoUnlocked;$('unlockBtn').textConten
 $('saveProfile').addEventListener('change',()=>{$('profileWrap').classList.toggle('hidden',!$('saveProfile').checked);if($('saveProfile').checked&&!$('profileName').value)$('profileName').value=(activeSavedCourse||detectCourseName(brightFilename))+' – '+new Date().getFullYear()});
 $('prepareBtn').onclick=prepareAudit;
 $('maxConfirm').addEventListener('change',()=>{$('downloadBtn').disabled=!$('maxConfirm').checked});
-$('downloadBtn').onclick=()=>{if(!$('maxConfirm').checked)return;const csv=outputRows.map(r=>r.map(esc).join(',')).join('\r\n')+'\r\n';const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=$('filePill').textContent;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url)};
-$('resetBtn').onclick=()=>location.reload();
+$('downloadBtn').onclick=()=>{if(!$('maxConfirm').checked)return;gradeWork.markSaved();const csv=outputRows.map(r=>r.map(esc).join(',')).join('\r\n')+'\r\n';const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=$('filePill').textContent;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url)};
+$('resetBtn').onclick=async()=>{if(gradeWork.isDirty()&&!await FTDialog.confirm('Your matching decisions have not been downloaded yet and will be cleared.',{title:'Start over?',confirmLabel:'Start over',danger:true}))return;FTUnsavedWork.allowLeave();location.reload()};
 $('themeToggle').onclick=()=>applyTheme(document.body.classList.contains('dark')?'light':'dark');
-$('helpBtn').onclick=()=>{$('helpModal').classList.remove('hidden');$('closeHelp').focus()};
-$('closeHelp').onclick=()=>{$('helpModal').classList.add('hidden');$('helpBtn').focus()};
-$('savedBtn').onclick=()=>{renderSavedModal();$('savedModal').classList.remove('hidden');$('closeSaved').focus()};
-$('closeSaved').onclick=()=>{$('savedModal').classList.add('hidden');$('savedBtn').focus()};
-$('deleteAllBtn').onclick=()=>{if(confirm('Delete every saved GradeBridge course profile and student mapping from this browser?')){localStorage.removeItem('gradebridge_profiles_v6');activeSavedCourse='';brightRows=[];brightHeaders=[];brightCols={};populateSaved();renderSavedModal();clearSavedSelection()}};
-[$('helpModal'),$('savedModal')].forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.add('hidden')}));
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('helpModal').classList.add('hidden');$('savedModal').classList.add('hidden')}});
+// Shared pop-ups: Escape, ×, and outside clicks close them; focus returns to the opening button.
+const helpDialog=FTDialog.manage($('helpModal')),savedDialog=FTDialog.manage($('savedModal'));
+$('helpBtn').onclick=()=>helpDialog.open($('helpBtn'));
+$('savedBtn').onclick=()=>{renderSavedModal();savedDialog.open($('savedBtn'))};
+$('deleteAllBtn').onclick=async()=>{if(await FTDialog.confirm('Every saved GradeBridge course profile and student mapping will be removed from this browser.',{title:'Delete all saved data?',confirmLabel:'Delete all saved data',danger:true})){localStorage.removeItem('gradebridge_profiles_v6');activeSavedCourse='';brightRows=[];brightHeaders=[];brightCols={};populateSaved();renderSavedModal();clearSavedSelection()}};
+// Unsaved work: matching decisions made since the review was built or the CSV was last downloaded.
+const gradeWork=FTUnsavedWork.track(()=>matches.length?matches.map(m=>[m.bi,m.excluded,m.matchConfirmed,m.matchStatus,m.scoreValue,m.scoreStatus]):null);
 
 migrateLegacyProfiles();applyTheme(localStorage.getItem('ft-theme')||'light');populateSaved();

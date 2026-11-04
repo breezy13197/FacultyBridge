@@ -38,8 +38,8 @@ test('QuestionBridge: synthetic question review, validation, persistence, deleti
   await page.reload();
   await page.locator('[data-screen="review"]').click();
   await expect(page.locator('#stem')).toHaveValue(/transports oxygen/);
-  page.once('dialog', dialog => dialog.accept());
   await page.locator('#deleteQuestion').click();
+  await page.getByRole('dialog', { name: 'Delete question?' }).getByRole('button', { name: 'Delete question' }).click();
   await expect(page.locator('[data-screen="export"]')).toBeDisabled();
   expect(await page.evaluate(() => state.questions.length)).toBe(0);
 });

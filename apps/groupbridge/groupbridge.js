@@ -104,5 +104,6 @@ $('downloadPlan').onclick=()=>download('GroupBridge-Group-List-'+dateStamp()+'.c
 $('themeBtn').onclick=()=>{const dark=document.documentElement.getAttribute('data-ft-theme')==='dark',next=dark?'light':'dark';document.documentElement.setAttribute('data-ft-theme',next);try{localStorage.setItem('ft-theme',next)}catch(e){}};
 document.querySelectorAll('.step').forEach(b=>b.onclick=()=>{const n=+b.dataset.step;if(n===1)return showStep(1);if(n===2&&students.length)return showStep(2);if((n===3||n===4)&&groups.length){showStep(n);if(n===4)renderCodes();return}toast(n===2?'Upload a roster first':'Generate groups first')});
 try{const savedTheme=localStorage.getItem('ft-theme');if(savedTheme)document.documentElement.setAttribute('data-ft-theme',savedTheme)}catch(e){}
-window.addEventListener('beforeunload',e=>{if(stateDirty&&groups.length){e.preventDefault();e.returnValue=''}});
+// Shared unsaved-work warning: generated or edited groups.
+FTUnsavedWork.watch(()=>stateDirty&&groups.length>0);
 updateStepNav();
