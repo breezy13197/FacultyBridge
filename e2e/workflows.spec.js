@@ -1,4 +1,7 @@
-import { test, expect } from './fixtures.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { test, expect, downloadFrom, syntheticDocx, syntheticSyllabus, DOCX_MIME } from './fixtures.js';
 import { workflows, gradeExamCsv, gradeBrightCsv } from './workflows.js';
 
 // Full load -> process -> export workflow for every tool, with exported files checked.
@@ -57,4 +60,34 @@ test.describe('GradeBridge safety gates', () => {
     await page.locator('#prepareBtn').click();
     await expect(page.locator('#auditCard')).toBeHidden();
   });
+});
+
+// A plural "COURSE COORDINATORS:" heading lists several coordinators; all of them must reach
+// the faculty list and the Course JSON, and CalendarBridge must see each one as a coordinator.
+test('SyllabusBridge keeps every coordinator under a plural heading', async ({ page, openTool }) => {
+  const paragraphs = ['PHA9999 - Synthetic Course',
+    'COURSE COORDINATORS:Ada Faculty, PharmD, BCPS', 'Assistant Professor of Pharmacy Practice', 'Office: 101', 'Email: afaculty@example.edu', '',
+    'Grace Teacher, PharmD, BCPS', 'Assistant Professor of Pharmacy Practice', 'Office: 102', 'Email: gteacher@example.edu', '',
+    'COURSE FACULTY: Alan Lecturer, PhD', 'Associate Professor of Pharmaceutical Sciences', 'Email: alecturer@example.edu', '',
+    'TIME AND LOCATION: Monday 9:00 AM - 10:00 AM', 'Fall 2026'];
+  await openTool('syllabusbridge');
+  await page.locator('#file').setInputFiles({ name: 'syllabus.docx', mimeType: DOCX_MIME, buffer: await syntheticDocx({ ...syntheticSyllabus, paragraphs }) });
+  await expect(page.locator('#screen-review')).toBeVisible();
+  await page.locator('#runValidation').click();
+  await expect(page.locator('#screen-report')).toBeVisible();
+  const { text } = await downloadFrom(page, async () => {
+    await page.locator('#exportCourseJsonReport').click();
+    await page.getByRole('dialog', { name: 'Export with validation issues?' }).getByRole('button', { name: 'Export anyway' }).click();
+  });
+  const course = JSON.parse(text);
+  expect(course.faculty.map(f => [f.name, f.role])).toEqual([
+    ['Ada Faculty, PharmD, BCPS', 'coordinator'], ['Grace Teacher, PharmD, BCPS', 'coordinator'], ['Alan Lecturer, PhD', 'faculty']]);
+  expect(course.coordinatorIds).toEqual(['faculty', 'teacher']);
+
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'bridge-')), 'course.json');
+  fs.writeFileSync(file, text);
+  await openTool('calendarbridge');
+  await page.locator('#courseJsonInput').setInputFiles(file);
+  await expect(page.locator('#screen-review')).toBeVisible();
+  expect(await page.evaluate(() => state.coordinatorIds)).toEqual(['faculty', 'teacher']);
 });
