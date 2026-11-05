@@ -83,12 +83,67 @@ the UI, checks nonempty extraction, generates exam reports, verifies item CSV
 downloads, runs syllabus validation, and tests Course JSON export or its blocking
 date validation. CalendarBridge tests both syllabi and course schedules, recording
 whether each document is accepted, the event count, and events needing review.
+Accepted CalendarBridge documents and SyllabusBridge baselines also record
+`coordinators` and `coordinatorDetected`, counting all detected coordinator roles.
+Rejected calendars omit extraction counts because parsing did not complete.
 Ready calendars also export a project; unresolved events must block export.
 Rejection by CalendarBridge is a recorded outcome, not a claim that the file was
 successfully converted. QuestionBridge records the question count, question
 types, image count, and blocked/warning counts for each export platform, then
 downloads each export that includes at least one question and checks it is not
 empty. A QuestionBridge file that cannot be read fails the test.
+
+QuestionBridge's `answers` summary records whether any answer was detected,
+question counts with and without detected answers, counts by question type, and
+parser confidence counts. Detection means a nonempty marked correct choice,
+an accepted short answer, or at least one blank with an accepted answer.
+Partially answered fill-in-the-blank questions count as detected; platform
+validation still checks completeness. Essay/unsupported types count as
+`notApplicable`. Confidence describes the parser's overall question confidence,
+not independent proof that an answer is correct. No answer text is stored.
+
+Additional extraction coverage:
+
+- SyllabusBridge records schedule candidates, parsed rows, and failed rows;
+  CLO candidates and parsed CLOs; faculty/coordinator contact completeness;
+  CLO mappings, PLOs, meeting patterns, grading rows, and the grading percentage
+  total (rounded to four decimal places). Candidate/failure counts come from
+  parser diagnostics; they are not guaranteed to partition source rows because
+  parsing can deduplicate or expand entries. Faculty contact counts include coordinators.
+- CalendarBridge records each review issue separately, including overlapping
+  issues on the same event. These follow the app's validation rules, which skip
+  excluded events. Separate coverage counts include all events: categories,
+  included/excluded counts, missing locations, exact duplicate copies, and
+  unresolved faculty/coordinator references. Duplicate comparison uses date,
+  time, topic, location, type, and the set of faculty assignments. A missing
+  location is informational; the app does not treat it as a blocking issue.
+- QuestionBridge records complete, partial, missing, invalid, and inapplicable
+  answer keys, total nonempty choices, correct-choice count distribution, and
+  blank fields with/without answers. Complete keys satisfy answer cardinality;
+  they do not establish that the question itself is valid or the answer is right.
+  Partial keys have some accepted blank answers but not all expected blanks.
+  Invalid keys include multiple correct choices for a single-answer question,
+  marked empty choices, or inconsistent blank structure. Parse-warning totals
+  and validation issues are grouped into fixed test codes with error/warning
+  counts; unrecognized messages use `other`, never the source message text.
+- Each QuestionBridge destination records eligible questions, whether a download
+  occurred, and questions read from the actual download. CSV records and XLSX
+  data rows are counted; ExamSoft RTF question records are counted using RTF
+  paragraph boundaries, excluding numbered blank answers within records.
+  These counts check coverage, not LMS import success or answer-key parity.
+  Download counts must equal eligible counts. Brightspace with images
+  uses the explicit **Download without images** option; this verifies question
+  coverage but does not verify the image package or image references. Destinations
+  with no eligible questions record zero and are not downloaded.
+
+`local-summaries.test.mjs` tests aggregate semantics with synthetic data.
+`local-summaries.spec.js` checks exact downloaded counts for all six QuestionBridge
+question types across all four destinations, in each browser/build format.
+
+When upgrading older baselines to these additional fields, `--capture-missing`
+does not update existing files. Use `--capture`, verify that all previous fields
+are unchanged, and review the new counts against the documents before treating
+the expanded baselines as reviewed.
 
 Baselines in `tests/local-baselines/` use tool names and source SHA-256 hashes,
 with numeric counts and acceptance flags only. A changed source file requires a
