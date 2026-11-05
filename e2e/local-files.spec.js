@@ -3,6 +3,9 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { test, expect } from './fixtures.js';
 import { fixtureRoot as root, groups, fixtureFiles, testTitle } from './local-fixtures.js';
+import { coordinatorSummary, questionAnswerSummary, syllabusExtractionSummary,
+  calendarExtractionSummary, answerCompletenessSummary, questionIssueSummary } from './local-summaries.js';
+import { downloadedQuestionCount } from './local-export-counts.js';
 
 const enabled = process.env.BRIDGE_LOCAL_FILES === '1';
 const baselineDir = path.resolve('tests/local-baselines');
@@ -64,6 +67,8 @@ test.describe('local course-file regression', () => {
           const accepted = await page.locator(group.ready).isVisible();
           summary = { accepted };
           if (accepted) {
+            Object.assign(summary, await page.evaluate(coordinatorSummary));
+            Object.assign(summary, await page.evaluate(calendarExtractionSummary));
             summary.events = await page.evaluate(() => state.events.length);
             summary.needsReview = await page.evaluate(() => state.events.filter(e => eventIssues(e).length).length);
             expect(summary.events).toBeGreaterThan(0);
@@ -97,23 +102,36 @@ test.describe('local course-file regression', () => {
               })) };
           });
           expect(summary.questions).toBeGreaterThan(0);
+          summary.answers = await page.evaluate(questionAnswerSummary);
+          summary.answerCoverage = await page.evaluate(answerCompletenessSummary);
+          summary.issueCoverage = await page.evaluate(questionIssueSummary);
+          summary.exports = {};
           await page.locator('[data-screen="export"]').click();
           await expect.poll(() => page.locator('#export').isVisible()).toBe(true);
           const cards = page.locator('#exportGrid .qb-export-card');
           expect(await cards.count()).toBe(Object.keys(summary.platforms).length);
-          // Download every export that includes at least one question and check it is not empty.
-          // Brightspace with images first asks about the image folder, so it is not downloaded here.
+          // Count questions in every downloaded export, including Brightspace's
+          // explicit download-without-images path when no image folder is set.
           for (const [i, [k, counts]] of Object.entries(summary.platforms).entries()) {
-            if (counts.blocked === summary.questions || (k === 'brightspace' && summary.images)) continue;
+            const eligible = summary.questions - counts.blocked;
+            summary.exports[k] = { eligible, downloaded: false, questions: 0 };
+            if (!eligible) continue;
             const pending = page.waitForEvent('download');
             await cards.nth(i).locator('.downloadBtn').click();
+            if (k === 'brightspace' && summary.images) await page.locator('#bsDownloadNoImages').click();
             const download = await pending;
-            expect(fs.statSync(await download.path()).size > 100).toBe(true);
+            const bytes = fs.readFileSync(await download.path());
+            expect(bytes.length > 100).toBe(true);
+            const questions = await downloadedQuestionCount(k, bytes);
+            summary.exports[k] = { eligible, downloaded: true, questions };
+            expect(questions).toBe(eligible);
             await download.delete();
           }
         } else {
           summary = await page.evaluate(() => ({ sections: state.sections.length, faculty: state.faculty.length,
             clos: state.clos.length, assessments: state.assessments.length, schedule: state.schedule.length }));
+          Object.assign(summary, await page.evaluate(coordinatorSummary));
+          Object.assign(summary, await page.evaluate(syllabusExtractionSummary));
           expect(summary.sections).toBeGreaterThan(0);
           await page.locator('#runValidation').click();
           await expect.poll(() => page.locator('#screen-report').isVisible()).toBe(true);
