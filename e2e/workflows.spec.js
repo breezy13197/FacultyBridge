@@ -91,3 +91,36 @@ test('SyllabusBridge keeps every coordinator under a plural heading', async ({ p
   await expect(page.locator('#screen-review')).toBeVisible();
   expect(await page.evaluate(() => state.coordinatorIds)).toEqual(['faculty', 'teacher']);
 });
+
+// Syllabi that number outcomes "CO1, CO2…", misspell "ACCOMODATION", and use colon-free policy
+// headings (EXCUSED ABSENCE POLICY, ELECTRONIC DEVICES, COPYRIGHT) must still split into the
+// right sections, and a bulleted policy reference must not end the course-specific policies.
+test('SyllabusBridge reads CO-numbered outcomes and colon-free policy headings', async ({ page, openTool }) => {
+  const paragraphs = ['PHA9999 - Synthetic Course', 'COURSE LEARNING OBJECTIVES:',
+    '• CO1 – Describe synthetic organisms and the conditions they cause.',
+    '• CO2 – Explain synthetic immune responses to pathogenic organisms.',
+    'ACCESSIBILITY AND DISABILITY ACCOMODATION:', 'Synthetic University provides accommodations to qualified students.',
+    'PROGRAM STUDENT LEARNING OUTCOMES (PSLO)',
+    'COURSE SPECIFIC POLICIES', 'Please refer to the synthetic handbook for:', '• Grading Scale', '• Academic Honesty and Integrity', 'Instructors may dismiss students who violate classroom policies.',
+    'EXCUSED ABSENCE POLICY', 'A student may receive an excused absence for synthetic reasons.',
+    'INCOMPLETE POLICY', 'Incompletes are given at the discretion of the faculty member.',
+    'ELECTRONIC DEVICES', 'No unapproved electronic devices are allowed during exams.',
+    'COPYRIGHT', 'Course materials are protected by copyright law.',
+    'PROFESSIONALISM', 'Students are expected to come to class prepared.'];
+  const table = [['Program Mapping Course Learning Objectives to Program Student Learning Outcomes'],
+    ['CO1 - Describe synthetic organisms and the conditions they cause.', 'PSLO 1.4'],
+    ['CO2 – Explain synthetic immune responses to pathogenic organisms.', 'PSLO 1.1, 1.4']];
+  await openTool('syllabusbridge');
+  await page.locator('#file').setInputFiles({ name: 'syllabus.docx', mimeType: DOCX_MIME, buffer: await syntheticDocx({ paragraphs, table }) });
+  await expect(page.locator('#screen-review')).toBeVisible();
+  const s = await page.evaluate(() => ({ clos: state.clos.length, maps: state.cloMappings.map(m => [m.clo, m.pslos]), p: state.policies }));
+  expect(s.clos).toBe(2);
+  expect(s.maps).toEqual([['CLO1', ['1.4']], ['CLO2', ['1.1', '1.4']]]);
+  expect(s.p.accessibility).toBe('Synthetic University provides accommodations to qualified students.');
+  expect(s.p.absence).toBe('A student may receive an excused absence for synthetic reasons.');
+  expect(s.p.incomplete).toBe('Incompletes are given at the discretion of the faculty member.');
+  expect(s.p.electronicPolicy).toBe('No unapproved electronic devices are allowed during exams.');
+  expect(s.p.coursePolicies).toContain('Instructors may dismiss students who violate classroom policies.');
+  await expect(page.locator('#mClos')).toHaveText('2');
+  await expect(page.locator('#mPlos')).toHaveText('2');
+});
