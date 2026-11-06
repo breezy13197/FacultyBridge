@@ -49,7 +49,7 @@ export function syllabusExtractionSummary(s = state) {
 
 export function calendarExtractionSummary(s = state, issuesFor = eventIssues) {
   const issues = Object.fromEntries(['date', 'weekday', 'time', 'inferred-time', 'event',
-    'faculty', 'continuation-row', 'other'].map(k => [k, 0]));
+    'faculty', 'continuation-row', 'year', 'date-order', 'other'].map(k => [k, 0]));
   const byType = Object.fromEntries(['lecture', 'assessment', 'activity', 'no-class', 'other'].map(k => [k, 0]));
   const seen = new Set();
   let included = 0, missingLocation = 0, duplicates = 0, unresolvedFacultyEvents = 0;

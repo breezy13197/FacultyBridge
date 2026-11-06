@@ -144,6 +144,22 @@ try {
       assert.notEqual(types[2],'assessment',`${tool.id} a quiz deadline note does not make a class period an exam`);
       assert.deepEqual(types.slice(3),['assessment','assessment','assessment'],`${tool.id} real exams and quizzes stay assessments`);
     }
+    if(['calendarbridge','syllabusbridge'].includes(tool.id)) {
+      // Date typos: a day name sharing the date's cell that disagrees with the calendar, a year that breaks
+      // from the dates around it, and a date earlier than the row above. Correct rows stay unflagged.
+      const flags=await page.evaluate(async id=>{
+        const p=t=>`<w:p><w:r><w:t>${t}</w:t></w:r></w:p>`,tc=t=>'<w:tc>'+p(t)+'</w:tc>';
+        const rows=[['Lecture','Date','Course Topics','Instructor'],['1','Monday 9/21/26','Proteins','Ada'],['2','Thursday 9/23/26','Enzymes','Ada'],['3','Friday 9/25/26','Lipids','Ada'],['4','Monday 9/28/25','Hemoglobin','Ada'],['5','Wednesday 9/30/26','Membranes','Ada'],['6','Wednesday 9/16/26','Carbohydrates','Ada']];
+        const xml=`<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${p('PHA9999 - Synthetic Course')}${p('Fall 2026')}${p('Course Schedule')}<w:tbl>${rows.map(r=>'<w:tr>'+r.map(tc).join('')+'</w:tr>').join('')}</w:tbl></w:body></w:document>`;
+        const z=new JSZip();z.file('word/document.xml',xml);
+        const file=new File([await z.generateAsync({type:'uint8array'})],'synthetic-date-typos.docx');
+        if(id==='syllabusbridge'){await parseDocx(file);return scheduleDateWarnings()}
+        const parsed=await parseDocx(file);state.events=parsed.events;resolveEventYears();flagDateProblems();
+        return Object.fromEntries(state.events.map(e=>[e.topic,eventIssues(e).filter(x=>['weekday','year','date-order'].includes(x))]));
+      },tool.id);
+      if(tool.id==='calendarbridge') assert.deepEqual(flags,{Proteins:[],Enzymes:['weekday'],Lipids:[],Hemoglobin:['weekday','year'],Membranes:[],Carbohydrates:['date-order']},'calendarbridge date typo flags');
+      else assert.deepEqual(flags,['Thursday 9/23/26: that date is a Wednesday','Monday 9/28/25: that date is a Sunday','9/28/25: the year 2025 does not match the dates around it (2026)','9/16/26: earlier than the row above it'],'syllabusbridge date typo warnings');
+    }
     if(tool.id==='calendarbridge') {
       // "Week N" heading rows inside a schedule table are section labels, not calendar events.
       const topics=await page.evaluate(async()=>{
