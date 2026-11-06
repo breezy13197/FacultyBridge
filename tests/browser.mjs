@@ -29,6 +29,15 @@ try {
     assert.deepEqual(remote,[],`${tool.id} ${format} remote requests`);
     assert.ok((await page.locator('.ft-build-label').textContent()).includes(`Build ${manifest.suiteVersion}`));
     assert.ok((await page.locator('header, .ft-topbar').first().textContent()).includes(`v${tool.version}`));
+    // Every page tells faculty who to contact, which build they are using, and not to send student or exam data.
+    const help=page.locator('.ft-support');
+    assert.equal(await help.count(),1,`${tool.id} ${format} support note`);
+    assert.ok(await help.isVisible(),`${tool.id} ${format} support note visible`);
+    const helpText=await help.textContent();
+    for(const part of [manifest.support.email,`v${tool.version}`,`Build ${manifest.suiteVersion}`,'student']) assert.ok(helpText.includes(part),`${tool.id} ${format} support note mentions ${part}: ${helpText}`);
+    const mail=await help.locator('a').getAttribute('href');
+    assert.ok(mail.startsWith(`mailto:${manifest.support.email}?subject=`),`${tool.id} ${format} support link: ${mail}`);
+    assert.ok(decodeURIComponent(mail).includes(`${tool.name} v${tool.version} (Build ${manifest.suiteVersion})`),`${tool.id} ${format} support subject: ${mail}`);
     // Accessibility basics: every form control in the page markup has a name a screen reader can announce,
     // and the visible page has exactly one main-content landmark.
     const unlabeled=await page.evaluate(()=>[...document.querySelectorAll('input:not([type=hidden]):not([type=file]),select,textarea')]

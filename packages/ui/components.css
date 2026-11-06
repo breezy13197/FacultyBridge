@@ -152,6 +152,10 @@ div.ft-dialog[open] { position: fixed; inset: 0; z-index: 80; height: fit-conten
 .ft-btn, .ft-icon-btn, .ft-step { min-height: 42px; }
 .ft-btn:disabled, .ft-icon-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 .ft-btn { text-decoration: none; }
+/* Support note appended to every page by runtime.js. */
+.ft-support { max-width: 72rem; margin: var(--ft-space-8) auto var(--ft-space-6); padding: var(--ft-space-3) var(--ft-space-4); font-size: var(--ft-font-size-sm); line-height: 1.5; color: var(--ft-text-muted); text-align: center; }
+.ft-support a { color: var(--ft-brand-700); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+.ft-support strong { color: var(--ft-text); font-weight: 600; }
 .ft-build-label { font-size: var(--ft-font-size-xs); font-weight: 500; color: var(--ft-text-muted); white-space: nowrap; }
 .ft-suite-link { display: inline-flex; align-items: center; white-space: nowrap; color: var(--ft-text); }
 .ft-p-5 { padding: var(--ft-space-5); }

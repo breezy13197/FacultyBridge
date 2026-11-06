@@ -118,7 +118,7 @@ Keep all real course files, local baselines, downloads, and reports private and 
 
 ## Reviewed status and remaining gaps
 
-Repository review: **2026-11-01**. This is source/test-coverage evidence, not certification that manual or private regressions passed for a release. Current manifest: suite **1.4.0**, UI **1.1.0**, FacultyBridge **1.3.0**, CalendarBridge **7.5.9**, ExamBridge **1.8.1**, GradeBridge **6.0.1**, GroupBridge **1.2.1**, ItemBridge **1.9**, QuestionBridge **4.1**, SyllabusBridge **2.1.2**.
+Repository review: **2026-11-01**. This is source/test-coverage evidence, not certification that manual or private regressions passed for a release. Current manifest: suite **1.5.0**, UI **1.2.0**, FacultyBridge **1.3.0**, CalendarBridge **7.5.9**, ExamBridge **1.8.1**, GradeBridge **6.0.1**, GroupBridge **1.2.1**, ItemBridge **1.9**, QuestionBridge **4.1**, SyllabusBridge **2.1.2**.
 
 | Earlier gate / gap | Current evidence and release action |
 |---|---|
@@ -131,6 +131,6 @@ Repository review: **2026-11-01**. This is source/test-coverage evidence, not ce
 | Tag automation coverage | The release workflow omits the six-project E2E suite and publishes immediately after smoke checks. Require full results on the tagged commit now; consider adding `test:e2e` to that workflow as a follow-up. |
 | Storage fallback and accessibility labels | Suite 1.3.1 adds shared in-memory fallback when browser storage access throws, form labels/status announcements, and landmark/contrast fixes. `tests/browser.mjs` adds blocked-storage startup, form-name, and main-landmark checks. Verify affected workflows and explain that fallback storage does not persist across reopening; these checks do not certify all accessibility or persistence behavior. |
 | Shared pop-up and unsaved-work warning | Suite 1.4.0 replaces the browser's built-in boxes and five home-made pop-ups with `packages/ui/dialog.js`. `tests/build.test.mjs` refuses `alert`/`confirm`/`prompt`, home-made `role="dialog"` markup, and per-tool `beforeunload`; `e2e/dialogs.spec.js` checks Escape, focus return, screen-reader role, and when each tool warns before leaving. Each tool's import-baseline hash was updated for pop-up code only. Run each tool's real-course regression below, and check Escape/focus by hand on managed Windows/Edge. Browsers show their own fixed wording for the leave warning. |
-| Support and recovery | Visible build labels now identify shipped builds. Confirm a usable support contact, safe reporting instructions, saved-project recovery, and replacement guidance; build labels alone do not provide them. |
+| Support and recovery | Suite 1.5.0 shows a support contact (`support.email` in `suite.json`), the exact build, and safe-reporting guidance on every page; `tests/build.test.mjs` requires the contact and `tests/browser.mjs` checks the note on every page in both formats. Before each release, confirm the contact is still monitored. Saved-project recovery and replacement guidance for downloaded copies are still needed. |
 
 Refresh this status table each release. Historical baseline and migration documents describe their recorded versions; investigate discrepancies against current source and reviewed outputs before changing expectations.
