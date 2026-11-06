@@ -632,7 +632,8 @@ function facultyIdsForText(text,faculty){
  for(const f of faculty){const terms=[f.shortName,f.name].map(norm).filter(Boolean);if(terms.some(t=>n.includes(t)||t.includes(n)))ids.push(f.id)}
  return [...new Set(ids)];
 }
-function classifySharedEvent(topic){const t=norm(topic);if(/no class|holiday|thanksgiving|veteran/.test(t))return'no-class';if(/exam|quiz/.test(t))return'assessment';if(/reinforcement|activity|review|assignment/.test(t))return'activity';return'class'}
+// A "(Quiz 1 due at 8 AM)" note is a deadline, not the meeting itself, and a review period that names an exam is still a class meeting.
+function classifySharedEvent(topic){const t=norm(topic);if(/no class|holiday|thanksgiving|veteran/.test(t))return'no-class';const core=t.replace(/\([^)]*\bdue\b[^)]*\)/g,' ');if(/\breview\b/.test(core.replace(/\([^)]*\)/g,' ')))return'activity';if(/exam|quiz/.test(core))return'assessment';if(/reinforcement|activity|assignment/.test(core))return'activity';return'class'}
 function buildFacultyBridgeCourse(){
  const faculty=sharedFaculty(),coords=faculty.filter(f=>f.role==='coordinator').map(f=>f.id),coord=coords[0]||null;
  const recurringSchedule=(state.meetingPatterns||[]).map((m,i)=>{const tr=normalizedTimeRange(m.time);return{id:`meeting-${i+1}`,day:m.day,startTime:tr.startTime,endTime:tr.endTime,timeText:tr.timeText,location:clean(state.course.location),source:{kind:m.source?.toLowerCase().includes('derived')?'inferred':'syllabus',text:clean(m.source)}}});

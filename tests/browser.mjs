@@ -136,6 +136,25 @@ try {
         const parsed=await parseDocx(file);return id==='calendarbridge'?parsed.events.length:parsed.schedule.length;
       },tool.id);
       assert.equal(parsed,3,`${tool.id} synthetic Word schedule extraction`);
+      // Review class periods that mention an exam or a quiz deadline are class meetings, not exams;
+      // real exams stay assessments. SyllabusBridge's Course JSON handoff must agree.
+      const classifyFn=tool.id==='calendarbridge'?'classify':'classifySharedEvent';
+      const types=await page.evaluate(fn=>['Review for exam 1 (Quiz 1 due at 8 AM)','Final Exam Review','Class activities (Quiz 2 due at 8AM)','Exam 1 (Lectures 1-8)','Comprehensive Final Exam','Quiz 3'].map(t=>window[fn](t)),classifyFn);
+      assert.deepEqual(types.slice(0,2),['activity','activity'],`${tool.id} review periods are class meetings`);
+      assert.notEqual(types[2],'assessment',`${tool.id} a quiz deadline note does not make a class period an exam`);
+      assert.deepEqual(types.slice(3),['assessment','assessment','assessment'],`${tool.id} real exams and quizzes stay assessments`);
+    }
+    if(tool.id==='calendarbridge') {
+      // "Week N" heading rows inside a schedule table are section labels, not calendar events.
+      const topics=await page.evaluate(async()=>{
+        const p=t=>`<w:p><w:r><w:t>${t}</w:t></w:r></w:p>`,tc=t=>'<w:tc>'+p(t)+'</w:tc>';
+        const rows=[['Lecture','Date','Course Topics','Instructor'],['1','Monday 9/21/26','Proteins','Ada'],['Week 2'],['2','Monday 9/28/26','Enzymes','Ada'],['','Friday 10/2/26','Review for exam 1 (Quiz 1 due at 8 AM)','Ada']];
+        const xml=`<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${p('Course Schedule')}<w:tbl>${rows.map(r=>'<w:tr>'+r.map(tc).join('')+'</w:tr>').join('')}</w:tbl></w:body></w:document>`;
+        const z=new JSZip();z.file('word/document.xml',xml);
+        const parsed=await parseDocx(new File([await z.generateAsync({type:'uint8array'})],'synthetic-weeks.docx'));
+        return parsed.events.map(e=>`${e.topic}|${e.type}`);
+      });
+      assert.deepEqual(topics,['Proteins|lecture','Enzymes|lecture','Review for exam 1 (Quiz 1 due at 8 AM)|activity'],'calendarbridge skips Week heading rows');
     }
     if(tool.id==='syllabusbridge') {
       // Report filters are generated dynamically after parsing the synthetic syllabus.
