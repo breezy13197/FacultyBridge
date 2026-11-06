@@ -11,6 +11,36 @@ for (const [tool, run] of Object.entries(workflows)) {
   });
 }
 
+// Import files must carry answers exactly as written. Signed numbers are common
+// in calculation questions; an added apostrophe would show up in the student's quiz.
+test('QuestionBridge Brightspace and Poll Everywhere exports keep answers starting with - + = @', async ({ page, openTool }) => {
+  await openTool('questionbridge');
+  await page.locator('[data-screen="upload"]').click();
+  await page.locator('#pasteText').fill('1. What is the net charge at pH 12?\n*A. -2\nB. +1\nC. =0\nD. @ pH 7, -1');
+  await page.locator('#parsePaste').click();
+  await expect(page.locator('#stem')).toHaveValue(/net charge/);
+  await page.locator('[data-screen="validate"]').click();
+  await expect(page.locator('body')).toContainText('begins with =, +, -, or @');
+  await page.locator('[data-screen="export"]').click();
+  const download = async name => {
+    const pending = page.waitForEvent('download');
+    await page.locator(`#exportGrid .qb-export-card:has-text("${name}") button:has-text("Download")`).click();
+    const file = await pending;
+    const text = fs.readFileSync(await file.path(), 'utf8');
+    await file.delete();
+    return text;
+  };
+  const bright = await download('Brightspace');
+  expect(bright).toContain('Option,100,-2,');
+  expect(bright).toContain('Option,0,+1,');
+  expect(bright).toContain('Option,0,=0,');
+  expect(bright).toContain('Option,0,"@ pH 7, -1",');
+  expect(bright).not.toContain("'");
+  const poll = await download('Poll Everywhere');
+  expect(poll).toContain('***-2,+1,=0,"@ pH 7, -1"');
+  expect(poll).not.toContain("'");
+});
+
 const csvFile = (name, text) => ({ name, mimeType: 'text/csv', buffer: Buffer.from(text) });
 async function loadGrades(page, openTool, exam, bright) {
   await openTool('gradebridge');
