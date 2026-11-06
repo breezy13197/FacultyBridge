@@ -114,7 +114,7 @@ window.openQuestion=i=>{state.selected=i;show('review')};
 window.confirmQuestionParsing=i=>{const q=state.questions[i];if(!q)return;q.confidence='high';q.confidenceReason='Faculty confirmed the parsed question';saveAutosave();renderValidation();pop(`Question ${i+1} confirmed`)};
 
 // Export generation
-function csvCell(v){v=String(v??'');if(/^[=+\-@]/.test(v))v="'"+v;return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
+function csvCell(v){v=String(v??'');return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
 function unicodeScript(text,kind){const sup={'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','+':'⁺','-':'⁻','=':'⁼','(':'⁽',')':'⁾','n':'ⁿ','i':'ⁱ'},sub={'0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉','+':'₊','-':'₋','=':'₌','(':'₍',')':'₎','a':'ₐ','e':'ₑ','h':'ₕ','i':'ᵢ','j':'ⱼ','k':'ₖ','l':'ₗ','m':'ₘ','n':'ₙ','o':'ₒ','p':'ₚ','r':'ᵣ','s':'ₛ','t':'ₜ','x':'ₓ'};const map=kind==='sup'?sup:sub;let ok=true,out='';for(const ch of text){if(map[ch])out+=map[ch];else{ok=false;out+=ch}}return ok?out:(kind==='sup'?`^(${text})`:`_(${text})`)}
 function richToScientificText(html,fallback=''){if(!html)return fallback;const d=document.createElement('div');d.innerHTML=html;d.querySelectorAll('sup').forEach(el=>el.replaceWith(document.createTextNode(unicodeScript(el.textContent,'sup'))));d.querySelectorAll('sub').forEach(el=>el.replaceWith(document.createTextNode(unicodeScript(el.textContent,'sub'))));d.querySelectorAll('br').forEach(el=>el.replaceWith(document.createTextNode('\n')));return d.textContent||fallback}
 function stripPrintedQuestionPrefix(t=''){return String(t).replace(/^\s*Question\s*#?\s*:\s*\d+\s*/i,'').replace(/^\s*(?:Q\s*)?\d+\s*[.)]\s*/i,'')}
