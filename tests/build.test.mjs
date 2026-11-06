@@ -28,6 +28,9 @@ test('all eight modular pages resolve dependencies, have build identities and pa
     }
   }
 });
+test('suite.json names a real support contact', () => {
+  assert.match(manifest.support?.email ?? '', /^[^@\s<>"]+@[^@\s<>"]+\.[a-z]{2,}$/i, 'suite.json support.email must be set to the address faculty should contact');
+});
 test('standalone builds are self-contained with valid JS, including report templates', () => {
   const dir = path.join(root, 'dist/standalone'); const files = [...walk(dir)];assert.equal(files.length, 8);
   for (const file of files) {

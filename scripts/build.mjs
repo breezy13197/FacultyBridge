@@ -55,7 +55,7 @@ fs.rmSync(output, { recursive: true, force: true });
 for (const tool of manifest.tools) {
   const destination = path.join(site, tool.route, 'index.html');
   let html = renderSource(path.join(root, 'apps', tool.id, 'index.html'), destination);
-  const info = { suiteVersion: manifest.suiteVersion, uiVersion: manifest.uiVersion, tools: manifest.tools, toolId: tool.id, output: 'site' };
+  const info = { suiteVersion: manifest.suiteVersion, uiVersion: manifest.uiVersion, support: manifest.support, tools: manifest.tools, toolId: tool.id, output: 'site' };
   const metadataPath = path.join(site, tool.route, 'build-info.js');
   write(metadataPath, `window.FacultyBridgeBuild = ${JSON.stringify(info)};\n`);
   html = html.replace('<script', '<script src="build-info.js"></script>\n<script');
