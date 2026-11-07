@@ -89,6 +89,46 @@ test('M4: faculty are told work is saved on this computer and can clear it', asy
   expect(await page.evaluate(() => state.questions.length)).toBe(0);
 });
 
+// Clearing must also empty what is still on screen: pasted text, file status, and editor fields
+// would otherwise let the next person on a shared computer read or re-parse the exam.
+test('M4: clearing saved work also empties pasted text and editor fields', async ({ page, openTool }) => {
+  await openTool('questionbridge');
+  await paste(page, markedQuestion);
+  await page.locator('#rationale').fill('Synthetic rationale');
+  await step(page, 'export').click();
+  await page.locator('#export').getByRole('button', { name: 'Clear saved work from this computer' }).click();
+  await page.getByRole('dialog', { name: 'Clear saved work from this computer?' }).getByRole('button', { name: 'Clear saved work' }).click();
+  await expect(page.locator('#pasteText')).toHaveValue('');
+  for (const id of ['stem', 'rationale', 'qTitle', 'topic', 'tags', 'shortAnswers', 'kahootStem', 'pollStem'])
+    await expect(page.locator(`#${id}`)).toHaveValue('');
+  await expect(page.locator('#answersArea .qb-answer-input')).toHaveCount(0);
+  await expect(page.locator('#fileName')).toHaveText('No file selected');
+  await expect(page.locator('#parseStatus')).toBeEmpty();
+  const text = await page.locator('body').innerText();
+  expect(text).not.toContain('transports oxygen');
+  expect(text).not.toContain('Hemoglobin');
+});
+
+// Preview must not offer a download the export card itself refuses.
+test('Preview of an export with no includable questions offers no download', async ({ page, openTool }) => {
+  await openTool('questionbridge');
+  await paste(page, keyedQuestion);
+  await step(page, 'export').click();
+  const bright = page.locator('#exportGrid .qb-export-card:has-text("Brightspace")');
+  await expect(bright.locator('.downloadBtn')).toBeDisabled();
+  await bright.getByRole('button', { name: 'Preview' }).click();
+  const preview = page.getByRole('dialog', { name: /preview/i });
+  await expect(preview).toContainText('No questions can be included yet');
+  await expect(preview.getByRole('button', { name: 'Download' })).toBeHidden();
+  await page.keyboard.press('Escape');
+  // Even if a download is requested another way, no empty file is produced.
+  let downloaded = false;
+  page.on('download', () => { downloaded = true; });
+  await page.evaluate(() => downloadExport('brightspace'));
+  await expect(page.getByRole('dialog', { name: 'Nothing to download yet' })).toBeVisible();
+  expect(downloaded).toBe(false);
+});
+
 test('m4: a deleted answer can be restored with Undo', async ({ page, openTool }) => {
   await openTool('questionbridge');
   await paste(page, markedQuestion);
