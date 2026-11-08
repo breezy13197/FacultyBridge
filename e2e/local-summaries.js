@@ -113,7 +113,7 @@ export function questionIssueSummary({ questions = state.questions, platforms = 
     ['single-correct-required', /^Select exactly one/], ['missing-short-answer', /^Add at least one accepted short/],
     ['missing-blank-marker', /^Add at least one blank marker/],
     ['missing-blank-answer', /^(?:Add an accepted answer for each|Blank \d+ needs)/],
-    ['duplicate-numbering', /^Question numbering restarts/], ['confidence', /^Parsing confidence:/],
+    ['duplicate-numbering', /^Question numbering restarts/], ['confidence', /^(?:Parsing confidence:|The correct answer was guessed)/],
     ['unsupported-fitb', /^Brightspace Question Library CSV does not support/],
     ['image-path', /^Image requires a Brightspace/], ['images-unsupported', /^(?:Legacy ExamSoft RTF import does not import images|Images cannot be included|Poll Everywhere CSV import cannot upload images)/],
     ['short-answer-conversion', /^Short Answer is exported/], ['scientific-notation', /^Superscript\/subscript/],

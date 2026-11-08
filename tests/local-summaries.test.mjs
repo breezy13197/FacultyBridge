@@ -64,10 +64,12 @@ test('answer completeness separates partial blanks, missing keys and invalid sin
 test('validation categories retain severity without storing dynamic or unknown message text', () => {
   const summary = questionIssueSummary({ questions: [{ parseWarnings: ['private warning'] }], platforms: ['kahoot'],
     validate: () => [{ level: 'error', msg: 'Kahoot question text is 123 characters; the spreadsheet limit is 95.' },
-      { level: 'warning', msg: 'Parsing confidence: private text' }, { level: 'warning', msg: 'unrecognized private text' }] });
+      { level: 'warning', msg: 'Parsing confidence: private text' },
+      { level: 'error', msg: 'The correct answer was guessed and has not been confirmed (private text).' },
+      { level: 'warning', msg: 'unrecognized private text' }] });
   assert.deepEqual(summary.parseWarnings, { questions: 1, total: 1 });
   assert.deepEqual(summary.platforms.kahoot, { 'stem-too-long': { error: 1, warning: 0 },
-    confidence: { error: 0, warning: 1 }, other: { error: 0, warning: 1 } });
+    confidence: { error: 1, warning: 1 }, other: { error: 0, warning: 1 } });
   assert.equal(JSON.stringify(summary).includes('private'), false);
 });
 
