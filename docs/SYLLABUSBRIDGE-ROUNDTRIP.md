@@ -25,6 +25,7 @@ is not included in the built site.
 | **Tab-aligned line, text inside a bookmark, a second line in a cell, a line break inside a cell** | **Pass.** |
 | **Red instruction bullet deleted** | **Pass.** |
 | **Safety:** stale or unsafe edits are refused, not guessed | **Pass.** Refused with a plain reason: text no longer matches, location missing, link, existing tracked changes, deleting the last paragraph in a cell or document, two edits to one paragraph. |
+| **Emoji and other characters JavaScript stores as two units** | **Pass**, after a review fix. Positions are counted in whole characters, so "😀 alpha ~~beta~~ gamma" no longer comes out as "bgamma". |
 | **Tracked-change mode** | **Pass.** Edits appear as Word tracked changes by "SyllabusBridge" with a date, as whole words ("~~2.6~~ 2.7"). Accepting them gives exactly the same text as a direct edit. |
 | **SyllabusBridge re-reads the edited file** | **Pass**, in both modes, on the website build and the single-file build. New text is read and deleted text is ignored, including deleted red instructions. |
 
@@ -121,8 +122,10 @@ A paragraph is left for faculty to edit by hand when it contains: a link, a
 field (such as a page number), a picture or shape, an embedded object, a
 footnote or endnote, a Word comment, unaccepted tracked changes, a content
 control, a smart tag, custom XML, or a symbol Word stores separately. The
-writer also refuses to delete a paragraph that ends a page-layout section, or
-the last paragraph in a cell or document. Each refusal has a plain-language
+writer also refuses to delete a paragraph that ends a page-layout section, the
+last paragraph in a cell or document, or (in direct mode) a paragraph holding
+one end of a comment or bookmark that continues into another paragraph.
+Damaged or cut-off Word XML stops with an error rather than being guessed at. Each refusal has a plain-language
 reason, ready for v2.5's "couldn't place" list.
 
 ## Still open (not covered by this test)

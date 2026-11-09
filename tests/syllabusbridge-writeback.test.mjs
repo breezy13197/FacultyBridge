@@ -168,3 +168,50 @@ test('tracked-change mode: edits show as Word tracked changes and accepting them
   const texts = (m, xml) => [...m.paragraphs.map(p => textOf(xml, p)), ...m.tables.flatMap(t => t.rows.flatMap(row => row.cells.flatMap(c => c.paragraphs.map(p => textOf(xml, p)))))];
   assert.deepEqual(texts(accepted, acceptAll(tracked.xml)), texts(plain, direct.xml));
 });
+
+// Review findings on the prototype. Small hand-built documents keep each case clear.
+const doc = body => `<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}<w:sectPr/></w:body></w:document>`;
+const textAt = (xml, i) => { const m = W.documentModel(xml); return W.paragraphText(xml, m.paragraphs[i]); };
+
+test('characters outside the basic range (emoji, some symbols) do not shift an edit', () => {
+  const xml = doc('<w:p><w:r><w:t>😀 alpha beta</w:t></w:r></w:p><w:p><w:r><w:t>End</w:t></w:r></w:p>');
+  const e = [{ anchor: { type: 'paragraph', paragraphIndex: 0 }, expectedText: '😀 alpha beta', newText: '😀 alpha gamma' }];
+  assert.equal(textAt(W.applyEdits(xml, e).xml, 0), '😀 alpha gamma');
+  const tracked = W.applyEdits(xml, e, { tracked: true, date: DATE }).xml;
+  assert.equal(textAt(acceptAll(tracked), 0), '😀 alpha gamma');
+  assert.match(tracked, /<w:delText xml:space="preserve">beta<\/w:delText>/, 'only the changed word is marked');
+  const twoEmoji = [{ anchor: { type: 'paragraph', paragraphIndex: 0 }, expectedText: '😀 alpha beta', newText: '😀🎉 alpha beta' }];
+  assert.equal(textAt(W.applyEdits(xml, twoEmoji).xml, 0), '😀🎉 alpha beta');
+});
+
+test('a paragraph holding one end of a comment or bookmark that spans paragraphs is not deleted directly', () => {
+  const xml = doc(
+    '<w:p><w:commentRangeStart w:id="0"/><w:r><w:t>First</w:t></w:r></w:p>' +
+    '<w:p><w:r><w:t>Second</w:t></w:r><w:commentRangeEnd w:id="0"/><w:r><w:commentReference w:id="0"/></w:r></w:p>' +
+    '<w:p><w:bookmarkStart w:id="3" w:name="Span"/><w:r><w:t>Third</w:t></w:r></w:p>' +
+    '<w:p><w:r><w:t>Fourth</w:t></w:r><w:bookmarkEnd w:id="3"/></w:p>' +
+    '<w:p><w:bookmarkStart w:id="4" w:name="Whole"/><w:r><w:t>Fifth</w:t></w:r><w:bookmarkEnd w:id="4"/></w:p>' +
+    '<w:p><w:r><w:t>End</w:t></w:r></w:p>');
+  const del = (i, text) => ({ anchor: { type: 'paragraph', paragraphIndex: i }, expectedText: text, newText: null });
+  const r = W.applyEdits(xml, [del(0, 'First'), del(2, 'Third'), del(3, 'Fourth'), del(4, 'Fifth')]);
+  assert.equal(r.refused.length, 3);
+  for (const x of r.refused) assert.match(x.reason, /comment or bookmark that continues into another paragraph/);
+  assert.equal(r.applied.length, 1, 'a bookmark wholly inside the paragraph goes with it');
+  assert.ok(r.xml.includes('<w:commentRangeStart w:id="0"/>') && r.xml.includes('<w:commentRangeEnd w:id="0"/>'));
+  // Tracked deletion keeps the paragraph (and its markers) until a person accepts it in Word.
+  const t = W.applyEdits(xml, [del(0, 'First')], { tracked: true, date: DATE });
+  assert.equal(t.applied.length, 1);
+  assert.ok(t.xml.includes('<w:commentRangeStart w:id="0"/>') && t.xml.includes('<w:commentRangeEnd w:id="0"/>'));
+});
+
+test('malformed XML gives an error instead of hanging', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const helper = new URL('./helpers/syllabus-docx.mjs', import.meta.url).href;
+  for (const broken of ['<w:document><w:body><!-- never closed', '<w:document><?pi never closed', '<w:document><![CDATA[ never closed', '<w:document><w:body']) {
+    const code = `const { loadWriter } = await import(${JSON.stringify(helper)});
+      try { loadWriter().parseTree(${JSON.stringify(broken)}); console.log('no error'); } catch (e) { console.log('error: ' + e.message); }`;
+    const run = spawnSync(process.execPath, ['--input-type=module', '-e', code], { timeout: 5000, encoding: 'utf8' });
+    assert.notEqual(run.error?.code, 'ETIMEDOUT', `hung on ${JSON.stringify(broken)}`);
+    assert.match(run.stdout, /^error: /, `no error for ${JSON.stringify(broken)}`);
+  }
+});

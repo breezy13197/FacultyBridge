@@ -34,15 +34,22 @@
 
   // Minimal XML tree that remembers where each element starts and ends in the
   // original text. Word's document.xml has no DTD or CDATA, so this is enough.
+  // Position just after the next `marker`; a missing marker means the file is
+  // cut off or damaged, which must be an error (never a loop back to the start).
+  function skipPast(xml, marker, from) {
+    const at = xml.indexOf(marker, from);
+    if (at < 0) throw new Error('Word document XML is cut off or damaged.');
+    return at + marker.length;
+  }
   function parseTree(xml) {
     const rootNode = { name: '#root', start: 0, end: xml.length, children: [], parent: null };
     let cur = rootNode, i = 0;
     while (i < xml.length) {
       const lt = xml.indexOf('<', i);
       if (lt < 0) break;
-      if (xml.startsWith('<?', lt)) { i = xml.indexOf('?>', lt) + 2; continue; }
-      if (xml.startsWith('<!--', lt)) { i = xml.indexOf('-->', lt) + 3; continue; }
-      if (xml.startsWith('<![CDATA[', lt)) { i = xml.indexOf(']]>', lt) + 3; continue; }
+      if (xml.startsWith('<?', lt)) { i = skipPast(xml, '?>', lt); continue; }
+      if (xml.startsWith('<!--', lt)) { i = skipPast(xml, '-->', lt); continue; }
+      if (xml.startsWith('<![CDATA[', lt)) { i = skipPast(xml, ']]>', lt); continue; }
       let gt = lt + 1, quote = '';
       for (; gt < xml.length; gt++) {
         const c = xml[gt];
@@ -132,6 +139,19 @@
     ['w:smartTag', 'contains a smart tag'],
     ['w:customXml', 'contains custom XML markup'],
   ]);
+  // True when the paragraph holds the start or end of a comment, bookmark, or
+  // other marked range whose other end is in a different paragraph.
+  function splitRange(p) {
+    const ends = new Map;
+    for (const n of descendants(p)) {
+      const m = n.name.match(/^w:(.+?)(RangeStart|RangeEnd|Start|End)$/);
+      if (!m || !/^(comment|bookmark|perm|moveFrom|moveTo|customXmlInsRange|customXmlDelRange)/.test(m[1])) continue;
+      const id = (n.attrs.match(/\bw:id="([^"]*)"/) || [])[1] ?? '';
+      const key = `${m[1]}:${id}`, side = /Start$/.test(m[2]) ? 1 : 2;
+      ends.set(key, (ends.get(key) || 0) | side);
+    }
+    return [...ends.values()].some(v => v !== 3);
+  }
   function unsafeReason(p) {
     for (const n of descendants(p)) if (UNSAFE.has(n.name)) return UNSAFE.get(n.name);
     return '';
@@ -185,11 +205,15 @@
   // Paragraph properties (style, bullets/numbering, indentation) and bookmarks
   // are never touched. newText === null deletes the whole paragraph.
   function rewriteParagraph(xml, p, parts, newText, opts, nextId) {
-    const { runs, atoms, text } = parts;
+    // Positions are counted in whole characters, one per atom. A JavaScript
+    // string counts some characters (emoji, rare symbols) as two units, which
+    // would shift every position after them.
+    const { runs, atoms } = parts;
+    const text = atoms.map(at => at.text);
     const stamp = () => `w:id="${nextId()}" w:author="${encodeAttr(opts.author)}" w:date="${encodeAttr(opts.date)}"`;
     const remove = newText === null;
-    const target = remove ? '' : String(newText);
-    if (!remove && text === target) return null; // nothing changed
+    const target = remove ? [] : Array.from(String(newText));
+    if (!remove && text.join('') === target.join('')) return null; // nothing changed
     let a = 0, b = 0;
     if (!remove) {
       while (a < text.length && a < target.length && text[a] === target[a]) a++;
@@ -202,7 +226,7 @@
       const tb = target.length - b;
       if (word(text[text.length - b]) && (word(text[text.length - b - 1]) || word(target[tb - 1]))) while (b > 0 && word(text[text.length - b])) b--;
     }
-    const delEnd = text.length - b, inserted = target.slice(a, target.length - b);
+    const delEnd = text.length - b, inserted = target.slice(a, target.length - b).join('');
     const fmt = (atoms[a] || atoms[a - 1] || runs[0])?.run?.rPrXml ?? runs[0]?.rPrXml ?? '';
     let placed = !inserted;
     const place = () => {
@@ -299,6 +323,10 @@
       if (why) { refuse(edit, `This paragraph ${why}, so the edit must be made by hand in Word.`); continue; }
       const parts = paragraphAtoms(xml, p);
       if (parts.unsafe) { refuse(edit, `This paragraph ${parts.unsafe}, so the edit must be made by hand in Word.`); continue; }
+      if (edit.newText === null && !options.tracked && splitRange(p)) {
+        refuse(edit, 'This paragraph holds one end of a Word comment or bookmark that continues into another paragraph, so deleting it would break that comment or bookmark. Delete its text instead.');
+        continue;
+      }
       if (edit.newText === null) {
         const pPr = find(p, W + 'pPr');
         if (pPr && find(pPr, W + 'sectPr')) { refuse(edit, 'This paragraph ends a page layout section; delete its text instead.'); continue; }
