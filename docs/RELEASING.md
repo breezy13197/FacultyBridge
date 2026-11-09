@@ -2,9 +2,8 @@
 
 This guide describes the current automation. Use it with the manual/content
 gates in [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md). The tag workflow now
-prepares a **draft**, rather than publishing automatically. Older checklist
-references to immediate publication or a separate Playwright workflow describe
-the previous automation; follow the process here for those steps.
+prepares a **draft**, with shared CI validation followed by artifact review and
+explicit publication after sign-off.
 
 ## Prepare the release commit
 

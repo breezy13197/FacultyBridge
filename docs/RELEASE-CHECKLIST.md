@@ -50,11 +50,11 @@ npm run test:e2e
 
 - [ ] `npm run check` passes: builds all eight site pages and eight standalone HTML files; checks local assets, script syntax, defined CSS tokens, imported processing-code hashes, deterministic output, and per-file checksums.
 - [ ] `npm run test:browser` passes for website and standalone builds, including smoke workflows, focus, contrast, and local dependency checks.
-- [ ] `npm run test:e2e` passes in Chromium, Firefox, and WebKit for both served and standalone builds. Required projects actually ran; missing browsers, skipped local fixtures, or a partial run do not count as a complete gate.
+- [ ] `npm run test:e2e` passes in Chromium, Firefox, and WebKit for both served and standalone builds. Required projects actually ran; missing browsers or a partial run do not count as a complete gate. Private local fixtures are checked separately in section 4.
 - [ ] Synthetic workflows verify downloaded contents, not just that a download occurs. Changed workflows/export formats have appropriate coverage in `e2e/workflows.js` and relevant safety/invalid-input cases.
-- [ ] Both **Suite checks** and **Playwright Tests** CI results are reviewed for the exact release commit. Retain safe evidence and investigate every failure.
+- [ ] Both required jobs, `verify` and `test`, in **Suite checks** are reviewed for the exact release commit. Retain safe evidence, inspect unexpected skips/retries, and investigate every failure. Private local-file skips are expected in CI; missing required browser projects are not.
 
-**Automation boundary:** `.github/workflows/release.yml` checks the tag against `suiteVersion`, runs `check` and the Chromium `test:browser` smoke suite, then creates the GitHub Release. It does **not** run `test:e2e`, private course-file regression, or manual sign-off. The separate Playwright workflow targets pull requests/pushes to `main` and `master`, not release tags. Verify its results on the release commit before tagging; do not assume the tag workflow supplies that coverage.
+**Automation boundary:** `.github/workflows/release.yml` checks the tag against `suiteVersion` and requires its commit to be an ancestor of `origin/main`. It calls the shared `ci.yml` workflow: `verify` runs `validate:quick`, then `test` runs all six E2E projects. Only after validation succeeds does packaging use the tested `facultybridge-build` artifact to create a **draft** GitHub Release. Automation does not run private course-file regression, provide manual sign-off, publish the draft, or deploy a website. Follow [RELEASING.md](RELEASING.md) for draft review and explicit publication.
 
 ## 3 · Fresh start, saved work, and recovery
 
@@ -107,14 +107,15 @@ Keep all real course files, local baselines, downloads, and reports private and 
 
 ## 7 · Package and distribute
 
-- [ ] All preceding gates and accepted exceptions are recorded **before** pushing the release tag. Pushing `facultybridge-v<suiteVersion>` triggers publication, not a draft/manual approval stage.
-- [ ] Tag targets the reviewed commit and matches `suite.json`. Release assets are `FacultyBridge-website.zip`, `FacultyBridge-standalone.zip`, and `dist/build-manifest.json` uploaded as `build-manifest.json`.
-- [ ] Download the actual release assets, extract them, and verify extracted `site/` and `standalone/` file bytes against their corresponding SHA-256 entries in the build manifest. The manifest hashes generated files, not the ZIP archives themselves.
+- [ ] Pre-tag automated, private regression, and manual gates and accepted exceptions are recorded. Pushing `facultybridge-v<suiteVersion>` deliberately requests a validated **draft** build; artifact review and publication sign-off follow below.
+- [ ] Tag targets the reviewed commit already merged into `main` and matches `suite.json`. The draft packages the tested build artifact as `FacultyBridge-website.zip`, `FacultyBridge-standalone.zip`, and `build-manifest.json`.
+- [ ] Download the actual draft release assets and extract each ZIP into a separate folder. ZIP roots contain site/standalone contents, not their parent folders. Verify extracted file bytes against the manifest's corresponding `site/` and `standalone/` SHA-256 entries using those extraction roots. The manifest hashes generated files, not the ZIP archives themselves.
 - [ ] Serve the extracted website at the intended host/base path and open the extracted standalone files from disk. Verify all eight pages/files and navigation, plus a representative import/export from the distributed copy.
 - [ ] Hosting/deployment is handled explicitly if needed; the release workflow packages files but does not deploy a website. Check the actual shared download location rather than a Drive/email HTML preview.
-- [ ] Use one canonical distribution location, mark older versions superseded, and retain the previous known-good artifacts for recovery. Tell users with downloaded copies how to replace them.
 - [ ] Confirm packages, release notes, and attached QA artifacts contain no private course data, student records, credentials, or private test reports.
-- [ ] Release owner/reviewer signs off, known issues and workarounds are visible, and colleagues can complete the workflow unassisted. Record a post-publication smoke result and how to report problems.
+- [ ] Release owner/reviewer signs off on the draft artifacts and completed gates or accepted exceptions. Known issues and workarounds are visible, and colleagues can complete the workflow unassisted.
+- [ ] Explicitly publish the approved draft in GitHub Releases. Use one canonical distribution location, mark older versions superseded, and retain the previous known-good artifacts for recovery. Tell users with downloaded copies how to replace them.
+- [ ] Record a post-publication smoke result from the actual shared copy and how to report problems.
 
 ## Reviewed status and remaining gaps
 
@@ -128,9 +129,11 @@ Repository review: **2026-11-01**. This is source/test-coverage evidence, not ce
 | QuestionBridge completion stepper | **Fixed in source:** a step is checked only when its work is done. Upload: questions exist. Review: every question is complete and its answer confirmed. Validate: at least one destination is selected and nothing is blocked. `e2e/questionbridge-readiness.spec.js` covers this. Still confirm it during the manual workflow pass. |
 | QuestionBridge destructive controls / touch targets | Question deletion, starting over, and clearing saved work ask first. Deleting an answer shows an Undo note. The answer marker and delete buttons now have 40 × 40 px click areas, covered by `e2e/questionbridge-readiness.spec.js`. Still check the editor by hand at 200% zoom and with a screen reader. |
 | Full regression and managed-machine evidence | Historical [migration QA](QA-MIGRATION.md) records missing four-exam/nine-syllabus inputs and pending managed Windows/Edge review. New synthetic/local-runner coverage does not by itself close those gates. Attach current private evidence or keep distribution blocked. |
-| Tag automation coverage | The release workflow omits the six-project E2E suite and publishes immediately after smoke checks. Require full results on the tagged commit now; consider adding `test:e2e` to that workflow as a follow-up. |
+| Tag automation coverage | The release workflow now reuses `ci.yml` (`verify` then all six E2E projects in `test`) and creates a draft from the tested build artifact. Review full results on the exact tagged commit, exercise the draft assets, and explicitly publish only after private/manual gates and sign-off. |
 | Storage fallback and accessibility labels | Suite 1.3.1 adds shared in-memory fallback when browser storage access throws, form labels/status announcements, and landmark/contrast fixes. `tests/browser.mjs` adds blocked-storage startup, form-name, and main-landmark checks. Verify affected workflows and explain that fallback storage does not persist across reopening; these checks do not certify all accessibility or persistence behavior. |
 | Shared pop-up and unsaved-work warning | Suite 1.4.0 replaces the browser's built-in boxes and five home-made pop-ups with `packages/ui/dialog.js`. `tests/build.test.mjs` refuses `alert`/`confirm`/`prompt`, home-made `role="dialog"` markup, and per-tool `beforeunload`; `e2e/dialogs.spec.js` checks Escape, focus return, screen-reader role, and when each tool warns before leaving. Each tool's import-baseline hash was updated for pop-up code only. Run each tool's real-course regression below, and check Escape/focus by hand on managed Windows/Edge. Browsers show their own fixed wording for the leave warning. |
 | Support and recovery | Suite 1.5.0 shows a support contact (`support.email` in `suite.json`), the exact build, and safe-reporting guidance on every page; `tests/build.test.mjs` requires the contact and `tests/browser.mjs` checks the note on every page in both formats. Before each release, confirm the contact is still monitored. Saved-project recovery and replacement guidance for downloaded copies are still needed. |
+
+Automation statements rechecked against `ci.yml` and `release.yml`: **2026-11-09**. This focused documentation review does not update the manual/private regression status above.
 
 Refresh this status table each release. Historical baseline and migration documents describe their recorded versions; investigate discrepancies against current source and reviewed outputs before changing expectations.
