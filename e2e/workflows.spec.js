@@ -122,6 +122,48 @@ test('SyllabusBridge keeps every coordinator under a plural heading', async ({ p
   expect(await page.evaluate(() => state.coordinatorIds)).toEqual(['faculty', 'teacher']);
 });
 
+// Calendar files must say class times are Eastern, so they land at the right hour in any
+// calendar app and on any computer. The exporting computer here is set to Pacific time, and
+// the course runs across the November daylight-saving change.
+test.describe('CalendarBridge time zone', () => {
+  test.use({ timezoneId: 'America/Los_Angeles' });
+  test('calendar files carry Eastern time across daylight saving, whatever the computer zone', async ({ page, openTool }) => {
+    const syllabus = { ...syntheticSyllabus, paragraphs: syntheticSyllabus.paragraphs.filter(p => p !== 'Course Schedule') };
+    await openTool('syllabusbridge');
+    await page.locator('#file').setInputFiles({ name: 'syllabus.docx', mimeType: DOCX_MIME, buffer: await syntheticDocx(syllabus) });
+    await page.locator('#runValidation').click();
+    const { text } = await downloadFrom(page, async () => {
+      await page.locator('#exportCourseJsonReport').click();
+      await page.getByRole('dialog', { name: 'Export with validation issues?' }).getByRole('button', { name: 'Export anyway' }).click();
+    });
+    // Move the three Mon/Wed/Mon classes to straddle 1 Nov 2026, when Eastern time leaves daylight saving.
+    const course = JSON.parse(text);
+    const moved = { '2026-09-21': '2026-10-26', '2026-09-23': '2026-10-28', '2026-09-28': '2026-11-02' };
+    course.schedule.forEach(e => { e.date = moved[e.date]; });
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'bridge-')), 'course.json');
+    fs.writeFileSync(file, JSON.stringify(course));
+
+    await openTool('calendarbridge');
+    await page.locator('#courseJsonInput').setInputFiles(file);
+    await page.locator('#toFaculty').click();
+    await page.locator('#toExport').click();
+    await expect(page.locator('#screen-export')).toContainText('Eastern Time');
+    const ics = (await downloadFrom(page, () => page.locator('#downloadSharedIcs').click())).text;
+    // Class times keep their clock time and carry the Eastern zone; none is left without a zone.
+    const events = ics.slice(ics.indexOf('BEGIN:VEVENT'));
+    expect(events.match(/^DTSTART.*$/gm)).toEqual(['DTSTART;TZID=America/New_York:20261026T090000',
+      'DTSTART;TZID=America/New_York:20261028T090000', 'DTSTART;TZID=America/New_York:20261102T090000']);
+    expect(events.match(/^DTEND.*$/gm)).toEqual(['DTEND;TZID=America/New_York:20261026T100000',
+      'DTEND;TZID=America/New_York:20261028T100000', 'DTEND;TZID=America/New_York:20261102T100000']);
+    // One zone definition with the US daylight-saving rules, before the first event.
+    const zone = ics.slice(ics.indexOf('BEGIN:VTIMEZONE'), ics.indexOf('END:VTIMEZONE'));
+    expect(ics.match(/BEGIN:VTIMEZONE/g)).toHaveLength(1);
+    expect(ics.indexOf('END:VTIMEZONE')).toBeLessThan(ics.indexOf('BEGIN:VEVENT'));
+    for (const line of ['TZID:America/New_York', 'BEGIN:DAYLIGHT', 'TZOFFSETFROM:-0500', 'TZOFFSETTO:-0400', 'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU',
+      'BEGIN:STANDARD', 'RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU']) expect(zone).toContain(line);
+  });
+});
+
 // Syllabi that number outcomes "CO1, CO2…", misspell "ACCOMODATION", and use colon-free policy
 // headings (EXCUSED ABSENCE POLICY, ELECTRONIC DEVICES, COPYRIGHT) must still split into the
 // right sections, and a bulleted policy reference must not end the course-specific policies.

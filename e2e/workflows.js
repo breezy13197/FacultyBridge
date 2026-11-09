@@ -207,8 +207,10 @@ export const workflows = {
     expect(ics.trimEnd().endsWith('END:VCALENDAR')).toBe(true);
     expect(ics.match(/BEGIN:VEVENT/g)).toHaveLength(3);
     expect(ics.match(/END:VEVENT/g)).toHaveLength(3);
-    expect(ics.match(/^DTSTART:\d{8}T\d{6}$/gm)).toEqual(['DTSTART:20260921T090000', 'DTSTART:20260923T090000', 'DTSTART:20260928T090000']);
-    expect(ics.match(/^DTEND:\d{8}T\d{6}$/gm)).toEqual(['DTEND:20260921T100000', 'DTEND:20260923T100000', 'DTEND:20260928T100000']);
+    // Class times carry the Eastern zone so calendar apps don't shift them.
+    const tz = 'TZID=America/New_York';
+    expect(ics.match(/^DTSTART;.+$/gm)).toEqual([`DTSTART;${tz}:20260921T090000`, `DTSTART;${tz}:20260923T090000`, `DTSTART;${tz}:20260928T090000`]);
+    expect(ics.match(/^DTEND;.+$/gm)).toEqual([`DTEND;${tz}:20260921T100000`, `DTEND;${tz}:20260923T100000`, `DTEND;${tz}:20260928T100000`]);
     for (const topic of ['Proteins', 'Enzymes', 'Hemoglobin']) expect(ics).toContain(`SUMMARY:PHA9999 – Synthetic Course: ${topic}`);
     // UIDs must be unique or calendar apps merge events.
     const uids = ics.match(/^UID:.+$/gm);
