@@ -217,6 +217,19 @@ test('CalendarBridge revised calendars keep event IDs and number each change', a
   expect(third.Enzymes).toEqual({ uid: first.Enzymes.uid, seq: '2' });
   expect(third.Proteins).toEqual(first.Proteins);
   expect(third.Lipids).toEqual(second.Lipids);
+
+  // Revision 3: Enzymes moves to another day. Without a lecture number the comparison matches
+  // events by date, so a moved event must still be recognized as the same event: same UID, next
+  // SEQUENCE, and no "removed" copy carrying that UID.
+  const rev3 = [rev2[0], row('9/25/2026', '2:00 PM - 3:00 PM', 'Enzymes'), rev2[2], rev2[3]];
+  await saveAndReopen('v3.json', rev3);
+  await expect(page.locator('#revChanged')).toHaveText('1');
+  await expect(page.locator('#revAdded')).toHaveText('0');
+  await expect(page.locator('#revRemoved')).toHaveText('0');
+  const fourth = await exportShared();
+  expect(fourth.Enzymes).toEqual({ uid: first.Enzymes.uid, seq: '3' });
+  expect(fourth.Proteins).toEqual(first.Proteins);
+  expect(new Set(Object.values(fourth).map(e => e.uid)).size).toBe(4);
 });
 
 // Syllabi that number outcomes "CO1, CO2…", misspell "ACCOMODATION", and use colon-free policy
