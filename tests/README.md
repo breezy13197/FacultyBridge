@@ -39,6 +39,11 @@ What it covers, using synthetic data only:
   CalendarBridge and exported as `.ics`. GradeBridge safety gates (percentage-only
   exports, Excel-mangled IDs, duplicates, unmatched students, missing scores)
   are tested to confirm unsafe files are refused.
+- `syllabusbridge-writeback.spec.js`: Word files edited by the SyllabusBridge
+  write-back prototype (direct and tracked-change edits) are uploaded back into
+  SyllabusBridge, which must read the new text and ignore deleted text. The
+  matching Node tests are in `syllabusbridge-writeback.test.mjs`; see
+  [the round-trip findings](../docs/SYLLABUSBRIDGE-ROUNDTRIP.md).
 - `offline.spec.js`: the same workflows with the network disabled after the page
   loads, to prove nothing is lazy-loaded from outside the computer.
 
