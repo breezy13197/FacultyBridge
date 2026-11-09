@@ -164,6 +164,61 @@ test.describe('CalendarBridge time zone', () => {
   });
 });
 
+// A revised syllabus must update events already in faculty calendars, not add second copies.
+// Calendar apps recognize an update by the same UID with a higher SEQUENCE, so each event keeps
+// its UID across revisions, unchanged events keep their SEQUENCE, and changed events go up by one.
+test('CalendarBridge revised calendars keep event IDs and number each change', async ({ page, openTool }) => {
+  const header = ['PHA9999 - Synthetic Course', 'COURSE COORDINATOR: Ada Faculty, PharmD', 'Email: afaculty@example.edu', 'Fall 2026', 'Course Schedule'];
+  const row = (date, time, topic) => [date, time, topic, 'Ada Faculty'];
+  const syllabus = rows => ({ paragraphs: header, table: [['Date', 'Time', 'Topic', 'Faculty'], ...rows] });
+  const original = [row('9/21/2026', '9:00 AM - 10:00 AM', 'Proteins'), row('9/23/2026', '9:00 AM - 10:00 AM', 'Enzymes'),
+    row('9/28/2026', '9:00 AM - 10:00 AM', 'Hemoglobin')];
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bridge-'));
+  const events = ics => Object.fromEntries(ics.split('BEGIN:VEVENT').slice(1).map(v => [v.match(/^SUMMARY:.*: (.+)$/m)[1],
+    { uid: v.match(/^UID:(.+)$/m)[1], seq: v.match(/^SEQUENCE:(.+)$/m)?.[1] }]));
+  const exportShared = async () => {
+    await page.locator('#toFaculty').click();
+    await page.locator('#toExport').click();
+    return events((await downloadFrom(page, () => page.locator('#downloadSharedIcs').click())).text);
+  };
+  const saveAndReopen = async (name, revised) => {
+    const file = path.join(dir, name);
+    fs.writeFileSync(file, (await downloadFrom(page, () => page.locator('#saveProject').click())).text);
+    await openTool('calendarbridge');
+    await page.locator('#projectInput').setInputFiles(file);
+    await expect(page.locator('#screen-review')).toBeVisible();
+    await page.locator('#revisionInput').setInputFiles({ name: 'revised.docx', mimeType: DOCX_MIME, buffer: await syntheticDocx(syllabus(revised)) });
+    await expect(page.locator('#revisionPanel')).toBeVisible();
+  };
+
+  await openTool('calendarbridge');
+  await page.locator('#fileInput').setInputFiles({ name: 'syllabus.docx', mimeType: DOCX_MIME, buffer: await syntheticDocx(syllabus(original)) });
+  await expect(page.locator('#screen-review')).toBeVisible();
+  const first = await exportShared();
+  expect(Object.values(first).map(e => e.seq)).toEqual(['0', '0', '0']);
+  // The export screen tells faculty what to do when the syllabus changes.
+  await expect(page.locator('#screen-export')).toContainText('If the syllabus changes');
+
+  // Revision 1: Enzymes moves to the afternoon and a Lipids class is added.
+  const rev1 = [original[0], row('9/23/2026', '1:00 PM - 2:00 PM', 'Enzymes'), original[2], row('9/30/2026', '9:00 AM - 10:00 AM', 'Lipids')];
+  await saveAndReopen('v1.json', rev1);
+  await expect(page.locator('#revChanged')).toHaveText('1');
+  const second = await exportShared();
+  expect(second.Proteins).toEqual(first.Proteins);
+  expect(second.Hemoglobin).toEqual(first.Hemoglobin);
+  expect(second.Enzymes).toEqual({ uid: first.Enzymes.uid, seq: '1' });
+  expect(second.Lipids.seq).toBe('0');
+  expect(new Set(Object.values(second).map(e => e.uid)).size).toBe(4);
+
+  // Revision 2, compared with the project saved after revision 1: Enzymes moves again.
+  const rev2 = [rev1[0], row('9/23/2026', '2:00 PM - 3:00 PM', 'Enzymes'), rev1[2], rev1[3]];
+  await saveAndReopen('v2.json', rev2);
+  const third = await exportShared();
+  expect(third.Enzymes).toEqual({ uid: first.Enzymes.uid, seq: '2' });
+  expect(third.Proteins).toEqual(first.Proteins);
+  expect(third.Lipids).toEqual(second.Lipids);
+});
+
 // Syllabi that number outcomes "CO1, CO2…", misspell "ACCOMODATION", and use colon-free policy
 // headings (EXCUSED ABSENCE POLICY, ELECTRONIC DEVICES, COPYRIGHT) must still split into the
 // right sections, and a bulleted policy reference must not end the course-specific policies.
