@@ -599,7 +599,9 @@ function renderStructuredTableEditor(table,editors){
  box.querySelector('.add-structured-row').onclick=()=>{
   const current=structuredDisplayModel(table),row=makeStructuredRow(table,current.maxCols);
   table.rows.push(row);recordAddRow(table,row);refreshDerivedTableViews();draw();markEditorChanged();
-  requestAnimationFrame(()=>tbody.querySelector(`tr[data-editor-row-id="${row.editorRowId}"] textarea`)?.focus())
+  // Focus now, not on a later animation frame: a late frame could pull the cursor
+  // back here after faculty had already moved to another cell and started typing.
+  tbody.querySelector(`tr[data-editor-row-id="${row.editorRowId}"] textarea`)?.focus()
  };
  return box
 }
@@ -737,13 +739,36 @@ function saveProject(){
  downloadText(JSON.stringify(project,null,2),name);projectWork.markSaved();
  const st=$('historyStatus');if(st)st.textContent=`Project saved as ${name}. Keep it with the Word syllabus; reopening needs both.`
 }
+// Checks every saved field SyllabusBridge will use, before anything on screen
+// changes. Returns a plain description of the first problem, or ''.
+const PROJECT_EDITOR_FIELDS=['course','faculty','coordinator','clos','cloMappings','plos','grading','assessments','policies','schedule','meetingPatterns','structuredTables','cloEditorIds'];
+function projectDataProblem(obj){
+ const isObj=v=>!!v&&typeof v==='object'&&!Array.isArray(v),isStr=v=>typeof v==='string',optStr=v=>v===undefined||v===null||isStr(v);
+ const isInt=v=>Number.isInteger(v),strings=v=>Array.isArray(v)&&v.every(isStr);
+ const objsWith=(v,check)=>Array.isArray(v)&&v.every(x=>isObj(x)&&check(x));
+ const e=obj.editor;
+ const cell=c=>isObj(c)&&isInt(c.columnIndex)&&isStr(c.text)&&(c.lines===undefined||strings(c.lines));
+ const row=r=>isObj(r)&&(r.rowIndex===null||r.rowIndex===undefined||isInt(r.rowIndex))&&(r.rowIndex!=null||isStr(r.editorRowId))&&optStr(r.editorRowId)&&Array.isArray(r.cells)&&r.cells.every(cell);
+ const checks=[
+  ['course details',()=>isObj(e.course)&&['code','title','year','location'].every(k=>optStr(e.course[k]))],
+  ['faculty',()=>objsWith(e.faculty,f=>isStr(f.name)&&['email','short','role','editorId'].every(k=>optStr(f[k])))&&(e.coordinator===null||e.coordinator===undefined||isObj(e.coordinator))],
+  ['course learning outcomes',()=>strings(e.clos)&&strings(e.plos||[])&&strings(e.cloEditorIds||[])&&objsWith(e.cloMappings||[],m=>optStr(m.clo)&&(m.pslos===undefined||strings(m.pslos)))],
+  ['grading',()=>objsWith(e.grading,g=>optStr(g.label)&&(g.pct===undefined||typeof g.pct==='number'))&&objsWith(e.assessments||[],()=>true)],
+  ['course policies',()=>e.policies===undefined||isObj(e.policies)&&Object.values(e.policies).every(v=>isStr(v)||typeof v==='boolean')],
+  ['course schedule',()=>objsWith(e.schedule,x=>['date','day','time','topic','faculty','raw','editorId'].every(k=>optStr(x[k]))&&(x.source===undefined||x.source===null||isObj(x.source)))&&objsWith(e.meetingPatterns||[],()=>true)],
+  ['structured tables',()=>objsWith(e.structuredTables,t=>isInt(t.tableIndex)&&isStr(t.type)&&strings(t.headers||[])&&Array.isArray(t.rows)&&t.rows.every(row))],
+  ['change records',()=>objsWith(obj.tableMutations,m=>isStr(m.key)&&['update-cell','add-row','remove-row'].includes(m.action)&&isInt(m.tableIndex)&&(m.action!=='add-row'||isStr(m.editorRowId)&&row(m.row)))],
+ ];
+ for(const [where,ok] of checks){let good=false;try{good=!!ok()}catch(err){good=false}if(!good)return`This SyllabusBridge project file is damaged (problem found in: ${where}), so it was not opened. Open an earlier saved copy, or start again from the Word syllabus.`}
+ return''
+}
 function projectProblem(obj){
  if(!obj||typeof obj!=='object'||obj.format!==PROJECT_FORMAT)return'This is not a SyllabusBridge project file. Choose a file saved with "Save SyllabusBridge project". (A Course JSON export cannot be reopened here.)';
  if(!Number.isInteger(obj.formatVersion)||obj.formatVersion<1)return'This SyllabusBridge project file is damaged: its format version is missing.';
  if(obj.formatVersion>PROJECT_FORMAT_VERSION)return`This project was saved by a newer SyllabusBridge (version ${obj.savedBy?.version||'unknown'}). Open it in that version or later.`;
  const e=obj.editor;
  if(!e||typeof e!=='object'||!e.course||!['faculty','clos','grading','schedule','structuredTables'].every(k=>Array.isArray(e[k]))||!Array.isArray(obj.tableMutations))return'This SyllabusBridge project file is damaged: some saved edits are missing.';
- return''
+ return projectDataProblem(obj)
 }
 async function openProjectFile(file){
  clearError();pendingProject=null;showProjectPending();
@@ -763,11 +788,32 @@ function showProjectPending(){
 }
 async function applyPendingProject(){
  const p=pendingProject,fp=state.sourceFingerprint||{},src=p.source||{};
- const sameFile=src.sha256&&fp.sha256?src.sha256===fp.sha256:(src.size===fp.size&&src.fileName===state.sourceName);
- if(!sameFile&&!await FTDialog.confirm(`This project was saved from "${src.fileName||'another Word file'}", but the file you chose${state.sourceName&&state.sourceName!==src.fileName?` ("${state.sourceName}")`:''} is different. It may be another version of the syllabus.\n\nIf you continue, the saved edits replace what SyllabusBridge read from this file, and the change count compares them with this file.`,{title:'Different Word file?',confirmLabel:'Open project anyway'}))return false;
- const saved=structuredClone(p.editor);
- Object.assign(state,saved);state.tableMutations=structuredClone(p.tableMutations);state.cloEditorIds=[...(saved.cloEditorIds||[])];
- refreshDerivedTableViews();resetHistory();state.openedProject=true;pendingProject=null;showProjectPending();
+ // Only two matching SHA-256 fingerprints prove it is the same file. A name and
+ // size can match for different files, so without both fingerprints, ask.
+ const verified=!!(src.sha256&&fp.sha256),sameFile=verified&&src.sha256===fp.sha256;
+ const consequence='If you continue, the saved edits replace what SyllabusBridge read from this file, and the change count compares them with this file.';
+ if(!sameFile){
+  const ok=verified
+   ?await FTDialog.confirm(`This project was saved from "${src.fileName||'another Word file'}", but the file you chose${state.sourceName&&state.sourceName!==src.fileName?` ("${state.sourceName}")`:''} is different. It may be another version of the syllabus.\n\n${consequence}`,{title:'Different Word file?',confirmLabel:'Open project anyway'})
+   :await FTDialog.confirm(`SyllabusBridge could not confirm that "${state.sourceName}" is the Word file this project was saved from ("${src.fileName||'unknown'}"). ${src.sha256?'This browser could not check the file you chose.':'The project was saved without a file fingerprint.'} A file with the same name can still be a different version.\n\n${consequence}`,{title:'Word file not verified',confirmLabel:'Open project anyway'});
+  if(!ok)return false
+ }
+ const before=state;
+ try{
+  // Restore only the fields the editor uses, from a copy of the checked project.
+  state={...state};
+  const saved=structuredClone(p.editor);
+  for(const k of PROJECT_EDITOR_FIELDS)if(saved[k]!==undefined)state[k]=saved[k];
+  state.coordinator=(state.faculty||[]).find(f=>saved.coordinator?.editorId&&f.editorId===saved.coordinator.editorId)||(state.faculty||[]).find(f=>f.role==='coordinator')||null;
+  state.tableMutations=structuredClone(p.tableMutations);state.cloEditorIds=[...(saved.cloEditorIds||[])];
+  refreshDerivedTableViews();renderReview();resetHistory()
+ }catch(err){
+  console.warn('SyllabusBridge project could not be restored',err);
+  state=before;pendingProject=null;showProjectPending();
+  showError('This SyllabusBridge project file is damaged, so it was not opened. Open an earlier saved copy, or start again from the Word syllabus.','Project could not be opened');
+  return false
+ }
+ state.openedProject=true;pendingProject=null;showProjectPending();
  updateEditorStatus();projectWork.markSaved();
  const notes=[`Opened the project saved ${p.savedAt?new Date(p.savedAt).toLocaleString():'earlier'}.`];
  if(!sameFile)notes.push('It was saved from a different Word file.');

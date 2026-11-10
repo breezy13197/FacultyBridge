@@ -137,3 +137,53 @@ test('the leave-page warning tracks edits made since the last save', async ({ pa
   await page.locator('#undoEdit').click();
   expect(await unsaved(page)).toBe(false);
 });
+
+// Review findings: identity must be proven by two matching fingerprints, and
+// damaged projects must be refused before anything on screen changes.
+test('without file fingerprints, reopening always asks before applying edits', async ({ page, openTool }) => {
+  // Simulate a browser that cannot compute SHA-256 fingerprints.
+  await page.addInitScript(() => Object.defineProperty(Crypto.prototype, 'subtle', { get: () => undefined }));
+  const original = await docxFile('rubric.docx', [['Exam', '50'], ['Project', '50']]);
+  const sameSizeDifferent = await docxFile('rubric.docx', [['Exam', '60'], ['Project', '40']]);
+  expect(sameSizeDifferent.buffer.length).toBe(original.buffer.length);
+  await openTool('syllabusbridge');
+  await upload(page, original);
+  await makeEdits(page);
+  const { name, project } = await saveProject(page);
+  expect(project.source.sha256).toBeNull();
+
+  await page.locator('#screen-review').getByRole('button', { name: '← Upload' }).click();
+  await openProject(page, jsonFile(name, project));
+  await page.locator('#file').setInputFiles(sameSizeDifferent);
+  const notVerified = page.getByRole('dialog', { name: 'Word file not verified' });
+  await expect(notVerified).toContainText('could not confirm');
+  await notVerified.getByRole('button', { name: 'Cancel' }).click();
+  expect(await page.evaluate(() => state.lines.length)).toBe(0);
+
+  // Even the identical file cannot be proven identical without fingerprints.
+  await page.locator('#file').setInputFiles(original);
+  await page.getByRole('dialog', { name: 'Word file not verified' }).getByRole('button', { name: 'Open project anyway' }).click();
+  await expect(page.locator('#courseTitle')).toHaveValue('Revised Synthetic Course');
+});
+
+test('damaged project contents are refused with a plain explanation before anything changes', async ({ page, openTool }) => {
+  await openTool('syllabusbridge');
+  await upload(page, await docxFile('rubric.docx'));
+  const { name, project } = await saveProject(page);
+  await page.locator('#screen-review').getByRole('button', { name: '← Upload' }).click();
+  const damaged = [
+    ['structured tables', p => { p.editor.structuredTables = [null]; }],
+    ['structured tables', p => { p.editor.structuredTables[0].rows[0].cells = [{ columnIndex: 0 }]; }],
+    ['change records', p => { p.tableMutations = [{ key: 'add:0:x', action: 'add-row', tableIndex: 0, editorRowId: 'x' }]; }],
+    ['faculty', p => { p.editor.faculty = [5]; }],
+    ['course details', p => { p.editor.course = 'PHA9999'; }],
+  ];
+  for (const [where, damage] of damaged) {
+    const copy = structuredClone(project);
+    damage(copy);
+    await openProject(page, jsonFile(name, copy));
+    await expect(page.locator('#uploadError')).toContainText(`problem found in: ${where}`);
+    await expect(page.locator('#projectPending')).toBeHidden();
+    expect(await page.evaluate(() => state.sourceName)).toBe('rubric.docx');
+  }
+});

@@ -90,13 +90,19 @@ Acceptance criteria (each covered by `e2e/syllabusbridge-undo.spec.js`):
   choose the Word syllabus it was made from. SyllabusBridge reads the Word file
   again and then puts the saved edits back, so **Reset edits** still returns to
   that file's parsed text.
-- **Different Word file:** if the fingerprint doesn't match, a warning appears
-  *before* anything is applied. Cancel leaves nothing loaded. Continuing applies
+- **Different Word file:** only two matching SHA-256 fingerprints count as the
+  same file. If they differ, a "Different Word file?" warning appears *before*
+  anything is applied. If either fingerprint is missing (for example, a browser
+  that can't compute one), a "Word file not verified" warning appears instead,
+  because a matching name and size don't prove it's the same file. Cancel leaves nothing loaded. Continuing applies
   the saved edits, and the change count then compares them with the new file.
   (A per-edit "which edits no longer line up" view needs the paragraph
   locations from the round-trip findings and comes with item 3.)
 - **Plain errors** for files that aren't projects (including Course JSON
   exports), damaged projects, and projects saved by a newer SyllabusBridge.
+  Every saved field (tables, rows, cells, change records, faculty, schedule)
+  is checked before anything on screen changes, and only the fields the editor
+  uses are restored.
 - The leave-page warning now means "edits not yet saved in a project": it
   clears after saving and returns with the next edit.
 - Undo history is not saved; a reopened project starts a fresh history.
