@@ -120,3 +120,58 @@ test('uploading another syllabus starts a fresh undo history', async ({ page, op
   await expect(page.locator('#undoEdit')).toBeDisabled();
   await expect(page.locator('#redoEdit')).toBeDisabled();
 });
+
+// Review finding: undo must keep each added structured-table row's identity, or
+// the visible editor and the exported change records disagree.
+test('undo and redo keep added table rows linked to their change records', async ({ page, openTool }) => {
+  const rubric = { paragraphs: syntheticSyllabus.paragraphs.filter(p => p !== 'Course Schedule'), table: [['Component', 'Points'], ['Exam', '50'], ['Project', '50']] };
+  await openTool('syllabusbridge');
+  await page.locator('#file').setInputFiles({ name: 'rubric.docx', mimeType: DOCX_MIME, buffer: await syntheticDocx(rubric) });
+  await expect(page.locator('#screen-review')).toBeVisible();
+  const editor = page.locator('.sb-structured-editor').filter({ has: page.locator('.add-structured-row') }).first();
+  const lastRow = () => editor.locator('tbody tr').last();
+  // Every visible added row must have exactly one matching add-row record, holding its current text.
+  const linkage = () => page.evaluate(() => {
+    const rows = state.structuredTables.flatMap(t => t.rows.filter(r => r.rowIndex == null));
+    const adds = state.tableMutations.filter(m => m.action === 'add-row' && m.active !== false);
+    return {
+      rows: rows.map(r => ({ id: r.editorRowId ?? null, text: r.cells.map(c => c.text) })),
+      adds: adds.map(m => ({ id: m.editorRowId, text: m.row.cells.map(c => c.text) })),
+      changes: editorDiffCount(),
+      exportedAdds: buildFacultyBridgeCourse().tableMutations.filter(m => m.action === 'add-row' && m.active !== false).length,
+    };
+  });
+
+  // 1. Add and fill in a rubric row.
+  await editor.locator('.add-structured-row').click();
+  await lastRow().locator('textarea').nth(0).fill('Participation');
+  await lastRow().locator('textarea').nth(1).fill('10');
+  // 2. Change the course title, then undo that change.
+  await page.locator('#courseTitle').fill('Revised Synthetic Course');
+  await page.locator('#courseTitle').press('Tab');
+  await page.locator('#undoEdit').click();
+  let seen = await linkage();
+  expect(seen.rows).toHaveLength(1);
+  expect(seen.rows[0].id).not.toBeNull();
+  expect(seen.adds).toEqual(seen.rows);
+
+  // 3. Edit the restored row again: its add-row record must follow.
+  await lastRow().locator('textarea').nth(1).fill('15');
+  seen = await linkage();
+  expect(seen.adds).toEqual(seen.rows);
+  expect(seen.rows[0].text).toEqual(['Participation', '15']);
+
+  // Redo and undo again keep the link too.
+  await page.locator('#undoEdit').click();
+  await page.locator('#redoEdit').click();
+  seen = await linkage();
+  expect(seen.adds).toEqual(seen.rows);
+
+  // 4. Delete the row: no phantom addition remains in the editor or the Course JSON.
+  await lastRow().locator('.sb-mini-remove').click();
+  seen = await linkage();
+  expect(seen.rows).toHaveLength(0);
+  expect(seen.adds).toHaveLength(0);
+  expect(seen.exportedAdds).toBe(0);
+  expect(seen.changes).toBe(0);
+});

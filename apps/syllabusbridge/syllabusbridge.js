@@ -414,8 +414,11 @@ function updateEditorStatus(){
 // history list; undo and redo put an earlier or later copy back. Copies (not
 // replayed edits) keep undo exact, and the editor data is small. Typing in one
 // field without a pause of 2 seconds or more counts as one step.
+// The copy keeps structured tables exactly as the editor holds them, including
+// each added row's editorRowId, which its add-row change record points to.
+// (editorSnapshot() keeps a reduced form that is only for counting changes.)
 const HISTORY_LIMIT=100,HISTORY_GROUP_MS=2000;
-function historySnapshot(){return structuredClone({editor:editorSnapshot(),tableMutations:state.tableMutations||[]})}
+function historySnapshot(){return structuredClone({editor:{...editorSnapshot(),structuredTables:state.structuredTables||[]},tableMutations:state.tableMutations||[]})}
 function resetHistory(){state.history={past:[],future:[],current:historySnapshot(),groupKey:null,groupAt:0};updateHistoryControls('')}
 function typingTarget(el){return !!el&&(el.tagName==='TEXTAREA'||(el.tagName==='INPUT'&&!/^(button|checkbox|radio|submit|reset|file|color|range)$/i.test(el.type||'')))||!!el?.isContentEditable}
 function recordHistory(){
