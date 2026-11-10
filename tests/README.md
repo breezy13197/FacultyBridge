@@ -56,6 +56,9 @@ What it covers, using synthetic data only:
   verified by fingerprint), damaged project contents are refused before
   anything changes, non-project files get a plain error, and the leave-page
   warning tracks saving.
+- `syllabusbridge-change-summary.spec.js`: SyllabusBridge change summary:
+  one row per counted change, grouped by section with before and after, the
+  same list in the printable report, and table cells/rows under their table.
 - `offline.spec.js`: the same workflows with the network disabled after the page
   loads, to prove nothing is lazy-loaded from outside the computer.
 

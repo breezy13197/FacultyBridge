@@ -150,13 +150,30 @@ Why this matters for later versions:
 - **Year-over-year rollover:** next year's syllabus can carry forward the
   intentional edits; parser corrections become parser fixes instead.
 
-### 4. Change summary
+### 4. Change summary — done (unreleased)
 
-- A screen listing exactly what changed, grouped **by syllabus section**, with
-  "before" and "after" for each change and its kind.
-- Can also be grouped **by finding**, showing which report items each edit
-  addressed.
-- Printable, so it can go to a coordinator or committee with the syllabus.
+- **Review changes** (under the "N net changes" count in the editor's status
+  bar) opens a list of every change, grouped by section: course information,
+  coordinator & course faculty, course learning outcomes, grading, policies
+  and narrative sections, course schedule, and each structured table.
+- Each row shows the kind of change (**Changed**, **Added**, **Removed**, as
+  words, not just colors), the item, and the text **before** and **after**.
+- The summary is built from the same comparison as the "N net changes" count:
+  one row per counted change, so the two always agree.
+- The **Validation report** includes the same summary ("Changes made in
+  SyllabusBridge"), so **Print / save PDF** gives a coordinator or committee
+  the validation results and the edits together.
+- Not yet: grouping by finding (needs findings linked to edits, item 3 and
+  v2.3) and showing the kind of change (parser correction vs. syllabus edit,
+  item 3). Long narrative sections show the whole before and after text;
+  highlighting only the changed words would be a later improvement.
+
+Acceptance criteria (each covered by `e2e/syllabusbridge-change-summary.spec.js`):
+- [x] Every counted change appears once, under its section, with before and
+  after; the number of rows equals "N net changes".
+- [x] Table cell edits, added rows, and removed rows appear under their table.
+- [x] The printable report contains the same summary, visible when printing.
+- [x] With no edits, or after undoing them, the summary says nothing changed.
 
 ### 5. Word round-trip test (groundwork for v2.5) — done
 
