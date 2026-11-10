@@ -399,7 +399,7 @@ function editorSnapshot(){
   structuredTables:editorStructuredTablesSnapshot(),cloEditorIds:[...(state.cloEditorIds||[])]
  });
 }
-function captureEditorBaseline(){initializeEditorIdentity();state.editorBaseline=editorSnapshot();state.editMutations=[];state.dirty=false;updateEditorStatus()}
+function captureEditorBaseline(){initializeEditorIdentity();state.editorBaseline=editorSnapshot();state.editMutations=[];state.dirty=false;updateEditorStatus();resetHistory()}
 function editorDiffCount(){
  if(!state.editorBaseline)return 0;
  rebuildEditMutations();
@@ -410,12 +410,40 @@ function updateEditorStatus(){
  el.textContent=`${n} net change${n===1?'':'s'}`;state.dirty=n>0;
  const box=$('editorStatus');if(box)box.classList.toggle('sb-edited',n>0);
 }
-function markEditorChanged(){updateEditorStatus();const v=$('liveValidation');if(v){v.textContent='Changes not revalidated';v.className='pill'}}
+// Undo/redo. After every editor change the whole editor state is copied onto a
+// history list; undo and redo put an earlier or later copy back. Copies (not
+// replayed edits) keep undo exact, and the editor data is small. Typing in one
+// field without a pause of 2 seconds or more counts as one step.
+const HISTORY_LIMIT=100,HISTORY_GROUP_MS=2000;
+function historySnapshot(){return structuredClone({editor:editorSnapshot(),tableMutations:state.tableMutations||[]})}
+function resetHistory(){state.history={past:[],future:[],current:historySnapshot(),groupKey:null,groupAt:0};updateHistoryControls('')}
+function typingTarget(el){return !!el&&(el.tagName==='TEXTAREA'||(el.tagName==='INPUT'&&!/^(button|checkbox|radio|submit|reset|file|color|range)$/i.test(el.type||'')))||!!el?.isContentEditable}
+function recordHistory(){
+ const h=state.history;if(!h||state.restoringHistory)return;
+ const now=Date.now(),el=document.activeElement,key=typingTarget(el)?el:null,snap=historySnapshot();
+ // Leaving a field fires a "changed" event even when nothing changed; that is not a step.
+ if(JSON.stringify(snap)===JSON.stringify(h.current))return;
+ if(!(key&&h.groupKey===key&&now-h.groupAt<HISTORY_GROUP_MS)){h.past.push(h.current);if(h.past.length>HISTORY_LIMIT)h.past.shift()}
+ h.current=snap;h.future=[];h.groupKey=key;h.groupAt=now;updateHistoryControls('')
+}
+function restoreHistory(snap){
+ const s=structuredClone(snap);state.restoringHistory=true;
+ try{Object.assign(state,s.editor);state.tableMutations=s.tableMutations;state.cloEditorIds=[...(s.editor.cloEditorIds||[])];refreshDerivedTableViews();renderReview();updateEditorStatus()}
+ finally{state.restoringHistory=false}
+ const v=$('liveValidation');if(v){v.textContent='Changes not revalidated';v.className='pill'}
+}
+function undoEdit(){const h=state.history;if(!h?.past.length)return;h.future.push(h.current);h.current=h.past.pop();h.groupKey=null;restoreHistory(h.current);updateHistoryControls('Undid the last change.')}
+function redoEdit(){const h=state.history;if(!h?.future.length)return;h.past.push(h.current);h.current=h.future.pop();h.groupKey=null;restoreHistory(h.current);updateHistoryControls('Redid the change.')}
+function updateHistoryControls(message){
+ const h=state.history,u=$('undoEdit'),r=$('redoEdit'),st=$('historyStatus');
+ if(u)u.disabled=!h?.past.length;if(r)r.disabled=!h?.future.length;if(st)st.textContent=message
+}
+function markEditorChanged(){recordHistory();updateEditorStatus();const v=$('liveValidation');if(v){v.textContent='Changes not revalidated';v.className='pill'}}
 function restoreEditorBaseline(){
  if(!state.editorBaseline)return;
  const b=structuredClone(state.editorBaseline);
  Object.assign(state,b);state.editorBaseline=structuredClone(b);state.tableMutations=[];state.editMutations=[];state.cloEditorIds=[...(b.cloEditorIds||[])];refreshDerivedTableViews();state.results=[];state.reviewComplete=false;state.dirty=false;
- renderReview();updateEditorStatus();const v=$('liveValidation');if(v){v.textContent='Reset to parsed extraction';v.className='pill'}
+ renderReview();recordHistory();updateEditorStatus();const v=$('liveValidation');if(v){v.textContent='Reset to parsed extraction';v.className='pill'}
 }
 function syncCourseFields(){
  state.course.code=clean($('courseCode').value);state.course.title=clean($('courseTitle').value);
@@ -680,5 +708,13 @@ function resetState(){state={sourceName:'',lines:[],sections:[],course:{code:'',
 function showLoading(on,text,pct){$('loading').classList.toggle('show',on);if(text)$('loadingText').textContent=text;$('bar').style.width=(pct||0)+'%'}function showError(msg,title='Word syllabus required'){$('uploadError').classList.add('show');$('uploadError').innerHTML=`<strong>${esc(title)}</strong><br>${esc(msg).replace(/\n/g,'<br>')}`}function clearError(){$('uploadError').classList.remove('show');$('uploadError').innerHTML=''}
 async function handleFile(file){clearError();resetState();go('upload');if(!file?.name?.toLowerCase().endsWith('.docx')){showError('SyllabusBridge accepts .docx Word syllabi only.');return}showLoading(true,'Reading Word syllabus…',15);try{await parseDocx(file);showLoading(true,'Extracting syllabus structure…',72);captureEditorBaseline();renderReview();showLoading(true,'Extraction complete',100);setTimeout(()=>{showLoading(false);go('review')},180)}catch(e){console.error(e);showLoading(false);if(e instanceof SyllabusFileError)showError(e.message,'Word syllabus could not be read');else showError(`Something went wrong while reading this syllabus. SyllabusBridge v2.1.2.\n\nTechnical detail: ${e?.message||'Unknown error'}\n\nPlease send a screenshot of this message and the syllabus filename to the FacultyBridge project owner.`,'SyllabusBridge encountered an internal error')}}
 $('exportCourseJson').onclick=exportCourseJson;if($('exportCourseJsonReport'))$('exportCourseJsonReport').onclick=exportCourseJson;$('choose').onclick=()=>$('file').click();$('file').onchange=e=>e.target.files[0]&&handleFile(e.target.files[0]);['dragenter','dragover'].forEach(ev=>$('drop').addEventListener(ev,e=>{e.preventDefault();$('drop').classList.add('drag')}));['dragleave','drop'].forEach(ev=>$('drop').addEventListener(ev,e=>{e.preventDefault();$('drop').classList.remove('drag')}));$('drop').addEventListener('drop',e=>e.dataTransfer.files[0]&&handleFile(e.dataTransfer.files[0]));$('runValidation').onclick=()=>{state.reviewComplete=true;syncCourseFields();renderReport();updateEditorStatus();go('report')};document.querySelectorAll('.sb-step').forEach(b=>b.onclick=()=>{if(b.getAttribute('aria-disabled')==='true')return;if(b.dataset.step==='report'){renderReport()}go(b.dataset.step)});const root=document.documentElement;const savedTheme=localStorage.getItem('ft-theme')||'light';root.dataset.theme=savedTheme;root.dataset.ftTheme=savedTheme;$('theme').onclick=()=>{const dark=root.dataset.theme==='dark',next=dark?'light':'dark';root.dataset.theme=next;root.dataset.ftTheme=next;localStorage.setItem('ft-theme',next)};
+// Undo/redo buttons and keyboard shortcuts. Inside a text box, Ctrl+Z / Cmd+Z
+// keeps doing the browser's own typing undo.
+$('undoEdit').onclick=undoEdit;$('redoEdit').onclick=redoEdit;
+document.addEventListener('keydown',e=>{
+ if(!$('screen-review').classList.contains('active')||!(e.ctrlKey||e.metaKey)||e.altKey||typingTarget(e.target)||e.target?.tagName==='SELECT'||document.querySelector('dialog[open]'))return;
+ const k=e.key.toLowerCase();
+ if(k==='z'&&!e.shiftKey){e.preventDefault();undoEdit()}else if((k==='z'&&e.shiftKey)||(k==='y'&&!e.shiftKey)){e.preventDefault();redoEdit()}
+});
 // Shared unsaved-work warning: edits that differ from the original extraction.
 FTUnsavedWork.watch(()=>state.dirty);go('upload');
