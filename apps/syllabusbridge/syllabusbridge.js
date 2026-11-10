@@ -792,6 +792,29 @@ function go(step){['upload','review','report'].forEach(s=>$('screen-'+s).classLi
 function resetState(){state={sourceName:'',lines:[],sections:[],course:{code:'',title:'',year:'',location:''},faculty:[],coordinator:null,clos:[],plos:[],cloMappings:[],meetingPatterns:[],assessments:[],policies:{},schedule:[],grading:[],rawTables:[],structuredTables:[],assignmentTables:[],supplementalTables:[],redText:[],results:[],extraction:{scheduleFailures:[],scheduleCandidates:0,cloCandidates:0},dirty:false,reviewComplete:false,editorBaseline:null,tableMutations:[],editMutations:[],cloEditorIds:[]};}
 
 function showLoading(on,text,pct){$('loading').classList.toggle('show',on);if(text)$('loadingText').textContent=text;$('bar').style.width=(pct||0)+'%'}function showError(msg,title='Word syllabus required'){$('uploadError').classList.add('show');$('uploadError').innerHTML=`<strong>${esc(title)}</strong><br>${esc(msg).replace(/\n/g,'<br>')}`}function clearError(){$('uploadError').classList.remove('show');$('uploadError').innerHTML=''}
+// Unaccepted tracked changes (v2.2). Many syllabi, including the approved
+// template, still carry Word tracked changes nobody accepted or rejected.
+// SyllabusBridge reads them as if accepted, but later Word export can't safely
+// edit those paragraphs, so faculty are told how to clear them. This reads the
+// file on its own and never changes how the syllabus is parsed.
+async function trackedChangesIn(file){
+ try{
+  const zip=await JSZip.loadAsync(file),xml=await zip.file('word/document.xml')?.async('string');
+  if(!xml)return{changes:0,paragraphs:0};
+  const marks=/<w:(?:ins|del|moveFrom|moveTo)\b[^>]*?(?:\/>|>)/g;
+  const changes=(xml.match(marks)||[]).length;
+  let paragraphs=0;for(const p of xml.match(/<w:p\b[^>]*?(?:\/>|>[\s\S]*?<\/w:p>)/g)||[])if(/<w:(?:ins|del|moveFrom|moveTo)\b/.test(p))paragraphs++;
+  return{changes,paragraphs}
+ }catch(e){return{changes:0,paragraphs:0}}
+}
+function trackedChangesMessage(t){
+ const n=t.changes,p=t.paragraphs;
+ return`This syllabus has <strong>${n} unaccepted tracked change${n===1?'':'s'}</strong>${p?` in ${p} paragraph${p===1?'':'s'}`:''}. Word shows them as colored, underlined, or crossed-out text. SyllabusBridge reads the syllabus as if every change were accepted, but saving edits back into Word (coming in a later version) cannot safely change those paragraphs.<br><strong>To clear them:</strong> in Word, open the <strong>Review</strong> tab, choose <strong>Accept ▸ Accept All Changes</strong> (or <strong>Reject ▸ Reject All Changes</strong>), save, and upload the file again. You can also keep working with this file.`
+}
+function showTrackedChanges(){
+ const t=state.trackedChanges,has=!!t?.changes;
+ for(const id of ['trackedChangesNotice','reportTrackedChanges']){const el=$(id);if(!el)continue;el.hidden=!has;el.innerHTML=has?trackedChangesMessage(t):''}
+}
 // SyllabusBridge project files (v2.2). A project saves the structured editor's
 // work so faculty can close the browser and continue later. It records which
 // Word file it belongs to (name, size, SHA-256 fingerprint); reopening asks for
@@ -907,7 +930,7 @@ async function applyPendingProject(){
  state.projectNote=notes.join(' ');
  return true
 }
-async function handleFile(file){clearError();resetState();go('upload');if(!file?.name?.toLowerCase().endsWith('.docx')){showError('SyllabusBridge accepts .docx Word syllabi only.');return}showLoading(true,'Reading Word syllabus…',15);try{const fingerprint=await fileFingerprint(file);await parseDocx(file);state.sourceFingerprint=fingerprint;showLoading(true,'Extracting syllabus structure…',72);captureEditorBaseline();if(pendingProject&&!await applyPendingProject()){showLoading(false);resetState();go('upload');return}renderReview();if(state.openedProject){const st=$('historyStatus');if(st)st.textContent=state.projectNote||''}showLoading(true,'Extraction complete',100);setTimeout(()=>{showLoading(false);go('review')},180)}catch(e){console.error(e);showLoading(false);if(e instanceof SyllabusFileError)showError(e.message,'Word syllabus could not be read');else showError(`Something went wrong while reading this syllabus. SyllabusBridge v2.1.2.\n\nTechnical detail: ${e?.message||'Unknown error'}\n\nPlease send a screenshot of this message and the syllabus filename to the FacultyBridge project owner.`,'SyllabusBridge encountered an internal error')}}
+async function handleFile(file){clearError();resetState();go('upload');if(!file?.name?.toLowerCase().endsWith('.docx')){showError('SyllabusBridge accepts .docx Word syllabi only.');return}showLoading(true,'Reading Word syllabus…',15);try{const fingerprint=await fileFingerprint(file),tracked=await trackedChangesIn(file);await parseDocx(file);state.sourceFingerprint=fingerprint;state.trackedChanges=tracked;showLoading(true,'Extracting syllabus structure…',72);captureEditorBaseline();if(pendingProject&&!await applyPendingProject()){showLoading(false);resetState();go('upload');return}renderReview();showTrackedChanges();if(state.openedProject){const st=$('historyStatus');if(st)st.textContent=state.projectNote||''}showLoading(true,'Extraction complete',100);setTimeout(()=>{showLoading(false);go('review')},180)}catch(e){console.error(e);showLoading(false);if(e instanceof SyllabusFileError)showError(e.message,'Word syllabus could not be read');else showError(`Something went wrong while reading this syllabus. SyllabusBridge v2.1.2.\n\nTechnical detail: ${e?.message||'Unknown error'}\n\nPlease send a screenshot of this message and the syllabus filename to the FacultyBridge project owner.`,'SyllabusBridge encountered an internal error')}}
 $('exportCourseJson').onclick=exportCourseJson;if($('exportCourseJsonReport'))$('exportCourseJsonReport').onclick=exportCourseJson;$('choose').onclick=()=>$('file').click();$('openProject').onclick=()=>$('projectFile').click();$('projectFile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)openProjectFile(f)};$('saveProject').onclick=saveProject;$('saveProjectReport').onclick=saveProject;$('file').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)handleFile(f)};['dragenter','dragover'].forEach(ev=>$('drop').addEventListener(ev,e=>{e.preventDefault();$('drop').classList.add('drag')}));['dragleave','drop'].forEach(ev=>$('drop').addEventListener(ev,e=>{e.preventDefault();$('drop').classList.remove('drag')}));$('drop').addEventListener('drop',e=>e.dataTransfer.files[0]&&handleFile(e.dataTransfer.files[0]));$('runValidation').onclick=()=>{state.reviewComplete=true;syncCourseFields();renderReport();updateEditorStatus();go('report')};document.querySelectorAll('.sb-step').forEach(b=>b.onclick=()=>{if(b.getAttribute('aria-disabled')==='true')return;if(b.dataset.step==='report'){renderReport()}go(b.dataset.step)});const root=document.documentElement;const savedTheme=localStorage.getItem('ft-theme')||'light';root.dataset.theme=savedTheme;root.dataset.ftTheme=savedTheme;$('theme').onclick=()=>{const dark=root.dataset.theme==='dark',next=dark?'light':'dark';root.dataset.theme=next;root.dataset.ftTheme=next;localStorage.setItem('ft-theme',next)};
 // Undo/redo buttons and keyboard shortcuts. Inside a text box, Ctrl+Z / Cmd+Z
 // keeps doing the browser's own typing undo.
