@@ -65,7 +65,17 @@ What it covers, using synthetic data only:
   syllabus edit by default, "SyllabusBridge misread this" marks a reading
   correction (shown in the summary and report), marking undo/redo, marks
   cleared when their change goes away, and kinds saved in project format 2
-  while format 1 projects still open.
+  (now 3) while format 1 projects still open.
+- `syllabusbridge-policy-checks.spec.js`: SyllabusBridge v2.3 policy content
+  checks: a syllabus that follows the policy passes all seven, each failing
+  check says exactly what is missing or different, checks that can't be made
+  say Not evaluated, the report (and its printed copy) names the policy it
+  checked against, grading scale rows written in other common ways are read,
+  and "Fix this" opens the right field, links the edit to the finding (through
+  Undo/Redo and in project format 3), and shows "Resolved by your edit" after
+  revalidating. `syllabusbridge-policy.test.mjs` (Node) checks every dated
+  policy profile file: loaded by the page, a grading scale with no gaps or
+  overlaps, patterns that work, and known section and editor field names.
 - `syllabusbridge-tracked-changes.spec.js`: SyllabusBridge warns about
   unaccepted Word tracked changes (with the Review ▸ Accept All Changes steps),
   shows nothing for a clean file, keeps working, and notes it in the report.

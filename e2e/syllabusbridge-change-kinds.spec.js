@@ -72,7 +72,7 @@ test('a mark is cleared when its change goes away, so a later change starts as a
   expect(await page.evaluate(() => state.changeKinds)).toEqual({});
 });
 
-test('kinds are saved in the project (format 2) and restored; format 1 projects still open', async ({ page, openTool }) => {
+test('kinds are saved in the project (format 3) and restored; format 1 projects still open', async ({ page, openTool }) => {
   await start(page, openTool);
   const file = await syllabusFile();
   // Re-upload this exact copy so the project fingerprint matches on reopen.
@@ -85,7 +85,7 @@ test('kinds are saved in the project (format 2) and restored; format 1 projects 
   await closeSummary(page);
   const { text } = await downloadFrom(page, () => page.locator('#saveProject').click());
   const project = JSON.parse(text);
-  expect(project.formatVersion).toBe(2);
+  expect(project.formatVersion).toBe(3);
   expect(Object.values(project.changeKinds)).toEqual(['reading-correction']);
 
   const reopen = async value => {

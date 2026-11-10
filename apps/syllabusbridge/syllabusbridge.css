@@ -73,3 +73,14 @@
 .sb-change-group{margin-top:14px}.sb-change-group h3{font-size:15px;margin:0 0 8px;display:flex;align-items:center;gap:8px}.sb-change-table td{vertical-align:top;overflow-wrap:break-word}.sb-change-table .pill{white-space:nowrap}.sb-change-table td:nth-child(2){min-width:120px}.sb-review-changes{margin-top:8px;padding:6px 12px;font-size:13px}.sb-change-table td:nth-child(3),.sb-change-table td:nth-child(4){min-width:180px}.sb-change-added{background:color-mix(in srgb,var(--ft-positive-soft) 22%,var(--ft-surface))}.sb-change-removed{background:color-mix(in srgb,var(--ft-danger) 12%,var(--ft-surface))}.sb-report-changes{margin-top:16px;padding:16px}.sb-report-changes h2{margin:0 0 4px;font-size:17px}@media print{.sb-change-table tr{break-inside:avoid}.sb-report-changes{break-before:auto}}
 .sb-kind{display:flex;gap:6px;align-items:flex-start;font-size:13px;min-width:150px;cursor:pointer}.sb-kind input{margin-top:2px;accent-color:var(--ft-sb-accent)}.sb-kind-help{font-size:13px;margin-top:4px}
 .sb-tracked-changes{margin:12px 0;line-height:1.5}.sb-tracked-changes[hidden]{display:none}
+/* v2.3 policy content checks and "Fix this" */
+.sb-policy-label{margin:4px 0 0;font-weight:700}
+.sb-editor-status:has(.sb-fix-context:not([hidden])){flex-wrap:wrap}
+.sb-fix-context:not([hidden]){flex:1 1 100%;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+.sb-fix-context .row{flex-wrap:wrap}
+.sb-fix-status{margin-top:6px;font-weight:700}
+.sb-fix-row{margin-top:10px}
+.sb-fix-note{margin-top:8px}
+.sb-resolved{margin-top:8px;font-weight:800;color:var(--ft-success-strong)}
+.sb-fix-link{margin-top:4px;font-size:12px;font-weight:700;color:var(--ft-text-muted)}
+.sb-fix-target{outline:3px solid color-mix(in srgb,var(--ft-sb-accent) 70%,transparent);outline-offset:3px}

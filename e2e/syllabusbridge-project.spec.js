@@ -52,7 +52,7 @@ test('save a project, reopen it with the same Word file, and get every edit back
 
   const { name, project } = await saveProject(page);
   expect(name).toBe('PHA9999-SyllabusBridge-project.json');
-  expect(project).toMatchObject({ format: 'SyllabusBridge project', formatVersion: 2, savedBy: { tool: 'SyllabusBridge' }, source: { fileName: 'rubric.docx' } });
+  expect(project).toMatchObject({ format: 'SyllabusBridge project', formatVersion: 3, savedBy: { tool: 'SyllabusBridge' }, source: { fileName: 'rubric.docx' } });
   expect(project.source.sha256).toMatch(/^[0-9a-f]{64}$/);
   expect(project.source.size).toBeGreaterThan(0);
   expect(project.editor.course.title).toBe('Revised Synthetic Course');

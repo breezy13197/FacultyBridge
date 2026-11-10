@@ -298,6 +298,105 @@ function coverageStatus(c){
  if(Number.isFinite(c.candidate)&&c.candidate>0&&c.count<c.candidate)return'warning';
  return'passed';
 }
+// Policy content checks (v2.3). The rules live in a dated policy profile
+// (policy/*.js, data only) instead of in this code. When the policy changes, a
+// new dated profile is added; the newest one loaded is used, and the report
+// names it. Every check says Not evaluated when SyllabusBridge can't tell.
+const POLICY_CATEGORY='Policy content';
+function policyProfile(){const list=globalThis.SyllabusBridgePolicyProfiles||[];return [...list].sort((a,b)=>String(b.updated||'').localeCompare(String(a.updated||'')))[0]||null}
+function policyName(p=policyProfile()){return p?`${p.name}, updated ${p.updated}`:''}
+function policyPatterns(patterns){return (patterns||[]).map(p=>{try{return new RegExp(p,'i')}catch(e){return null}}).filter(Boolean)}
+function policyMatch(text,patterns){for(const re of policyPatterns(patterns)){const m=re.exec(text);if(m)return m}return null}
+// The words around a match, kept within the line it is on.
+function policySnippet(text,m){const ls=text.lastIndexOf('\n',m.index)+1,nl=text.indexOf('\n',m.index+m[0].length),le=nl<0?text.length:nl,s=Math.max(ls,m.index-60),e=Math.min(le,m.index+m[0].length+60);return `${s>ls?'…':''}${clean(text.slice(s,e))}${e<le?'…':''}`}
+function listWords(items){return items.length<2?items.join(''):`${items.slice(0,-1).join(', ')}${items.length>2?',':''} and ${items.at(-1)}`}
+const POLICY_UNCONFIRMED=' Note: this part of the policy profile has not yet been confirmed against the official policy.';
+// Everything SyllabusBridge read, plus the editor's current text, so edits count.
+function currentSyllabusText(){
+ const p=state.policies||{},tables=(state.structuredTables||[]).flatMap(t=>[...(t.headers||[]),...(t.rows||[]).flatMap(r=>(r.cells||[]).map(tableCellValue))]);
+ return [...(state.lines||[]),...Object.values(p).filter(v=>typeof v==='string'),...tables,...(state.grading||[]).map(g=>g.label),...(state.schedule||[]).map(e=>e.topic),...(state.clos||[])].join('\n')
+}
+function policyContentResult(check,profile){
+ const id='policy-'+check.id,sections=check.sections||[];
+ const text=check.searchWholeSyllabus?currentSyllabusText():sections.map(k=>String(state.policies?.[k]||'')).filter(t=>clean(t)).join('\n');
+ const note=check.confirmed===false?POLICY_UNCONFIRMED:'';
+ const sectionNames=sections.map(k=>SECTION_RULES.find(r=>r.key===k)?.label||k);
+ if(!clean(text))return result(id,POLICY_CATEGORY,'not-evaluated',check.title,`${check.title} could not be checked because no ${sectionNames[0]||'section'} text was found.`,`No text was extracted for: ${sectionNames.join(', ')}.${note}`,'Add the section in the structured editor (or check the section heading in the Word file), then revalidate.',false);
+ const found=[],missing=[];
+ for(const req of check.requirements||[]){const m=policyMatch(text,req.patterns);if(m)found.push(`${req.label} ("${policySnippet(text,m)}")`);else missing.push(req.label)}
+ let extra='';
+ if(check.campusSetting){const v=clean(profile.campus?.[check.campusSetting]);if(!v)extra=' The campus-specific contact is not set in the policy profile, so it was not compared.';else if(norm(text).includes(norm(v)))found.push(`the campus contact "${v}"`);else missing.push(`the campus contact "${v}"`)}
+ if(check.onlyWhen){
+  const trigger=policyMatch(text,check.onlyWhen.patterns);
+  if(!trigger){
+   if(!missing.length)return result(id,POLICY_CATEGORY,'passed',check.title,`The syllabus ${listWords((check.requirements||[]).map(r=>r.label))}.`,`Found: ${found.join(' · ')}. No research assignment was detected, so this is not required.${note}`,'No action needed.');
+   return result(id,POLICY_CATEGORY,'not-evaluated',check.title,`No assignment that involves research was detected, so this check does not apply.`,`Looked for research-type work (${check.onlyWhen.label}) and found none.${note}`,'If any assignment does involve research, point students to South University Library resources.',false)
+  }
+  extra=` Research detected: "${policySnippet(text,trigger)}".`+extra
+ }
+ const status=missing.length?'warning':'passed';
+ const summary=missing.length?`Not found: ${listWords(missing)}.`:`Includes ${listWords((check.requirements||[]).map(r=>r.label))}.`;
+ const evidence=`${found.length?`Found: ${found.join(' · ')}.`:'None of the required wording was found.'}${missing.length?` Not found: ${missing.join(' · ')}.`:''}${extra} Checked: ${sectionNames.join(', ')}${check.searchWholeSyllabus?' and the rest of the syllabus':''}.${note}`;
+ return result(id,POLICY_CATEGORY,status,check.title,summary,evidence,missing.length?check.action:'No action needed.')
+}
+// Grading scale: a percent band ("≥90", "76", "65-69", "64 and below") and a GPA.
+function parsePercentBand(s){
+ const t=clean(s).replace(/≥/g,'>=').replace(/≤/g,'<=').replace(/[–—−]/g,'-').replace(/%/g,'').toLowerCase().trim();let m;
+ if((m=t.match(/^(\d{1,3})\s*-\s*(\d{1,3})$/)))return{min:Math.min(+m[1],+m[2]),max:Math.max(+m[1],+m[2])};
+ if((m=t.match(/^(?:>=|=>)\s*(\d{1,3})$/)||t.match(/^(\d{1,3})\s*(?:\+|(?:and|or|&)\s*(?:above|higher|greater|over|up))$/)))return{min:+m[1],max:100};
+ if((m=t.match(/^(?:<=|=<)\s*(\d{1,3})$/)||t.match(/^(\d{1,3})\s*(?:and|or|&)\s*(?:below|lower|less|under)$/)))return{min:0,max:+m[1]};
+ if((m=t.match(/^(?:<|below|less than|under)\s*(\d{1,3})$/)))return{min:0,max:+m[1]-1};
+ if((m=t.match(/^(?:>|above|greater than|over)\s*(\d{1,3})$/)))return{min:+m[1]+1,max:100};
+ if((m=t.match(/^(\d{1,3})$/)))return{min:+m[1],max:+m[1]};
+ return null
+}
+function parseGpa(s){const m=clean(s).match(/^(\d(?:\.\d{1,2})?)$/);return m&&+m[1]<=4?+m[1]:null}
+function percentBandLabel(x){return x.min===x.max?`${x.min}%`:x.max===100?`≥${x.min}%`:x.min===0?`≤${x.max}%`:`${x.min}–${x.max}%`}
+// Finds the table whose header has a percent column next to a GPA column (one or
+// more side-by-side pairs) and reads its current, possibly edited, rows.
+function gradingScaleRows(){
+ for(const t of state.structuredTables||[]){
+  const all=[{cells:(t.headers||[]).map((h,i)=>({columnIndex:i,text:clean(h),lines:[clean(h)]}))},...(t.rows||[])];
+  let head=-1,pairs=[];
+  for(let i=0;i<Math.min(all.length,3)&&head<0;i++){
+   const cells=all[i].cells||[];
+   // The nearest column to the left that says % or percent; failing that, one that says grade (not "Letter Grade" when a % column exists).
+   pairs=cells.filter(c=>/\bgpa\b|grade point/i.test(c.text)).map(g=>{const left=[...cells].reverse().filter(c=>c.columnIndex<g.columnIndex&&!/\bgpa\b|grade point/i.test(c.text)),p=left.find(c=>/%|percent/i.test(c.text))||left.find(c=>/grade/i.test(c.text)&&!/letter/i.test(c.text));return p?{pct:p.columnIndex,gpa:g.columnIndex}:null}).filter(Boolean);
+   if(pairs.length)head=i
+  }
+  if(head<0)continue;
+  const rows=[];
+  for(const row of all.slice(head+1))for(const p of pairs){
+   const cellLines=col=>{const c=(row.cells||[]).find(x=>x.columnIndex===col);return(c?.lines?.length?c.lines:[c?.text||'']).map(clean)};
+   const pl=cellLines(p.pct),gl=cellLines(p.gpa);
+   for(let k=0;k<Math.max(pl.length,gl.length);k++){const a=pl[k]||'',b=gl[k]||'';if(a||b)rows.push({pctText:a,gpaText:b,band:parsePercentBand(a),gpa:parseGpa(b)})}
+  }
+  return{table:t,rows}
+ }
+ return null
+}
+function gradingScaleResult(profile){
+ const spec=profile.gradingScale,id='policy-grading-scale',title=spec.title||'Grading scale matches the official scale',note=spec.confirmed===false?POLICY_UNCONFIRMED:'';
+ const found=gradingScaleRows();
+ if(!found||!found.rows.length)return result(id,POLICY_CATEGORY,'not-evaluated',title,'The grading scale table was not found, so it was not compared with the official scale.',`No table with a percent column and a GPA column was detected.${note}`,'Confirm the syllabus includes the official grading scale table (percent and GPA).',false);
+ const gpa=v=>Number(v).toFixed(1),used=new Set,wrong=[],missing=[];
+ for(const want of spec.rows||[]){const got=found.rows.find(r=>!used.has(r)&&r.band&&r.band.min===want.min&&r.band.max===want.max);if(!got){missing.push(percentBandLabel(want));continue}used.add(got);if(got.gpa!==null&&Math.abs(got.gpa-want.gpa)>0.001)wrong.push(`${percentBandLabel(want)} shows ${got.gpaText}; the official scale is ${gpa(want.gpa)}`);else if(got.gpa===null)wrong.push(`${percentBandLabel(want)} has no readable GPA ("${got.gpaText||'blank'}"); the official scale is ${gpa(want.gpa)}`)}
+ const extra=found.rows.filter(r=>r.band&&!used.has(r)).map(r=>`${r.pctText} = ${r.gpaText||'(blank)'}`),unreadable=found.rows.filter(r=>!r.band).map(r=>`"${r.pctText||'(blank)'}" = ${r.gpaText||'(blank)'}`);
+ const status=wrong.length?'issue':(missing.length||extra.length||unreadable.length)?'warning':'passed';
+ const problems=wrong.length+missing.length+extra.length+unreadable.length;
+ const summary=status==='passed'?`All ${found.rows.length} rows match the official grading scale.`:wrong.length?`${wrong.length} GPA value${wrong.length===1?' differs':'s differ'} from the official grading scale.`:`${problems} row${problems===1?' does':'s do'} not line up with the official grading scale.`;
+ const parts=[`Compared ${found.rows.length} row${found.rows.length===1?'':'s'} with the ${(spec.rows||[]).length}-row official scale.`];
+ if(wrong.length)parts.push(`Different GPA: ${wrong.join(' · ')}.`);
+ if(missing.length)parts.push(`Missing: ${missing.join(', ')}.`);
+ if(extra.length)parts.push(`Not on the official scale: ${extra.join(' · ')}.`);
+ if(unreadable.length)parts.push(`Could not read: ${unreadable.join(' · ')}.`);
+ return result(id,POLICY_CATEGORY,status,title,summary,parts.join(' ')+note,status==='passed'?'No action needed.':'Use the official grading scale from the syllabus policy. You can correct the Grading scale table in the structured editor.')
+}
+function policyResults(){
+ const profile=policyProfile();
+ if(!profile)return[result('policy-profile',POLICY_CATEGORY,'not-evaluated','Syllabus policy profile','No syllabus policy profile was loaded, so policy wording was not checked.','The policy profile file is missing from this copy of SyllabusBridge.','Reload SyllabusBridge, or download a fresh copy. If this keeps happening, contact the FacultyBridge project owner.',false)];
+ return[gradingScaleResult(profile),...(profile.contentChecks||[]).map(c=>policyContentResult(c,profile))]
+}
 function validate(){const r=[],hasSection=k=>state.sections.some(x=>x.key===k),allText=state.lines.join('\n');
  const required=[
  ['description','Course description'],['clos','Course learning outcomes'],['coordinator','Course coordinator'],
@@ -333,6 +432,7 @@ function validate(){const r=[],hasSection=k=>state.sections.some(x=>x.key===k),a
  if(state.schedule.length){const w=scheduleDateWarnings();r.push(result('schedule-dates','Schedule',w.length?'warning':'passed','Schedule dates, weekdays, and order',w.length?`${w.length} schedule date${w.length===1?' looks':'s look'} wrong.`:'Every schedule date matches its printed weekday, year, and order.',w.length?w.join(' · '):`Checked ${state.schedule.length} schedule entries.`,w.length?'Correct the date or the day name in the syllabus. If a date is intentional, no change is needed.':'No action needed.'))}
  for(const [key,title] of [['theftPolicy','Theft'],['electronicPolicy','Electronic devices'],['professionalismPolicy','Professionalism']]){const text=clean(state.policies[key]),heading=hasSection(key);r.push(result('optional-'+key,'Optional course-specific policies',text?'passed':'not-evaluated',title,text?`${title} language was detected.`:`${title} was not detected; this section is optional in the approved template.`,text?`Heading ${heading?'found':'not found'} · ${text.split(/\s+/).length} words extracted.`:'No content extracted. Optional sections do not affect the pass/fail interpretation.',text?'No action needed.':'Add this section only if it is applicable to the course.',!!text))}
  r.push(result('academic-integrity-reference','Policies',hasSection('integrity')?'passed':'warning','Academic honesty/integrity reference',hasSection('integrity')?'Academic honesty/integrity language or reference was detected.':'Academic honesty/integrity language or reference was not detected.',hasSection('integrity')?(state.sections.find(x=>x.key==='integrity')?.line||'Reference detected'):'No matching text found.','Confirm the Course Specific Policies section retains the required Academic Honesty and Integrity reference.'));
+ r.push(...policyResults());
  r.push(result('university-calendar','University calendar','not-evaluated','University calendar alignment','University-calendar comparison is not yet configured.','No academic-calendar profile is configured in this release.','Compare syllabus dates with the official institutional calendar manually. A calendar profile remains planned for a later release.',false));
  state.results=r;return r}
 function autoGrow(t){const min=t.classList.contains('clo-text')?52:110;t.style.height='0px';t.style.height=Math.max(min,t.scrollHeight+2)+'px'}
@@ -408,7 +508,7 @@ function editorDiffCount(){
 function updateEditorStatus(){
  const el=$('editCount');if(!el)return;const n=editorDiffCount();
  el.textContent=`${n} net change${n===1?'':'s'}`;state.dirty=n>0;
- const box=$('editorStatus');if(box)box.classList.toggle('sb-edited',n>0);
+ const box=$('editorStatus');if(box)box.classList.toggle('sb-edited',n>0);updateFixCount();
 }
 // Undo/redo. After every editor change the whole editor state is copied onto a
 // history list; undo and redo put an earlier or later copy back. Copies (not
@@ -418,12 +518,12 @@ function updateEditorStatus(){
 // each added row's editorRowId, which its add-row change record points to.
 // (editorSnapshot() keeps a reduced form that is only for counting changes.)
 const HISTORY_LIMIT=100,HISTORY_GROUP_MS=2000;
-function historySnapshot(){return structuredClone({editor:{...editorSnapshot(),structuredTables:state.structuredTables||[]},tableMutations:state.tableMutations||[],changeKinds:state.changeKinds||{}})}
+function historySnapshot(){return structuredClone({editor:{...editorSnapshot(),structuredTables:state.structuredTables||[]},tableMutations:state.tableMutations||[],changeKinds:state.changeKinds||{},changeFindings:state.changeFindings||{}})}
 function resetHistory(){state.history={past:[],future:[],current:historySnapshot(),groupKey:null,groupAt:0};updateHistoryControls('')}
 function typingTarget(el){return !!el&&(el.tagName==='TEXTAREA'||(el.tagName==='INPUT'&&!/^(button|checkbox|radio|submit|reset|file|color|range)$/i.test(el.type||'')))||!!el?.isContentEditable}
 function recordHistory(){
  const h=state.history;if(!h||state.restoringHistory)return;
- pruneChangeKinds();
+ pruneChangeKinds();linkFixEdits();
  const now=Date.now(),el=document.activeElement,key=typingTarget(el)?el:null,snap=historySnapshot();
  // Leaving a field fires a "changed" event even when nothing changed; that is not a step.
  if(JSON.stringify(snap)===JSON.stringify(h.current))return;
@@ -432,7 +532,7 @@ function recordHistory(){
 }
 function restoreHistory(snap){
  const s=structuredClone(snap);state.restoringHistory=true;
- try{Object.assign(state,s.editor);state.tableMutations=s.tableMutations;state.changeKinds=s.changeKinds||{};state.cloEditorIds=[...(s.editor.cloEditorIds||[])];refreshDerivedTableViews();renderReview();updateEditorStatus()}
+ try{Object.assign(state,s.editor);state.tableMutations=s.tableMutations;state.changeKinds=s.changeKinds||{};state.changeFindings=s.changeFindings||{};state.cloEditorIds=[...(s.editor.cloEditorIds||[])];refreshDerivedTableViews();renderReview();updateEditorStatus()}
  finally{state.restoringHistory=false}
  const v=$('liveValidation');if(v){v.textContent='Changes not revalidated';v.className='pill'}
 }
@@ -457,7 +557,7 @@ function revalidateInEditor(){
  syncCourseFields();state.results=validate();
  const c={passed:0,warning:0,issue:0,'not-evaluated':0};state.results.forEach(r=>c[r.status]++);
  const v=$('liveValidation');v.textContent=`${c.passed} passed · ${c.warning} warnings · ${c.issue} issues`;v.className='pill sb-validation-mini';
- updateEditorStatus();
+ updateEditorStatus();showFixOutcome();
 }
 
 function editorRowId(){
@@ -531,10 +631,10 @@ function makeStructuredRow(table,colCount){
  return{rowIndex:null,editorRowId:editorRowId(),cells:Array.from({length:colCount},(_,i)=>({columnIndex:i,text:'',lines:[''],sourceColumnIndex:null}))}
 }
 function editableStructuredTables(){
- return (state.structuredTables||[]).filter(t=>['assignmentSchedule','rubric','dueDateTopic','studentTeams'].includes(t.type))
+ return (state.structuredTables||[]).filter(t=>['gradingScale','assignmentSchedule','rubric','dueDateTopic','studentTeams'].includes(t.type))
 }
 function structuredTableTitle(type){
- return type==='assignmentSchedule'?'Assignments / Activities':type==='rubric'?'Project / Assignment Rubric':type==='studentTeams'?'Student Teams':'Quiz / Assignment Due Dates'
+ return type==='gradingScale'?'Grading scale':type==='assignmentSchedule'?'Assignments / Activities':type==='rubric'?'Project / Assignment Rubric':type==='studentTeams'?'Student Teams':'Quiz / Assignment Due Dates'
 }
 function structuredDisplayModel(table){
  let headers=[...(table.headers||[])],rows=[...(table.rows||[])],headerSourceRow=null;
@@ -610,7 +710,7 @@ function renderReview(){sourceName.textContent=state.sourceName;courseCode.value
  const facultyHost=$('facultyList');facultyHost.innerHTML='';$('facultyStatus').textContent=state.faculty.length?'Detected':'Not detected';
  const drawFaculty=()=>{facultyHost.innerHTML='';if(!state.faculty.length){facultyHost.innerHTML='<div class="muted">No faculty contact records were confidently extracted.</div>';return}state.faculty.forEach((f,i)=>{const d=document.createElement('div');d.className='faculty-edit-row';d.innerHTML=`<select class="select f-role ft-select" aria-label="Faculty role"><option value="coordinator"${f.role==='coordinator'?' selected':''}>Coordinator</option><option value="faculty"${f.role!=='coordinator'?' selected':''}>Course faculty</option></select><input class="input f-name ft-input" aria-label="Faculty name" value="${esc(f.name)}" placeholder="Faculty name"><input class="input f-email ft-input" aria-label="Faculty email" type="email" value="${esc(f.email)}" placeholder="Email"><button type="button" class="sb-mini-remove" aria-label="Remove ${esc(f.name||'faculty record')}">×</button>`;facultyHost.appendChild(d);const save=()=>{f.role=d.querySelector('.f-role').value;f.name=clean(d.querySelector('.f-name').value);f.email=clean(d.querySelector('.f-email').value);f.short=lastName(f.name)||f.short||`Faculty ${i+1}`;state.coordinator=state.faculty.find(x=>x.role==='coordinator')||null;markEditorChanged()};d.querySelectorAll('input,select').forEach(x=>x.addEventListener('change',()=>{save();drawFaculty()}));d.querySelector('.sb-mini-remove').onclick=()=>{state.faculty.splice(i,1);state.coordinator=state.faculty.find(x=>x.role==='coordinator')||null;drawFaculty();markEditorChanged()}})};drawFaculty();
  $('addFacultyRow').onclick=()=>{state.faculty.push({name:'',email:'',short:`Faculty ${state.faculty.length+1}`,role:'faculty',editorId:`faculty-new-${editorRowId()}`});drawFaculty();markEditorChanged()};
- const editors=$('editors');editors.innerHTML='';const cards=[['Student engagement','engagement',state.policies.engagement],['Required materials','materials',state.policies.materials],['Required hardware/software','hardware',state.policies.hardware],['Accessibility / accommodations','accessibility',state.policies.accessibility],['Attendance/tardy policy','attendance',state.policies.attendance],['Assessment policy','assessmentPolicy',state.policies.assessmentPolicy],['Absence policy','absence',state.policies.absence],['Incomplete policy','incomplete',state.policies.incomplete],['Theft','theftPolicy',state.policies.theftPolicy],['Electronic devices','electronicPolicy',state.policies.electronicPolicy],['Professionalism','professionalismPolicy',state.policies.professionalismPolicy],['Course-specific policies','coursePolicies',state.policies.coursePolicies]];
+ const editors=$('editors');editors.innerHTML='';const cards=[['Student engagement','engagement',state.policies.engagement],['Required materials','materials',state.policies.materials],['Required hardware/software','hardware',state.policies.hardware],['Accessibility / accommodations','accessibility',state.policies.accessibility],['Program-wide assessment tools','programAssessment',state.policies.programAssessment],['Attendance/tardy policy','attendance',state.policies.attendance],['Assessment policy','assessmentPolicy',state.policies.assessmentPolicy],['Absence policy','absence',state.policies.absence],['Incomplete policy','incomplete',state.policies.incomplete],['Theft','theftPolicy',state.policies.theftPolicy],['Electronic devices','electronicPolicy',state.policies.electronicPolicy],['Professionalism','professionalismPolicy',state.policies.professionalismPolicy],['Course-specific policies','coursePolicies',state.policies.coursePolicies]];
 
 
  const descBox=document.createElement('div');descBox.className='soft editor section-anchor';descBox.id='review-description';descBox.innerHTML=`<h2>Course description <span class="pill">${clean(state.policies.description)?'Detected':'Not detected'}</span></h2><textarea class="textarea ft-textarea" data-key="description" placeholder="Nothing confidently extracted">${esc(state.policies.description)}</textarea>`;editors.appendChild(descBox);const descTa=descBox.querySelector('textarea');descTa.addEventListener('input',()=>autoGrow(descTa));descTa.onchange=()=>applyEditor('description',descTa.value);requestAnimationFrame(()=>autoGrow(descTa));
@@ -644,7 +744,7 @@ function renderReview(){sourceName.textContent=state.sourceName;courseCode.value
  $('addScheduleRow').onclick=()=>{const e={date:'',day:'',time:'',topic:'New schedule event',faculty:'',raw:'Added in structured editor',editorId:`schedule-new-${editorRowId()}`};state.schedule.push(e);recordScheduleAdd(e);drawSchedule();markEditorChanged()};
  [['courseCode','code'],['courseTitle','title'],['courseYear','year'],['courseLocation','location']].forEach(([id,key])=>{$(id).onchange=e=>{state.course[key]=clean(e.target.value);markEditorChanged()}});
  $('revalidateNow').onclick=revalidateInEditor;$('resetEdits').onclick=async()=>{if(editorDiffCount()&& !await FTDialog.confirm('All structured edits will go back to what was originally extracted from the syllabus.',{title:'Reset all edits?',confirmLabel:'Reset edits',danger:true}))return;restoreEditorBaseline()};
- updateEditorStatus();
+ updateEditorStatus();showFixContext();
  requestAnimationFrame(()=>{editors.querySelectorAll('textarea').forEach(autoGrow);document.querySelectorAll('.clo-text').forEach(autoGrow)})
 }
 
@@ -721,7 +821,8 @@ const CHANGE_KIND_READING='reading-correction';
 function currentChangeKeys(){rebuildEditMutations();return new Set([...(state.editMutations||[]).map(m=>m.key),...activeStructuredMutations().map(m=>m.key)])}
 // A mark belongs to a change that exists now. When the change goes away (undone or
 // typed back to the original), its mark goes too, so a later change starts fresh.
-function pruneChangeKinds(){const k=state.changeKinds;if(!k||!Object.keys(k).length)return;const live=currentChangeKeys();for(const key of Object.keys(k))if(!live.has(key))delete k[key]}
+// Finding links (v2.3, state.changeFindings) follow the same rule.
+function pruneChangeKinds(){const maps=[state.changeKinds,state.changeFindings].filter(m=>m&&Object.keys(m).length);if(!maps.length)return;const live=currentChangeKeys();for(const m of maps)for(const key of Object.keys(m))if(!live.has(key))delete m[key]}
 function changeKind(key){return state.changeKinds?.[key]===CHANGE_KIND_READING?CHANGE_KIND_READING:'syllabus-edit'}
 function setChangeKind(key,reading){
  state.changeKinds=state.changeKinds||{};
@@ -733,7 +834,7 @@ function changeSummary(){
  rebuildEditMutations();
  const b=state.editorBaseline,c=editorSnapshot(),groups=new Map;
  let currentKey='';
- const add=(section,item)=>{if(!groups.has(section))groups.set(section,[]);groups.get(section).push({...item,key:currentKey,kind:changeKind(currentKey)})};
+ const add=(section,item)=>{if(!groups.has(section))groups.set(section,[]);groups.get(section).push({...item,key:currentKey,kind:changeKind(currentKey),finding:state.changeFindings?.[currentKey]||null})};
  const byId=arr=>new Map((arr||[]).map((x,i)=>[x.editorId||`index-${i}`,x]));
  const verb={add:'Added',remove:'Removed',update:'Changed'};
  const facultyText=f=>f?[clean(f.name),clean(f.email),f.role==='coordinator'?'Coordinator':'Course faculty'].filter(Boolean).join(' · '):'';
@@ -765,30 +866,86 @@ function changeSummary(){
  }
  return [...groups].map(([section,items])=>({section,items}))
 }
+function changeCountsText(n,reading,fixes){const e=n-reading;return `${n} change${n===1?'':'s'} compared with what SyllabusBridge read from <strong>${esc(state.sourceName)}</strong>: ${e} syllabus edit${e===1?'':'s'}, ${reading} reading correction${reading===1?'':'s'}.${fixes?` ${fixes} ${fixes===1?'was':'were'} made to fix a report finding.`:''}`}
 function renderChangeSummary(el,{interactive=false}={}){
  const groups=changeSummary(),items=groups.flatMap(g=>g.items),n=items.length;
  const text=v=>v?esc(v).replace(/\n/g,'<br>'):'<span class="muted">(blank)</span>';
  if(!n){el.innerHTML='<p class="muted">No changes. Everything still matches what SyllabusBridge read from the Word syllabus.</p>';return n}
- const reading=items.filter(i=>i.kind===CHANGE_KIND_READING).length,edits=n-reading;
- const kindCell=i=>interactive
+ const reading=items.filter(i=>i.kind===CHANGE_KIND_READING).length,fixes=items.filter(i=>i.finding).length;
+ // A fix for a finding (v2.3) is still a syllabus edit or a reading correction; the link is shown with it.
+ const fixLabel=i=>i.finding?`<div class="sb-fix-link">Fix for a finding: ${esc(i.finding.title)}</div>`:'';
+ const kindCell=i=>(interactive
   ?`<label class="sb-kind"><input type="checkbox" class="sb-kind-reading" data-change-key="${esc(i.key)}"${i.kind===CHANGE_KIND_READING?' checked':''}> SyllabusBridge misread this</label>`
-  :(i.kind===CHANGE_KIND_READING?'Reading correction':'Syllabus edit');
- el.innerHTML=`<p class="muted sb-change-counts">${n} change${n===1?'':'s'} compared with what SyllabusBridge read from <strong>${esc(state.sourceName)}</strong>: ${edits} syllabus edit${edits===1?'':'s'}, ${reading} reading correction${reading===1?'':'s'}.</p>`
+  :(i.kind===CHANGE_KIND_READING?'Reading correction':'Syllabus edit'))+fixLabel(i);
+ el.innerHTML=`<p class="muted sb-change-counts">${changeCountsText(n,reading,fixes)}</p>`
   +(interactive?'<p class="muted sb-kind-help">Every change counts as a syllabus edit. Tick <strong>SyllabusBridge misread this</strong> when the Word file was right and you only corrected how SyllabusBridge read it. Reading corrections are never written into the Word syllabus.</p>':'')
   +groups.map(g=>`<section class="sb-change-group"><h3>${esc(g.section)} <span class="pill">${g.items.length}</span></h3><div class="ft-table-wrap"><table class="ft-table sb-change-table"><thead><tr><th scope="col">Change</th><th scope="col">Item</th><th scope="col">Before</th><th scope="col">After</th><th scope="col">Kind</th></tr></thead><tbody>${g.items.map(i=>`<tr><td><span class="pill sb-change-${i.action.toLowerCase()}">${esc(i.action)}</span></td><td>${esc(i.what)}</td><td>${i.action==='Added'?'<span class="muted">(new)</span>':text(i.before)}</td><td>${i.action==='Removed'?'<span class="muted">(removed)</span>':text(i.after)}</td><td>${kindCell(i)}</td></tr>`).join('')}</tbody></table></div></section>`).join('');
  if(interactive)el.querySelectorAll('.sb-kind-reading').forEach(box=>box.onchange=()=>{
   setChangeKind(box.dataset.changeKey,box.checked);
-  const counts=el.querySelector('.sb-change-counts'),r=Object.keys(state.changeKinds||{}).length,e=n-r;
-  if(counts)counts.innerHTML=`${n} change${n===1?'':'s'} compared with what SyllabusBridge read from <strong>${esc(state.sourceName)}</strong>: ${e} syllabus edit${e===1?'':'s'}, ${r} reading correction${r===1?'':'s'}.`;
+  const counts=el.querySelector('.sb-change-counts');
+  if(counts)counts.innerHTML=changeCountsText(n,Object.keys(state.changeKinds||{}).length,fixes);
   const st=$('historyStatus');if(st)st.textContent=box.checked?'Marked as a reading correction.':'Marked as a syllabus edit.'
  });
  return n
 }
 function openChangeSummary(){renderChangeSummary($('changeSummaryBody'),{interactive:true});FTDialog.manage($('changeSummaryDialog')).open($('reviewChanges'))}
-function renderReport(){renderChangeSummary($('reportChangesBody'));const rs=validate(),counts={passed:0,warning:0,issue:0,'not-evaluated':0};rs.forEach(x=>counts[x.status]++);$('passedCount').textContent=counts.passed;$('warningCount').textContent=counts.warning;$('issueCount').textContent=counts.issue;$('neCount').textContent=counts['not-evaluated'];const evaluated=rs.filter(x=>x.evaluated).length,total=rs.length,pct=Math.round(evaluated/total*100);$('coverageText').textContent=`${evaluated} of ${total} checks completed`;$('coverageBar').style.width=pct+'%';$('coverageNote').textContent=`${pct}% validation coverage. Not evaluated checks are excluded from pass/fail interpretation.`;$('reportTitle').textContent=`${state.course.code||'Course'} syllabus validation report`;$('reportSubtitle').textContent=`${state.sourceName} · SyllabusBridge v2.1.2`;const filters=$('filters');filters.innerHTML='';[['all','All'],['passed','Passed'],['warning','Warnings'],['issue','Issues'],['not-evaluated','Not evaluated']].forEach(([v,l],i)=>{const b=document.createElement('button');b.className='sb-btn ft-btn filter'+(i===0?' active':'');b.textContent=l;b.onclick=()=>{document.querySelectorAll('.filter').forEach(x=>x.classList.remove('active'));b.classList.add('active');renderResults(v)};filters.appendChild(b)});renderValidationNav();renderResults('all')}
+function renderReport(){renderChangeSummary($('reportChangesBody'));const rs=validate(),counts={passed:0,warning:0,issue:0,'not-evaluated':0};rs.forEach(x=>counts[x.status]++);$('passedCount').textContent=counts.passed;$('warningCount').textContent=counts.warning;$('issueCount').textContent=counts.issue;$('neCount').textContent=counts['not-evaluated'];const evaluated=rs.filter(x=>x.evaluated).length,total=rs.length,pct=Math.round(evaluated/total*100);$('coverageText').textContent=`${evaluated} of ${total} checks completed`;$('coverageBar').style.width=pct+'%';$('coverageNote').textContent=`${pct}% validation coverage. Not evaluated checks are excluded from pass/fail interpretation.`;$('reportTitle').textContent=`${state.course.code||'Course'} syllabus validation report`;$('reportSubtitle').textContent=`${state.sourceName} · SyllabusBridge v2.1.2`;const policy=policyProfile();$('reportPolicy').textContent=policy?`Checked against ${policyName(policy)}.`:'No syllabus policy profile was loaded; policy wording was not checked.';const filters=$('filters');filters.innerHTML='';[['all','All'],['passed','Passed'],['warning','Warnings'],['issue','Issues'],['not-evaluated','Not evaluated']].forEach(([v,l],i)=>{const b=document.createElement('button');b.className='sb-btn ft-btn filter'+(i===0?' active':'');b.textContent=l;b.onclick=()=>{document.querySelectorAll('.filter').forEach(x=>x.classList.remove('active'));b.classList.add('active');renderResults(v)};filters.appendChild(b)});renderValidationNav();renderResults('all')}
 function renderValidationNav(){const nav=$('validationNav');if(!nav)return;nav.innerHTML='<h2>Validation checks</h2>';const icons={passed:'✓',warning:'⚠',issue:'✕','not-evaluated':'—'},labels={passed:'Passed',warning:'Warning',issue:'Issue','not-evaluated':'Not evaluated'};let last='';state.results.forEach(r=>{if(r.category!==last){const c=document.createElement('div');c.className='nav-category';c.textContent=r.category;nav.appendChild(c);last=r.category}const a=document.createElement('a');a.href='#check-'+r.id;a.setAttribute('aria-label',`${r.title}: ${labels[r.status]}`);a.innerHTML=`<span class="check-icon ${r.status}" aria-hidden="true">${icons[r.status]}</span><span>${esc(r.title)}</span>`;a.onclick=e=>{e.preventDefault();document.getElementById('check-'+r.id)?.scrollIntoView({behavior:'smooth',block:'start'})};nav.appendChild(a)})}
-function renderResults(filter){const host=$('results');host.innerHTML='';const icon={passed:'✓',warning:'!',issue:'×','not-evaluated':'?'};const cls={passed:'passed',warning:'warning-status',issue:'issue','not-evaluated':'not-evaluated'};state.results.filter(r=>filter==='all'||r.status===filter).forEach(r=>{const d=document.createElement('div');d.className=`soft result ${cls[r.status]}`;d.id='check-'+r.id;d.innerHTML=`<div class="status-icon">${icon[r.status]}</div><div><div class="category">${esc(r.category)}</div><h2>${esc(r.title)}</h2><div>${esc(r.summary)}</div><div class="evidence"><strong>Evidence:</strong> ${esc(r.evidence)}</div><div class="action"><strong>Suggested action:</strong> ${esc(r.action)}</div></div><span class="pill">${r.status==='not-evaluated'?'Not evaluated':r.status[0].toUpperCase()+r.status.slice(1)}</span>`;host.appendChild(d)})}
-function go(step){['upload','review','report'].forEach(s=>$('screen-'+s).classList.toggle('active',s===step));document.querySelectorAll('.sb-step').forEach(b=>{const target=b.dataset.step,available=target==='upload'||state.lines.length>0;b.classList.toggle('active',target===step);b.classList.toggle('done',(target==='upload'&&state.lines.length>0)||(target==='review'&&state.reviewComplete));b.setAttribute('aria-disabled',available?'false':'true');if(target===step)b.setAttribute('aria-current','step');else b.removeAttribute('aria-current')});if(step==='review')requestAnimationFrame(()=>document.querySelectorAll('#editors textarea').forEach(autoGrow));const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;window.scrollTo({top:0,behavior:reduce?'auto':'smooth'})}
+function renderResults(filter){const host=$('results');host.innerHTML='';const icon={passed:'✓',warning:'!',issue:'×','not-evaluated':'?'};const cls={passed:'passed',warning:'warning-status',issue:'issue','not-evaluated':'not-evaluated'};state.results.filter(r=>filter==='all'||r.status===filter).forEach(r=>{const d=document.createElement('div');d.className=`soft result ${cls[r.status]}`;d.id='check-'+r.id;const links=linkedChanges(r.id),fixable=(r.status==='warning'||r.status==='issue')&&fixTarget(r.id),fix=(links&&r.status==='passed'?`<div class="sb-resolved"><span aria-hidden="true">✓</span> Resolved by your edit${links===1?'':'s'}</div>`:'')+(links&&r.status!=='passed'?`<div class="muted sb-fix-note">${links} change${links===1?' was':'s were'} made for this finding; it still needs attention.</div>`:'')+(fixable?`<div class="no-print sb-fix-row"><button type="button" class="sb-btn ft-btn sb-fix" aria-label="Fix this: ${esc(r.title)}">Fix this</button></div>`:'');d.innerHTML=`<div class="status-icon">${icon[r.status]}</div><div><div class="category">${esc(r.category)}</div><h2>${esc(r.title)}</h2><div>${esc(r.summary)}</div><div class="evidence"><strong>Evidence:</strong> ${esc(r.evidence)}</div><div class="action"><strong>Suggested action:</strong> ${esc(r.action)}</div>${fix}</div><span class="pill">${r.status==='not-evaluated'?'Not evaluated':r.status[0].toUpperCase()+r.status.slice(1)}</span>`;d.querySelector('.sb-fix')?.addEventListener('click',()=>startFix(r.id));host.appendChild(d)})}
+// "Fix this" (v2.3). Each finding in the report links to the editor field that
+// fixes it. While fixing, every change made or altered is linked to that finding
+// (state.changeFindings maps a change's key to {id,title}). A link belongs to a
+// change that exists now, like a reading-correction mark. After revalidating, a
+// finding that passes and has linked changes shows "Resolved by your edit".
+function fixTarget(id){
+ const card=k=>({anchor:'review-'+k,focus:[`#review-${k} textarea`]});
+ const scale=(state.structuredTables||[]).find(t=>t.type==='gradingScale'),scaleTarget=scale?{anchor:`review-structured-${scale.tableIndex}`,focus:[`#review-structured-${scale.tableIndex} textarea`,`#review-structured-${scale.tableIndex} .add-structured-row`]}:null;
+ const faculty={anchor:'review-faculty',focus:['#facultyList .f-name','#addFacultyRow']},clos={anchor:'review-clos',focus:['#review-clos .clo-text','#addCloRow']},mapping={anchor:'review-clos',focus:['#review-clos .clo-map','#addCloRow']};
+ const schedule={anchor:'review-schedule',focus:['#scheduleBody .sb-schedule-invalid .s-date','#scheduleBody .s-date','#addScheduleRow']},evaluation={anchor:'review-assessments',focus:['#courseEvaluationText']},course=f=>({anchor:'review-course-info',focus:['#'+f]});
+ const map={'section-description':card('description'),'section-clos':clos,'section-plos':mapping,'clo-pslo':mapping,
+  'section-coordinator':faculty,'section-faculty':faculty,'coordinator-record':faculty,'faculty-consistency':faculty,'faculty-contact-completeness':{anchor:'review-faculty',focus:['#facultyList .f-email','#addFacultyRow']},
+  'section-timeLocation':course('courseLocation'),'course-code':course('courseCode'),'course-title':course('courseTitle'),'course-year':course('courseYear'),
+  'section-grading':scaleTarget,'policy-grading-scale':scaleTarget,'section-assessment':evaluation,'evaluation-narrative':evaluation,'grading-total':{anchor:'review-assessments',focus:['#gradeGrid .grade-weight','#addGradeRow']},
+  'section-schedule':schedule,'schedule-internal':schedule,'schedule-handoff-dates':schedule,'schedule-dates':schedule,'academic-integrity-reference':card('coursePolicies')};
+ for(const k of ['materials','hardware','accessibility','engagement','programAssessment','coursePolicies','attendance','assessmentPolicy','absence','incomplete'])map['section-'+k]=card(k);
+ const check=(policyProfile()?.contentChecks||[]).find(c=>'policy-'+c.id===id);
+ const t=check?.fixField?card(check.fixField):map[id];
+ return t&&$(t.anchor)?t:null
+}
+function fixSignatures(){const out=new Map;for(const g of changeSummary())for(const i of g.items)out.set(i.key,JSON.stringify([i.action,i.before,i.after]));return out}
+function linkFixEdits(){
+ const f=state.activeFix;if(!f)return;
+ state.changeFindings=state.changeFindings||{};
+ for(const [key,sig] of fixSignatures())if(f.start.get(key)!==sig){state.changeFindings[key]={id:f.id,title:f.title};f.start.set(key,sig)}
+}
+function linkedChanges(id){return Object.values(state.changeFindings||{}).filter(x=>x.id===id).length}
+function startFix(id){
+ const r=(state.results||[]).find(x=>x.id===id),t=fixTarget(id);if(!r||!t)return;
+ go('review');
+ state.activeFix={id:r.id,title:r.title,start:fixSignatures()};showFixContext();
+ document.querySelectorAll('.sb-fix-target').forEach(x=>x.classList.remove('sb-fix-target'));
+ const el=$(t.anchor);el.classList.add('sb-fix-target');
+ const field=t.focus.map(s=>document.querySelector(s)).find(Boolean);field?.focus({preventScroll:true});
+ const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+ // Scroll the field to just below the sticky status bar (which now shows the Fixing note).
+ requestAnimationFrame(()=>{const bar=$('editorStatus'),cs=getComputedStyle(bar),offset=cs.position==='sticky'?(parseFloat(cs.top)||0)+bar.offsetHeight+12:100;window.scrollTo({top:Math.max(0,el.getBoundingClientRect().top+window.scrollY-offset),behavior:reduce?'auto':'smooth'})})
+}
+function endFix(){if(!state.activeFix)return;state.activeFix=null;document.querySelectorAll('.sb-fix-target').forEach(x=>x.classList.remove('sb-fix-target'));showFixContext()}
+function updateFixCount(){const el=$('fixLinkedCount'),f=state.activeFix;if(!el||!f)return;const n=linkedChanges(f.id);el.textContent=n?`${n} change${n===1?'':'s'} linked so far.`:''}
+function showFixContext(message=''){
+ const el=$('fixContext');if(!el)return;const f=state.activeFix;
+ el.hidden=!f;if(!f){el.innerHTML='';return}
+ el.innerHTML=`<div><strong>Fixing: ${esc(f.title)}</strong><div class="muted">Changes you make now are linked to this finding and marked “Fix for a finding” in the change summary. <span id="fixLinkedCount"></span></div>${message?`<div class="sb-fix-status">${message}</div>`:''}</div><div class="row"><button type="button" class="sb-btn ft-btn" id="fixDone">Revalidate and return to report</button><button type="button" class="sb-btn ft-btn" id="fixStop">Stop linking changes</button></div>`;
+ updateFixCount();
+ $('fixDone').onclick=()=>$('runValidation').click();
+ $('fixStop').onclick=()=>{endFix();const st=$('historyStatus');if(st)st.textContent='Changes are no longer linked to a finding.'}
+}
+// After "Revalidate now" while fixing, say whether the finding now passes.
+function showFixOutcome(){
+ const f=state.activeFix;if(!f)return;const r=(state.results||[]).find(x=>x.id===f.id);if(!r)return;
+ showFixContext(r.status==='passed'?(linkedChanges(f.id)?'<span aria-hidden="true">✓</span> This finding now passes. Resolved by your edit.':'<span aria-hidden="true">✓</span> This finding now passes.'):`Still needs attention: ${esc(r.summary)}`)
+}
+function go(step){if(step!=='review')endFix();['upload','review','report'].forEach(s=>$('screen-'+s).classList.toggle('active',s===step));document.querySelectorAll('.sb-step').forEach(b=>{const target=b.dataset.step,available=target==='upload'||state.lines.length>0;b.classList.toggle('active',target===step);b.classList.toggle('done',(target==='upload'&&state.lines.length>0)||(target==='review'&&state.reviewComplete));b.setAttribute('aria-disabled',available?'false':'true');if(target===step)b.setAttribute('aria-current','step');else b.removeAttribute('aria-current')});if(step==='review')requestAnimationFrame(()=>document.querySelectorAll('#editors textarea').forEach(autoGrow));const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;window.scrollTo({top:0,behavior:reduce?'auto':'smooth'})}
 function resetState(){state={sourceName:'',lines:[],sections:[],course:{code:'',title:'',year:'',location:''},faculty:[],coordinator:null,clos:[],plos:[],cloMappings:[],meetingPatterns:[],assessments:[],policies:{},schedule:[],grading:[],rawTables:[],structuredTables:[],assignmentTables:[],supplementalTables:[],redText:[],results:[],extraction:{scheduleFailures:[],scheduleCandidates:0,cloCandidates:0},dirty:false,reviewComplete:false,editorBaseline:null,tableMutations:[],editMutations:[],cloEditorIds:[]};}
 
 function showLoading(on,text,pct){$('loading').classList.toggle('show',on);if(text)$('loadingText').textContent=text;$('bar').style.width=(pct||0)+'%'}function showError(msg,title='Word syllabus required'){$('uploadError').classList.add('show');$('uploadError').innerHTML=`<strong>${esc(title)}</strong><br>${esc(msg).replace(/\n/g,'<br>')}`}function clearError(){$('uploadError').classList.remove('show');$('uploadError').innerHTML=''}
@@ -822,7 +979,9 @@ function showTrackedChanges(){
 // locations only make sense against that exact file (see
 // docs/SYLLABUSBRIDGE-ROUNDTRIP.md), so a different file gets a warning first.
 // Format 2 (v2.2) adds changeKinds. Format 1 files still open; their changes are syllabus edits.
-const PROJECT_FORMAT='SyllabusBridge project',PROJECT_FORMAT_VERSION=2;
+// Format 3 (v2.3) adds changeFindings (changes made from a report finding's "Fix this").
+// Format 1 and 2 files still open, with no changes linked to findings.
+const PROJECT_FORMAT='SyllabusBridge project',PROJECT_FORMAT_VERSION=3;
 let pendingProject=null;
 const projectWork=FTUnsavedWork.track(()=>state.dirty?JSON.stringify(historySnapshot()):null);
 function toolVersion(){return (window.FacultyBridgeBuild?.tools||[]).find(t=>t.id==='syllabusbridge')?.version||'2.1.2'}
@@ -836,7 +995,7 @@ function buildProject(){
  return{format:PROJECT_FORMAT,formatVersion:PROJECT_FORMAT_VERSION,savedAt:new Date().toISOString(),
   savedBy:{tool:'SyllabusBridge',version:toolVersion(),suiteVersion:window.FacultyBridgeBuild?.suiteVersion||''},
   source:{fileName:state.sourceName,size:state.sourceFingerprint?.size??null,sha256:state.sourceFingerprint?.sha256??null},
-  editor:historySnapshot().editor,tableMutations:structuredClone(state.tableMutations||[]),changeKinds:(pruneChangeKinds(),structuredClone(state.changeKinds||{})),baseline:structuredClone(state.editorBaseline)}
+  editor:historySnapshot().editor,tableMutations:structuredClone(state.tableMutations||[]),changeKinds:(pruneChangeKinds(),structuredClone(state.changeKinds||{})),changeFindings:structuredClone(state.changeFindings||{}),baseline:structuredClone(state.editorBaseline)}
 }
 function saveProject(){
  if(!state.lines.length)return;
@@ -863,6 +1022,7 @@ function projectDataProblem(obj){
   ['course schedule',()=>objsWith(e.schedule,x=>['date','day','time','topic','faculty','raw','editorId'].every(k=>optStr(x[k]))&&(x.source===undefined||x.source===null||isObj(x.source)))&&objsWith(e.meetingPatterns||[],()=>true)],
   ['structured tables',()=>objsWith(e.structuredTables,t=>isInt(t.tableIndex)&&isStr(t.type)&&strings(t.headers||[])&&Array.isArray(t.rows)&&t.rows.every(row))],
   ['kinds of change',()=>obj.changeKinds===undefined||isObj(obj.changeKinds)&&Object.entries(obj.changeKinds).every(([k,v])=>isStr(k)&&v===CHANGE_KIND_READING)],
+  ['links to findings',()=>obj.changeFindings===undefined||isObj(obj.changeFindings)&&Object.values(obj.changeFindings).every(v=>isObj(v)&&isStr(v.id)&&isStr(v.title))],
   ['change records',()=>objsWith(obj.tableMutations,m=>isStr(m.key)&&['update-cell','add-row','remove-row'].includes(m.action)&&isInt(m.tableIndex)&&(m.action!=='add-row'||isStr(m.editorRowId)&&row(m.row)))],
  ];
  for(const [where,ok] of checks){let good=false;try{good=!!ok()}catch(err){good=false}if(!good)return`This SyllabusBridge project file is damaged (problem found in: ${where}), so it was not opened. Open an earlier saved copy, or start again from the Word syllabus.`}
@@ -911,7 +1071,7 @@ async function applyPendingProject(){
   const saved=structuredClone(p.editor);
   for(const k of PROJECT_EDITOR_FIELDS)if(saved[k]!==undefined)state[k]=saved[k];
   state.coordinator=(state.faculty||[]).find(f=>saved.coordinator?.editorId&&f.editorId===saved.coordinator.editorId)||(state.faculty||[]).find(f=>f.role==='coordinator')||null;
-  state.tableMutations=structuredClone(p.tableMutations);state.changeKinds=structuredClone(p.changeKinds||{});state.cloEditorIds=[...(saved.cloEditorIds||[])];
+  state.tableMutations=structuredClone(p.tableMutations);state.changeKinds=structuredClone(p.changeKinds||{});state.changeFindings=structuredClone(p.changeFindings||{});state.cloEditorIds=[...(saved.cloEditorIds||[])];
   refreshDerivedTableViews();
   // Against a different Word file some saved changes can disappear (the file already
   // says the same thing). Drop their marks before the fresh history starts.
