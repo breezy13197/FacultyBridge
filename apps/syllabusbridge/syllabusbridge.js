@@ -889,7 +889,10 @@ async function applyPendingProject(){
   for(const k of PROJECT_EDITOR_FIELDS)if(saved[k]!==undefined)state[k]=saved[k];
   state.coordinator=(state.faculty||[]).find(f=>saved.coordinator?.editorId&&f.editorId===saved.coordinator.editorId)||(state.faculty||[]).find(f=>f.role==='coordinator')||null;
   state.tableMutations=structuredClone(p.tableMutations);state.changeKinds=structuredClone(p.changeKinds||{});state.cloEditorIds=[...(saved.cloEditorIds||[])];
-  refreshDerivedTableViews();renderReview();resetHistory()
+  refreshDerivedTableViews();
+  // Against a different Word file some saved changes can disappear (the file already
+  // says the same thing). Drop their marks before the fresh history starts.
+  pruneChangeKinds();renderReview();resetHistory()
  }catch(err){
   console.warn('SyllabusBridge project could not be restored',err);
   state=before;pendingProject=null;showProjectPending();

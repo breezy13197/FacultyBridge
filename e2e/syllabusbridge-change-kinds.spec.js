@@ -116,3 +116,33 @@ test('a damaged kind in a project file is refused with a plain explanation', asy
   await page.locator('#projectFile').setInputFiles({ name: 'p.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(project)) });
   await expect(page.locator('#uploadError')).toContainText('problem found in: kinds of change');
 });
+
+// Review finding: reopening a project against a different Word file can make a
+// saved change disappear (the new file already says the same thing). Its mark
+// must go too, or the next edit to that item wrongly starts as a reading correction.
+test('reopening against a different Word file drops marks whose change no longer exists', async ({ page, openTool }) => {
+  const original = await syllabusFile();
+  const alreadyCorrected = { name: 'syllabus-revised.docx', mimeType: DOCX_MIME, buffer: await syntheticDocx({
+    paragraphs: ['PHA9999 - Revised Synthetic Course', ...paragraphs.slice(1)], table: syntheticSyllabus.table }) };
+  await openTool('syllabusbridge');
+  await page.locator('#file').setInputFiles(original);
+  await expect(page.locator('#screen-review')).toBeVisible();
+  await setField(page.locator('#courseTitle'), 'Revised Synthetic Course');
+  await openSummary(page);
+  await readingBox(page, 'Course title').check();
+  await closeSummary(page);
+  const { text } = await downloadFrom(page, () => page.locator('#saveProject').click());
+
+  await page.locator('#screen-review').getByRole('button', { name: '← Upload' }).click();
+  await page.locator('#openProject').click();
+  await page.locator('#projectFile').setInputFiles({ name: 'p.json', mimeType: 'application/json', buffer: Buffer.from(text) });
+  await page.locator('#file').setInputFiles(alreadyCorrected);
+  await page.getByRole('dialog', { name: 'Different Word file?' }).getByRole('button', { name: 'Open project anyway' }).click();
+  await expect(page.locator('#screen-review')).toBeVisible();
+  expect(await page.evaluate(() => editorDiffCount())).toBe(0);
+  expect(await page.evaluate(() => state.changeKinds)).toEqual({});
+
+  await setField(page.locator('#courseTitle'), 'A New Intentional Title');
+  await openSummary(page);
+  expect(await kinds(dialog(page))).toEqual([['Course title', 'Syllabus edit']]);
+});

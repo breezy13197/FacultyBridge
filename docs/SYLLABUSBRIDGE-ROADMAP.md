@@ -135,8 +135,9 @@ What shipped (decided 2026-11-10: mark in the summary, labels only this round):
   ("4 syllabus edits, 1 reading correction").
 - Marking is a step in Undo/Redo and counts as unsaved work.
 - A mark belongs to a change that exists now. If the change goes away (undone,
-  or typed back to the original), its mark is cleared, so a later change to the
-  same item starts as a syllabus edit again.
+  typed back to the original, or gone because a project was reopened against a
+  Word file that already says the same thing), its mark is cleared, so a later
+  change to the same item starts as a syllabus edit again.
 - Saved in the project file as `changeKinds` (**format version 2**). Format 1
   files still open, with every change counted as a syllabus edit.
 - Reading corrections still fix the data: validation and the Course JSON for
