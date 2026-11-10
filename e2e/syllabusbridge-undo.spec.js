@@ -200,3 +200,22 @@ test('a late screen refresh after Add row does not move typing into the wrong ce
   await cells.nth(1).fill('10');
   expect(await page.evaluate(() => state.structuredTables[0].rows.at(-1).cells.map(c => c.text))).toEqual(['Participation', '10']);
 });
+
+// WebKit (Safari) carried typed values into the rebuilt grade boxes after Undo,
+// so the screen disagreed with the data, and the next edit saved the stale text.
+test('after Undo, the grade boxes show the restored values, not what was typed', async ({ page, openTool }) => {
+  await openTool('syllabusbridge');
+  await page.locator('#file').setInputFiles({ name: 'syllabus.docx', mimeType: DOCX_MIME, buffer: await syntheticDocx({
+    paragraphs: ['PHA9999 - Synthetic Course', 'Fall 2026', 'COURSE EVALUATION'],
+    table: [['Assessment', 'Weight'], ['Final exam', '60%'], ['Quizzes', '40%']],
+  }) });
+  await expect(page.locator('#screen-review')).toBeVisible();
+  const row = page.locator('.grade-row').first();
+  for (const [box, typed, original] of [['.grade-name', 'Final exam (revised)', 'Final exam'], ['.grade-date', '12/10/2026', ''], ['.grade-weight', '55', '60']]) {
+    await row.locator(box).fill(typed);
+    await row.locator(box).press('Tab');
+    await page.locator('#undoEdit').click();
+    await expect(page.locator('.grade-row').first().locator(box)).toHaveValue(original);
+  }
+  expect(await page.evaluate(() => editorDiffCount())).toBe(0);
+});

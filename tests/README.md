@@ -49,7 +49,9 @@ What it covers, using synthetic data only:
   undoable, and typing undo left alone inside text boxes. It also replays a
   late screen refresh after "+ Add row": that refresh used to move the cursor
   back to the new row's first cell after typing had moved on, which made CI
-  runs flaky ("Participation10"). The cell is now focused immediately.
+  runs flaky ("Participation10"). The cell is now focused immediately. It also
+  checks that, after Undo, the grade boxes show the restored values: WebKit
+  (Safari) used to keep the typed text in the rebuilt boxes.
 - `syllabusbridge-project.spec.js`: SyllabusBridge project save and reopen:
   every edit comes back with the same Word file, a different Word file is
   warned about before anything is applied (and so is any file that can't be
