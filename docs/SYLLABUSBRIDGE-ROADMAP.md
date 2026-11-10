@@ -123,32 +123,47 @@ Acceptance criteria (each covered by `e2e/syllabusbridge-project.spec.js`):
   plain explanation.
 - [x] The leave-page warning clears after saving and returns with new edits.
 
-### 3. Three kinds of change
+### 3. Kinds of change — labels done (unreleased); finding links later
 
-Every edit is labeled as one of:
+What shipped (decided 2026-11-10: mark in the summary, labels only this round):
+
+- Every change counts as a **syllabus edit** by default. In the **Change
+  summary**, each row has a **"SyllabusBridge misread this"** checkbox that
+  marks it as a **reading correction**: the Word file was right, and only how
+  SyllabusBridge read it was wrong. No questions interrupt editing.
+- The summary and the printable report show each change's kind and the totals
+  ("4 syllabus edits, 1 reading correction").
+- Marking is a step in Undo/Redo and counts as unsaved work.
+- A mark belongs to a change that exists now. If the change goes away (undone,
+  typed back to the original, or gone because a project was reopened against a
+  Word file that already says the same thing), its mark is cleared, so a later
+  change to the same item starts as a syllabus edit again.
+- Saved in the project file as `changeKinds` (**format version 2**). Format 1
+  files still open, with every change counted as a syllabus edit.
+- Reading corrections still fix the data: validation and the Course JSON for
+  CalendarBridge use the corrected values. **Word export (v2.5) must skip
+  them;** that is the main reason for this distinction.
 
 | Kind | What it means | Written into the exported .docx? |
 |---|---|---|
-| **Parser correction** | "SyllabusBridge read this wrong." | **No** |
-| **Fix for a finding** | An edit made in response to a specific warning or issue in the report. | Yes |
-| **Other intentional edit** | Any other content change faculty want. | Yes |
+| **Syllabus edit** | A change faculty want in the syllabus. | Yes (v2.5) |
+| **Reading correction** | "SyllabusBridge read this wrong." | **No** |
 
-- Default labeling: an edit made after jumping from a finding (see v2.3 item 2)
-  is labeled "Fix for a finding" and linked to that check. Other edits ask once,
-  with a simple choice: "Correcting how SyllabusBridge read this" or "Changing
-  the syllabus."
-- Faculty can change the label later in the change summary.
-- When a linked fix is made and the syllabus is revalidated, the report marks
-  that finding **"Resolved by your edit."**
-- Parser corrections can be exported as a separate **parser QA log** (what was
-  read, what it should have been, where). This shows where the parser needs
-  work. Logs from real courses stay out of this repository; turn patterns into
-  synthetic test fixtures instead.
+Still to come:
+
+- **Fix for a finding:** linking an edit to the validation warning it fixes,
+  and showing "Resolved by your edit" after revalidating. This comes with
+  v2.3's "Fix this" links, which create the link naturally.
+- **Paragraph locations** in the parser for body text (from the round-trip
+  findings). This comes with the v2.5 Word export work, because it changes
+  the protected parsing code.
+- A parser QA log export of reading corrections (to find where the parser
+  most needs work).
 
 Why this matters for later versions:
-- **v2.5 export:** only content edits go back into Word (principle 2).
+- **v2.5 export:** only syllabus edits go back into Word.
 - **Year-over-year rollover:** next year's syllabus can carry forward the
-  intentional edits; parser corrections become parser fixes instead.
+  intentional edits; reading corrections become parser fixes instead.
 
 ### 4. Change summary — done (unreleased)
 

@@ -13,7 +13,8 @@ async function setField(locator, value) { await locator.fill(value); await locat
 async function summaryRows(root) {
   const rows = await root.locator('.sb-change-group').evaluateAll(groups => groups.flatMap(g => {
     const section = g.querySelector('h3').firstChild.textContent.trim();
-    return [...g.querySelectorAll('tbody tr')].map(tr => [section, ...[...tr.cells].map(td => td.innerText.trim())]);
+    // Change, item, before, after (the Kind column is checked in syllabusbridge-change-kinds.spec.js).
+    return [...g.querySelectorAll('tbody tr')].map(tr => [section, ...[...tr.cells].slice(0, 4).map(td => td.innerText.trim())]);
   }));
   // A "Changed" row whose before and after read the same hides what changed.
   for (const row of rows) if (row[1] === 'Changed') expect(row[3], `before and after must differ: ${row.join(' | ')}`).not.toBe(row[4]);

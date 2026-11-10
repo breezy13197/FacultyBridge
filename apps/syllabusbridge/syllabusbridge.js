@@ -418,11 +418,12 @@ function updateEditorStatus(){
 // each added row's editorRowId, which its add-row change record points to.
 // (editorSnapshot() keeps a reduced form that is only for counting changes.)
 const HISTORY_LIMIT=100,HISTORY_GROUP_MS=2000;
-function historySnapshot(){return structuredClone({editor:{...editorSnapshot(),structuredTables:state.structuredTables||[]},tableMutations:state.tableMutations||[]})}
+function historySnapshot(){return structuredClone({editor:{...editorSnapshot(),structuredTables:state.structuredTables||[]},tableMutations:state.tableMutations||[],changeKinds:state.changeKinds||{}})}
 function resetHistory(){state.history={past:[],future:[],current:historySnapshot(),groupKey:null,groupAt:0};updateHistoryControls('')}
 function typingTarget(el){return !!el&&(el.tagName==='TEXTAREA'||(el.tagName==='INPUT'&&!/^(button|checkbox|radio|submit|reset|file|color|range)$/i.test(el.type||'')))||!!el?.isContentEditable}
 function recordHistory(){
  const h=state.history;if(!h||state.restoringHistory)return;
+ pruneChangeKinds();
  const now=Date.now(),el=document.activeElement,key=typingTarget(el)?el:null,snap=historySnapshot();
  // Leaving a field fires a "changed" event even when nothing changed; that is not a step.
  if(JSON.stringify(snap)===JSON.stringify(h.current))return;
@@ -431,7 +432,7 @@ function recordHistory(){
 }
 function restoreHistory(snap){
  const s=structuredClone(snap);state.restoringHistory=true;
- try{Object.assign(state,s.editor);state.tableMutations=s.tableMutations;state.cloEditorIds=[...(s.editor.cloEditorIds||[])];refreshDerivedTableViews();renderReview();updateEditorStatus()}
+ try{Object.assign(state,s.editor);state.tableMutations=s.tableMutations;state.changeKinds=s.changeKinds||{};state.cloEditorIds=[...(s.editor.cloEditorIds||[])];refreshDerivedTableViews();renderReview();updateEditorStatus()}
  finally{state.restoringHistory=false}
  const v=$('liveValidation');if(v){v.textContent='Changes not revalidated';v.className='pill'}
 }
@@ -711,11 +712,28 @@ async function exportCourseJson(){
 // Change summary (v2.2): every net change, grouped by syllabus section, with the
 // text before and after. Built from the same comparison as the "N net changes"
 // count, so the two always agree (one summary row per counted change).
+// Kinds of change (v2.2). Every change is a syllabus edit unless faculty mark it
+// as a reading correction: SyllabusBridge misread the Word file, and the file was
+// right. Reading corrections still fix the data (Course JSON, validation), but
+// Word export (v2.5) must never write them into the syllabus.
+// state.changeKinds maps a change's key to 'reading-correction'.
+const CHANGE_KIND_READING='reading-correction';
+function currentChangeKeys(){rebuildEditMutations();return new Set([...(state.editMutations||[]).map(m=>m.key),...activeStructuredMutations().map(m=>m.key)])}
+// A mark belongs to a change that exists now. When the change goes away (undone or
+// typed back to the original), its mark goes too, so a later change starts fresh.
+function pruneChangeKinds(){const k=state.changeKinds;if(!k||!Object.keys(k).length)return;const live=currentChangeKeys();for(const key of Object.keys(k))if(!live.has(key))delete k[key]}
+function changeKind(key){return state.changeKinds?.[key]===CHANGE_KIND_READING?CHANGE_KIND_READING:'syllabus-edit'}
+function setChangeKind(key,reading){
+ state.changeKinds=state.changeKinds||{};
+ if(reading)state.changeKinds[key]=CHANGE_KIND_READING;else delete state.changeKinds[key];
+ recordHistory();updateEditorStatus()
+}
 function changeSummary(){
  if(!state.editorBaseline)return[];
  rebuildEditMutations();
  const b=state.editorBaseline,c=editorSnapshot(),groups=new Map;
- const add=(section,item)=>{if(!groups.has(section))groups.set(section,[]);groups.get(section).push(item)};
+ let currentKey='';
+ const add=(section,item)=>{if(!groups.has(section))groups.set(section,[]);groups.get(section).push({...item,key:currentKey,kind:changeKind(currentKey)})};
  const byId=arr=>new Map((arr||[]).map((x,i)=>[x.editorId||`index-${i}`,x]));
  const verb={add:'Added',remove:'Removed',update:'Changed'};
  const facultyText=f=>f?[clean(f.name),clean(f.email),f.role==='coordinator'?'Coordinator':'Course faculty'].filter(Boolean).join(' · '):'';
@@ -729,6 +747,7 @@ function changeSummary(){
  const bf=byId(b.faculty),cf=byId(c.faculty),bg=byId(b.grading),cg=byId(c.grading),bs=byId(b.schedule),cs=byId(c.schedule);
  const bclo=new Map(cloRows(b).map(x=>[x.editorId,x])),cclo=new Map(cloRows(c).map(x=>[x.editorId,x]));
  for(const m of state.editMutations||[]){
+  currentKey=m.key;
   const both=(bm,cm,fmt)=>({before:fmt(bm.get(m.id)),after:fmt(cm.get(m.id))});
   if(m.section==='course')add('Course information',{action:'Changed',what:courseLabels[m.field]||m.field,before:clean(b.course?.[m.field]),after:clean(c.course?.[m.field])});
   else if(m.section==='faculty')add('Coordinator & course faculty',{action:verb[m.action],what:clean((cf.get(m.id)||bf.get(m.id))?.name)||'Faculty member',...both(bf,cf,facultyText)});
@@ -738,6 +757,7 @@ function changeSummary(){
   else if(m.section==='policy')add('Policies and narrative sections',{action:'Changed',what:policyLabel(m.field),before:clean(b.policies?.[m.field]),after:clean(c.policies?.[m.field])});
  }
  for(const mu of activeStructuredMutations()){
+  currentKey=mu.key;
   const section=structuredTableTitle(mu.tableType),cells=r=>(r?.cells||[]).map(tableCellValue).filter(Boolean).join(' | ');
   if(mu.action==='update-cell'){const head=clean(baselineTable(mu.tableIndex)?.headers?.[mu.sourceColumnIndex])||`Column ${(mu.sourceColumnIndex??0)+1}`;add(section,{action:'Changed',what:`Row ${mu.sourceRowIndex??'?'}, ${head}`,before:mu.originalValue||'',after:mu.newValue||''})}
   else if(mu.action==='add-row')add(section,{action:'Added',what:'New row',before:'',after:cells(mu.row)});
@@ -745,14 +765,26 @@ function changeSummary(){
  }
  return [...groups].map(([section,items])=>({section,items}))
 }
-function renderChangeSummary(el){
- const groups=changeSummary(),n=groups.reduce((a,g)=>a+g.items.length,0);
+function renderChangeSummary(el,{interactive=false}={}){
+ const groups=changeSummary(),items=groups.flatMap(g=>g.items),n=items.length;
  const text=v=>v?esc(v).replace(/\n/g,'<br>'):'<span class="muted">(blank)</span>';
  if(!n){el.innerHTML='<p class="muted">No changes. Everything still matches what SyllabusBridge read from the Word syllabus.</p>';return n}
- el.innerHTML=`<p class="muted">${n} change${n===1?'':'s'} compared with what SyllabusBridge read from <strong>${esc(state.sourceName)}</strong>.</p>`+groups.map(g=>`<section class="sb-change-group"><h3>${esc(g.section)} <span class="pill">${g.items.length}</span></h3><div class="ft-table-wrap"><table class="ft-table sb-change-table"><thead><tr><th scope="col">Change</th><th scope="col">Item</th><th scope="col">Before</th><th scope="col">After</th></tr></thead><tbody>${g.items.map(i=>`<tr><td><span class="pill sb-change-${i.action.toLowerCase()}">${esc(i.action)}</span></td><td>${esc(i.what)}</td><td>${i.action==='Added'?'<span class="muted">(new)</span>':text(i.before)}</td><td>${i.action==='Removed'?'<span class="muted">(removed)</span>':text(i.after)}</td></tr>`).join('')}</tbody></table></div></section>`).join('');
+ const reading=items.filter(i=>i.kind===CHANGE_KIND_READING).length,edits=n-reading;
+ const kindCell=i=>interactive
+  ?`<label class="sb-kind"><input type="checkbox" class="sb-kind-reading" data-change-key="${esc(i.key)}"${i.kind===CHANGE_KIND_READING?' checked':''}> SyllabusBridge misread this</label>`
+  :(i.kind===CHANGE_KIND_READING?'Reading correction':'Syllabus edit');
+ el.innerHTML=`<p class="muted sb-change-counts">${n} change${n===1?'':'s'} compared with what SyllabusBridge read from <strong>${esc(state.sourceName)}</strong>: ${edits} syllabus edit${edits===1?'':'s'}, ${reading} reading correction${reading===1?'':'s'}.</p>`
+  +(interactive?'<p class="muted sb-kind-help">Every change counts as a syllabus edit. Tick <strong>SyllabusBridge misread this</strong> when the Word file was right and you only corrected how SyllabusBridge read it. Reading corrections are never written into the Word syllabus.</p>':'')
+  +groups.map(g=>`<section class="sb-change-group"><h3>${esc(g.section)} <span class="pill">${g.items.length}</span></h3><div class="ft-table-wrap"><table class="ft-table sb-change-table"><thead><tr><th scope="col">Change</th><th scope="col">Item</th><th scope="col">Before</th><th scope="col">After</th><th scope="col">Kind</th></tr></thead><tbody>${g.items.map(i=>`<tr><td><span class="pill sb-change-${i.action.toLowerCase()}">${esc(i.action)}</span></td><td>${esc(i.what)}</td><td>${i.action==='Added'?'<span class="muted">(new)</span>':text(i.before)}</td><td>${i.action==='Removed'?'<span class="muted">(removed)</span>':text(i.after)}</td><td>${kindCell(i)}</td></tr>`).join('')}</tbody></table></div></section>`).join('');
+ if(interactive)el.querySelectorAll('.sb-kind-reading').forEach(box=>box.onchange=()=>{
+  setChangeKind(box.dataset.changeKey,box.checked);
+  const counts=el.querySelector('.sb-change-counts'),r=Object.keys(state.changeKinds||{}).length,e=n-r;
+  if(counts)counts.innerHTML=`${n} change${n===1?'':'s'} compared with what SyllabusBridge read from <strong>${esc(state.sourceName)}</strong>: ${e} syllabus edit${e===1?'':'s'}, ${r} reading correction${r===1?'':'s'}.`;
+  const st=$('historyStatus');if(st)st.textContent=box.checked?'Marked as a reading correction.':'Marked as a syllabus edit.'
+ });
  return n
 }
-function openChangeSummary(){renderChangeSummary($('changeSummaryBody'));FTDialog.manage($('changeSummaryDialog')).open($('reviewChanges'))}
+function openChangeSummary(){renderChangeSummary($('changeSummaryBody'),{interactive:true});FTDialog.manage($('changeSummaryDialog')).open($('reviewChanges'))}
 function renderReport(){renderChangeSummary($('reportChangesBody'));const rs=validate(),counts={passed:0,warning:0,issue:0,'not-evaluated':0};rs.forEach(x=>counts[x.status]++);$('passedCount').textContent=counts.passed;$('warningCount').textContent=counts.warning;$('issueCount').textContent=counts.issue;$('neCount').textContent=counts['not-evaluated'];const evaluated=rs.filter(x=>x.evaluated).length,total=rs.length,pct=Math.round(evaluated/total*100);$('coverageText').textContent=`${evaluated} of ${total} checks completed`;$('coverageBar').style.width=pct+'%';$('coverageNote').textContent=`${pct}% validation coverage. Not evaluated checks are excluded from pass/fail interpretation.`;$('reportTitle').textContent=`${state.course.code||'Course'} syllabus validation report`;$('reportSubtitle').textContent=`${state.sourceName} · SyllabusBridge v2.1.2`;const filters=$('filters');filters.innerHTML='';[['all','All'],['passed','Passed'],['warning','Warnings'],['issue','Issues'],['not-evaluated','Not evaluated']].forEach(([v,l],i)=>{const b=document.createElement('button');b.className='sb-btn ft-btn filter'+(i===0?' active':'');b.textContent=l;b.onclick=()=>{document.querySelectorAll('.filter').forEach(x=>x.classList.remove('active'));b.classList.add('active');renderResults(v)};filters.appendChild(b)});renderValidationNav();renderResults('all')}
 function renderValidationNav(){const nav=$('validationNav');if(!nav)return;nav.innerHTML='<h2>Validation checks</h2>';const icons={passed:'✓',warning:'⚠',issue:'✕','not-evaluated':'—'},labels={passed:'Passed',warning:'Warning',issue:'Issue','not-evaluated':'Not evaluated'};let last='';state.results.forEach(r=>{if(r.category!==last){const c=document.createElement('div');c.className='nav-category';c.textContent=r.category;nav.appendChild(c);last=r.category}const a=document.createElement('a');a.href='#check-'+r.id;a.setAttribute('aria-label',`${r.title}: ${labels[r.status]}`);a.innerHTML=`<span class="check-icon ${r.status}" aria-hidden="true">${icons[r.status]}</span><span>${esc(r.title)}</span>`;a.onclick=e=>{e.preventDefault();document.getElementById('check-'+r.id)?.scrollIntoView({behavior:'smooth',block:'start'})};nav.appendChild(a)})}
 function renderResults(filter){const host=$('results');host.innerHTML='';const icon={passed:'✓',warning:'!',issue:'×','not-evaluated':'?'};const cls={passed:'passed',warning:'warning-status',issue:'issue','not-evaluated':'not-evaluated'};state.results.filter(r=>filter==='all'||r.status===filter).forEach(r=>{const d=document.createElement('div');d.className=`soft result ${cls[r.status]}`;d.id='check-'+r.id;d.innerHTML=`<div class="status-icon">${icon[r.status]}</div><div><div class="category">${esc(r.category)}</div><h2>${esc(r.title)}</h2><div>${esc(r.summary)}</div><div class="evidence"><strong>Evidence:</strong> ${esc(r.evidence)}</div><div class="action"><strong>Suggested action:</strong> ${esc(r.action)}</div></div><span class="pill">${r.status==='not-evaluated'?'Not evaluated':r.status[0].toUpperCase()+r.status.slice(1)}</span>`;host.appendChild(d)})}
@@ -766,7 +798,8 @@ function showLoading(on,text,pct){$('loading').classList.toggle('show',on);if(te
 // that Word file again, reads it fresh, then puts the saved edits back. Edit
 // locations only make sense against that exact file (see
 // docs/SYLLABUSBRIDGE-ROUNDTRIP.md), so a different file gets a warning first.
-const PROJECT_FORMAT='SyllabusBridge project',PROJECT_FORMAT_VERSION=1;
+// Format 2 (v2.2) adds changeKinds. Format 1 files still open; their changes are syllabus edits.
+const PROJECT_FORMAT='SyllabusBridge project',PROJECT_FORMAT_VERSION=2;
 let pendingProject=null;
 const projectWork=FTUnsavedWork.track(()=>state.dirty?JSON.stringify(historySnapshot()):null);
 function toolVersion(){return (window.FacultyBridgeBuild?.tools||[]).find(t=>t.id==='syllabusbridge')?.version||'2.1.2'}
@@ -780,7 +813,7 @@ function buildProject(){
  return{format:PROJECT_FORMAT,formatVersion:PROJECT_FORMAT_VERSION,savedAt:new Date().toISOString(),
   savedBy:{tool:'SyllabusBridge',version:toolVersion(),suiteVersion:window.FacultyBridgeBuild?.suiteVersion||''},
   source:{fileName:state.sourceName,size:state.sourceFingerprint?.size??null,sha256:state.sourceFingerprint?.sha256??null},
-  editor:historySnapshot().editor,tableMutations:structuredClone(state.tableMutations||[]),baseline:structuredClone(state.editorBaseline)}
+  editor:historySnapshot().editor,tableMutations:structuredClone(state.tableMutations||[]),changeKinds:(pruneChangeKinds(),structuredClone(state.changeKinds||{})),baseline:structuredClone(state.editorBaseline)}
 }
 function saveProject(){
  if(!state.lines.length)return;
@@ -806,6 +839,7 @@ function projectDataProblem(obj){
   ['course policies',()=>e.policies===undefined||isObj(e.policies)&&Object.values(e.policies).every(v=>isStr(v)||typeof v==='boolean')],
   ['course schedule',()=>objsWith(e.schedule,x=>['date','day','time','topic','faculty','raw','editorId'].every(k=>optStr(x[k]))&&(x.source===undefined||x.source===null||isObj(x.source)))&&objsWith(e.meetingPatterns||[],()=>true)],
   ['structured tables',()=>objsWith(e.structuredTables,t=>isInt(t.tableIndex)&&isStr(t.type)&&strings(t.headers||[])&&Array.isArray(t.rows)&&t.rows.every(row))],
+  ['kinds of change',()=>obj.changeKinds===undefined||isObj(obj.changeKinds)&&Object.entries(obj.changeKinds).every(([k,v])=>isStr(k)&&v===CHANGE_KIND_READING)],
   ['change records',()=>objsWith(obj.tableMutations,m=>isStr(m.key)&&['update-cell','add-row','remove-row'].includes(m.action)&&isInt(m.tableIndex)&&(m.action!=='add-row'||isStr(m.editorRowId)&&row(m.row)))],
  ];
  for(const [where,ok] of checks){let good=false;try{good=!!ok()}catch(err){good=false}if(!good)return`This SyllabusBridge project file is damaged (problem found in: ${where}), so it was not opened. Open an earlier saved copy, or start again from the Word syllabus.`}
@@ -854,8 +888,11 @@ async function applyPendingProject(){
   const saved=structuredClone(p.editor);
   for(const k of PROJECT_EDITOR_FIELDS)if(saved[k]!==undefined)state[k]=saved[k];
   state.coordinator=(state.faculty||[]).find(f=>saved.coordinator?.editorId&&f.editorId===saved.coordinator.editorId)||(state.faculty||[]).find(f=>f.role==='coordinator')||null;
-  state.tableMutations=structuredClone(p.tableMutations);state.cloEditorIds=[...(saved.cloEditorIds||[])];
-  refreshDerivedTableViews();renderReview();resetHistory()
+  state.tableMutations=structuredClone(p.tableMutations);state.changeKinds=structuredClone(p.changeKinds||{});state.cloEditorIds=[...(saved.cloEditorIds||[])];
+  refreshDerivedTableViews();
+  // Against a different Word file some saved changes can disappear (the file already
+  // says the same thing). Drop their marks before the fresh history starts.
+  pruneChangeKinds();renderReview();resetHistory()
  }catch(err){
   console.warn('SyllabusBridge project could not be restored',err);
   state=before;pendingProject=null;showProjectPending();

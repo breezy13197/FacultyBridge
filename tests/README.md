@@ -61,6 +61,11 @@ What it covers, using synthetic data only:
 - `syllabusbridge-change-summary.spec.js`: SyllabusBridge change summary:
   one row per counted change, grouped by section with before and after, the
   same list in the printable report, and table cells/rows under their table.
+- `syllabusbridge-change-kinds.spec.js`: SyllabusBridge kinds of change:
+  syllabus edit by default, "SyllabusBridge misread this" marks a reading
+  correction (shown in the summary and report), marking undo/redo, marks
+  cleared when their change goes away, and kinds saved in project format 2
+  while format 1 projects still open.
 - `offline.spec.js`: the same workflows with the network disabled after the page
   loads, to prove nothing is lazy-loaded from outside the computer.
 
