@@ -175,3 +175,28 @@ test('undo and redo keep added table rows linked to their change records', async
   expect(seen.exportedAdds).toBe(0);
   expect(seen.changes).toBe(0);
 });
+
+// CI investigation: "+ Add row" used to focus the new row's first cell on the
+// next animation frame. When that frame arrived late (a busy computer), it pulled
+// the cursor back after typing had moved to the second cell, so "10" landed in the
+// first cell ("Participation10"). This replays that late frame on purpose.
+test('a late screen refresh after Add row does not move typing into the wrong cell', async ({ page, openTool }) => {
+  await page.addInitScript(() => {
+    const queued = [];
+    window.requestAnimationFrame = cb => { queued.push(cb); return queued.length; };
+    document.addEventListener('focusin', e => {
+      if (e.target.matches?.('.sb-table-cell[data-col="1"]')) queued.splice(0).forEach(cb => cb(performance.now()));
+    }, true);
+  });
+  const rubric = { paragraphs: syntheticSyllabus.paragraphs.filter(p => p !== 'Course Schedule'), table: [['Component', 'Points'], ['Exam', '50'], ['Project', '50']] };
+  await openTool('syllabusbridge');
+  await page.locator('#file').setInputFiles({ name: 'rubric.docx', mimeType: DOCX_MIME, buffer: await syntheticDocx(rubric) });
+  await expect(page.locator('#screen-review')).toBeVisible();
+  const editor = page.locator('.sb-structured-editor').filter({ has: page.locator('.add-structured-row') }).first();
+  await editor.locator('.add-structured-row').click();
+  const cells = editor.locator('tbody tr').last().locator('textarea');
+  await expect(cells.nth(0)).toBeFocused();
+  await cells.nth(0).fill('Participation');
+  await cells.nth(1).fill('10');
+  expect(await page.evaluate(() => state.structuredTables[0].rows.at(-1).cells.map(c => c.text))).toEqual(['Participation', '10']);
+});

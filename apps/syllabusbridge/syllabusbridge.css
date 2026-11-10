@@ -69,3 +69,4 @@
 
 .sb-schedule-invalid td{background:color-mix(in srgb,var(--ft-danger) 7%,var(--ft-surface))}
 .sb-schedule-invalid .s-date{border-color:var(--ft-danger);box-shadow:0 0 0 2px color-mix(in srgb,var(--ft-danger) 18%,transparent)}
+.sb-project-open{margin-top:14px;display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap}.sb-project-pending{margin-top:13px;text-align:left}.sb-project-pending .row{flex-wrap:wrap}

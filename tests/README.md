@@ -46,7 +46,16 @@ What it covers, using synthetic data only:
   [the round-trip findings](../docs/SYLLABUSBRIDGE-ROUNDTRIP.md).
 - `syllabusbridge-undo.spec.js`: SyllabusBridge editor undo/redo by button and
   keyboard, one step per typing burst, redo cleared by a new edit, Reset edits
-  undoable, and typing undo left alone inside text boxes.
+  undoable, and typing undo left alone inside text boxes. It also replays a
+  late screen refresh after "+ Add row": that refresh used to move the cursor
+  back to the new row's first cell after typing had moved on, which made CI
+  runs flaky ("Participation10"). The cell is now focused immediately.
+- `syllabusbridge-project.spec.js`: SyllabusBridge project save and reopen:
+  every edit comes back with the same Word file, a different Word file is
+  warned about before anything is applied (and so is any file that can't be
+  verified by fingerprint), damaged project contents are refused before
+  anything changes, non-project files get a plain error, and the leave-page
+  warning tracks saving.
 - `offline.spec.js`: the same workflows with the network disabled after the page
   loads, to prove nothing is lazy-loaded from outside the computer.
 
