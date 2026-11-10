@@ -11,10 +11,13 @@ async function open(page, openTool, table) {
 async function setField(locator, value) { await locator.fill(value); await locator.press('Tab'); }
 // The summary as data: [section, action, item, before, after] rows.
 async function summaryRows(root) {
-  return root.locator('.sb-change-group').evaluateAll(groups => groups.flatMap(g => {
+  const rows = await root.locator('.sb-change-group').evaluateAll(groups => groups.flatMap(g => {
     const section = g.querySelector('h3').firstChild.textContent.trim();
     return [...g.querySelectorAll('tbody tr')].map(tr => [section, ...[...tr.cells].map(td => td.innerText.trim())]);
   }));
+  // A "Changed" row whose before and after read the same hides what changed.
+  for (const row of rows) if (row[1] === 'Changed') expect(row[3], `before and after must differ: ${row.join(' | ')}`).not.toBe(row[4]);
+  return rows;
 }
 const netChanges = page => page.evaluate(() => editorDiffCount());
 
@@ -87,4 +90,41 @@ test('with no edits, or after undoing them, the summary says nothing has changed
   await page.locator('#reviewChanges').click();
   await expect(dialog).toContainText('No changes. Everything still matches');
   expect(await summaryRows(dialog)).toHaveLength(0);
+});
+
+// Review finding: grading compares type, name, date, and weight. A change to
+// only the date or only the type must show its actual old and new values.
+test('grading changes show the type and date that changed, in the editor and the report', async ({ page, openTool }) => {
+  await openTool('syllabusbridge');
+  await page.locator('#file').setInputFiles({ name: 'syllabus.docx', mimeType: DOCX_MIME, buffer: await syntheticDocx({
+    paragraphs: ['PHA9999 - Synthetic Course', 'Fall 2026', 'COURSE EVALUATION'],
+    table: [['Assessment', 'Weight'], ['Final exam', '60%'], ['Quizzes', '40%']],
+  }) });
+  await expect(page.locator('#screen-review')).toBeVisible();
+  const finalExam = page.locator('.grade-row').filter({ has: page.locator('.grade-name[value="Final exam"]') });
+  const gradingRows = async root => (await summaryRows(root)).filter(r => r[0] === 'Grading');
+
+  // Only the date.
+  await setField(finalExam.locator('.grade-date'), '12/10/2026');
+  expect(await netChanges(page)).toBe(1);
+  await page.locator('#reviewChanges').click();
+  const dialog = page.getByRole('dialog', { name: 'Change summary' });
+  expect(await gradingRows(dialog)).toEqual([
+    ['Grading', 'Changed', 'Final exam', 'Final exam · Exam · (no date) · 60%', 'Final exam · Exam · date 12/10/2026 · 60%'],
+  ]);
+  await page.keyboard.press('Escape');
+  await page.locator('#undoEdit').click();
+
+  // Only the type.
+  await finalExam.locator('.grade-type').selectOption('Other');
+  expect(await netChanges(page)).toBe(1);
+  await page.locator('#reviewChanges').click();
+  const typeOnly = [['Grading', 'Changed', 'Final exam', 'Final exam · Exam · (no date) · 60%', 'Final exam · Other · (no date) · 60%']];
+  expect(await gradingRows(dialog)).toEqual(typeOnly);
+  await page.keyboard.press('Escape');
+
+  // The printable report shows the same old and new values.
+  await page.locator('#runValidation').click();
+  await expect(page.locator('#screen-report')).toBeVisible();
+  expect(await gradingRows(page.locator('#reportChanges'))).toEqual(typeOnly);
 });

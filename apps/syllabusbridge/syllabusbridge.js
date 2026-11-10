@@ -715,7 +715,9 @@ function changeSummary(){
  const byId=arr=>new Map((arr||[]).map((x,i)=>[x.editorId||`index-${i}`,x]));
  const verb={add:'Added',remove:'Removed',update:'Changed'};
  const facultyText=f=>f?[clean(f.name),clean(f.email),f.role==='coordinator'?'Coordinator':'Course faculty'].filter(Boolean).join(' · '):'';
- const gradeText=g=>g?`${clean(g.label)||'Grade item'}: ${+g.pct||0}%`:'';
+ // Built from comparableGrade, the same fields the change count compares, so a
+ // counted change (type, name, date, or weight) always shows in the text.
+ const gradeText=g=>{const x=comparableGrade(g);return x?`${x.label||'Grade item'} · ${x.type||'(no type)'} · ${x.date?`date ${x.date}`:'(no date)'} · ${x.pct}%`:''};
  const scheduleText=e=>e?[clean(e.date),clean(e.day),clean(e.time),clean(e.topic),clean(e.faculty)].filter(Boolean).join(' · '):'';
  const cloText=x=>x?`${x.clo}${x.pslos.length?` → PSLO ${x.pslos.join(', ')}`:''}`:'';
  const policyLabel=k=>k==='courseEvaluation'?'Course evaluation narrative':(SECTION_RULES.find(r=>r.key===k)?.label||k);

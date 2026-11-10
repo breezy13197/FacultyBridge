@@ -159,7 +159,9 @@ Why this matters for later versions:
 - Each row shows the kind of change (**Changed**, **Added**, **Removed**, as
   words, not just colors), the item, and the text **before** and **after**.
 - The summary is built from the same comparison as the "N net changes" count:
-  one row per counted change, so the two always agree.
+  one row per counted change, so the two always agree. Each row's text shows
+  every detail that comparison checks (for grading: type, name, date, and
+  weight), so a counted change is never invisible.
 - The **Validation report** includes the same summary ("Changes made in
   SyllabusBridge"), so **Print / save PDF** gives a coordinator or committee
   the validation results and the edits together.
