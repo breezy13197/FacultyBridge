@@ -72,34 +72,50 @@ Acceptance criteria (each covered by `e2e/syllabusbridge-undo.spec.js`):
 - [x] Making a new edit after an undo clears the redo history.
 - [x] Ctrl+Z inside a text box does not trigger whole-edit undo.
 
-### 2. Save and reopen a SyllabusBridge project
+### 2. Save and reopen a SyllabusBridge project — done (unreleased)
 
-- A **"Save SyllabusBridge project"** button downloads a file ending in
-  `.syllabusbridge.json`. The name is deliberately different from "Export
-  Course JSON" so faculty don't confuse the two.
+- **Save SyllabusBridge project** (on the Review extraction and Validation
+  report screens) downloads a file named like
+  `PHA9999-SyllabusBridge-project.json`, matching CalendarBridge's
+  "Save CalendarBridge project" naming. (The roadmap first suggested a
+  `.syllabusbridge.json` ending; the file says what it is inside instead, and
+  SyllabusBridge refuses any JSON that isn't one of its projects.)
 - The file contains:
-  - a **format version number**, so later releases know how to read it;
-  - a **fingerprint (hash) of the original .docx**, plus its file name;
-  - the full edit log, including the kind of each change (see item 3) and,
-    for every edit, the exact location and original text that Word export
-    will need (listed in
-    [the round-trip findings](SYLLABUSBRIDGE-ROUNDTRIP.md#4-what-the-v22-project-file-must-store-for-each-edit));
-  - the SyllabusBridge version that saved it.
-- **Reopening:** faculty choose the project file and attach the original .docx
-  again. If the .docx doesn't match the fingerprint, SyllabusBridge warns:
-  "This project was made from a different version of the syllabus." Faculty
-  can stop, or continue and see which edits no longer line up.
-- The project file holds syllabus content only. Syllabi contain faculty
-  contact details but no student records; even so, project files from real
-  courses are never committed to this repository.
+  - `format` ("SyllabusBridge project") and a **format version number** (1);
+  - the original Word file's **name, size, and SHA-256 fingerprint**;
+  - the full editor state, including every added table row's identifier;
+  - the edit log (`tableMutations`) and the parsed starting point (`baseline`);
+  - the SyllabusBridge and suite versions that saved it, and when.
+- **Reopening:** on the upload screen, **Open SyllabusBridge project**, then
+  choose the Word syllabus it was made from. SyllabusBridge reads the Word file
+  again and then puts the saved edits back, so **Reset edits** still returns to
+  that file's parsed text.
+- **Different Word file:** if the fingerprint doesn't match, a warning appears
+  *before* anything is applied. Cancel leaves nothing loaded. Continuing applies
+  the saved edits, and the change count then compares them with the new file.
+  (A per-edit "which edits no longer line up" view needs the paragraph
+  locations from the round-trip findings and comes with item 3.)
+- **Plain errors** for files that aren't projects (including Course JSON
+  exports), damaged projects, and projects saved by a newer SyllabusBridge.
+- The leave-page warning now means "edits not yet saved in a project": it
+  clears after saving and returns with the next edit.
+- Undo history is not saved; a reopened project starts a fresh history.
+- The file holds syllabus content and faculty contact details, never student
+  records. Project files from real courses are never committed to this
+  repository.
+- Not yet stored: paragraph locations for body text and the kind of each
+  change. They arrive with item 3 as format version 2, which will still open
+  version 1 files.
 
-Acceptance criteria:
-- Save after edits, reload the page, reopen with the same .docx: every edit,
-  its kind, and the change count are restored.
-- Reopen with a different .docx: a clear warning appears before anything is
-  applied.
-- A project file from an older format version opens (or explains plainly why
-  it can't).
+Acceptance criteria (each covered by `e2e/syllabusbridge-project.spec.js`):
+- [x] Save after edits, reload the page, reopen with the same .docx: every
+  edit, added rows (still linked to their change records), and the change
+  count are restored.
+- [x] Reopen with a different .docx: a clear warning appears before anything is
+  applied; Cancel loads nothing.
+- [x] Non-project files, damaged projects, and newer-format projects get a
+  plain explanation.
+- [x] The leave-page warning clears after saving and returns with new edits.
 
 ### 3. Three kinds of change
 
