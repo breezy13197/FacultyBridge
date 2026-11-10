@@ -66,6 +66,9 @@ What it covers, using synthetic data only:
   correction (shown in the summary and report), marking undo/redo, marks
   cleared when their change goes away, and kinds saved in project format 2
   while format 1 projects still open.
+- `syllabusbridge-tracked-changes.spec.js`: SyllabusBridge warns about
+  unaccepted Word tracked changes (with the Review ▸ Accept All Changes steps),
+  shows nothing for a clean file, keeps working, and notes it in the report.
 - `offline.spec.js`: the same workflows with the network disabled after the page
   loads, to prove nothing is lazy-loaded from outside the computer.
 

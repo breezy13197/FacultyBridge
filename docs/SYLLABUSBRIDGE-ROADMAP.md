@@ -217,21 +217,32 @@ What this changes for the rest of v2.2:
 - Microsoft Word itself has not opened the test files yet. That manual check is
   required before v2.5 ships.
 
-### 6. Warn about unaccepted tracked changes at upload
+### 6. Warn about unaccepted tracked changes at upload — done (unreleased)
 
 The approved template contains unaccepted tracked changes in about one
 paragraph in five, so syllabi built from it do too. Word export can't safely
 edit those paragraphs.
 
-- On upload, if the syllabus has unaccepted tracked changes, show: "This
-  syllabus has unaccepted tracked changes. In Word, choose Review → Accept All
-  Changes (or reject them), save, and upload again."
-- Faculty can continue anyway; the report then notes that those paragraphs
-  can't be exported automatically.
+- After upload (and when a project is reopened), a warning above the editor
+  says how many unaccepted tracked changes there are and in how many
+  paragraphs, what they look like in Word, and how to clear them: **Review**
+  tab → **Accept ▸ Accept All Changes** (or **Reject ▸ Reject All Changes**),
+  save, and upload again.
+- Faculty can keep working; nothing is blocked. The **Validation report**
+  carries the same note, including when printed.
+- Insertions, deletions, moved text, and inserted or deleted paragraph marks
+  all count. Only the main document is checked (not headers or footers),
+  matching what SyllabusBridge reads.
+- The check reads the Word file on its own; how SyllabusBridge parses the
+  syllabus is unchanged.
+- On the approved 2026-09-28 template it reports 75 tracked changes in 40
+  paragraphs (31 body paragraphs plus 9 Program Mapping table paragraphs),
+  matching the round-trip findings.
 
-Acceptance criteria:
-- A syllabus with tracked changes shows the message. One without them does not.
-- The message names the Word menu steps.
+Acceptance criteria (each covered by `e2e/syllabusbridge-tracked-changes.spec.js`):
+- [x] A syllabus with tracked changes shows the message. One without them does not.
+- [x] The message names the Word menu steps.
+- [x] Work can continue, and the report (and its printed copy) carries the note.
 
 ---
 
