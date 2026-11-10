@@ -71,7 +71,10 @@ Acceptance criteria:
 - The file contains:
   - a **format version number**, so later releases know how to read it;
   - a **fingerprint (hash) of the original .docx**, plus its file name;
-  - the full edit log, including the kind of each change (see item 3);
+  - the full edit log, including the kind of each change (see item 3) and,
+    for every edit, the exact location and original text that Word export
+    will need (listed in
+    [the round-trip findings](SYLLABUSBRIDGE-ROUNDTRIP.md#4-what-the-v22-project-file-must-store-for-each-edit));
   - the SyllabusBridge version that saved it.
 - **Reopening:** faculty choose the project file and attach the original .docx
   again. If the .docx doesn't match the fingerprint, SyllabusBridge warns:
@@ -124,23 +127,46 @@ Why this matters for later versions:
   addressed.
 - Printable, so it can go to a coordinator or committee with the syllabus.
 
-### 5. Word round-trip test (groundwork for v2.5)
+### 5. Word round-trip test (groundwork for v2.5) — done
 
-This is a technical test, not a feature faculty see.
+A prototype writer was tested against a synthetic syllabus and, on a
+development machine, the approved template. Full results:
+[SYLLABUSBRIDGE-ROUNDTRIP.md](SYLLABUSBRIDGE-ROUNDTRIP.md).
 
-- Open a .docx and write it back out with no edits: the result opens in Word
-  and its content and formatting are unchanged.
-- Change one table cell and write it out: only that cell differs.
-- Try one body paragraph, one bullet list item, and one piece of red
-  instruction text, including text Word has split across several formatting
-  pieces ("runs").
-- Record what location details each case needs, and make sure the v2.2 project
-  file stores them. **This is the main reason to do this test now:** finding
-  out in v2.5 that the save format is missing something would break projects
-  people saved in v2.2.
+- With no edits, the file comes back byte-for-byte identical. A single edit
+  changes only that paragraph.
+- Bullets, bold labels, red instruction text, and text split across
+  formatting pieces all keep their formatting.
+- Tracked-change export works and reads as whole-word changes.
+- SyllabusBridge reads the edited files correctly.
 
-Use synthetic test syllabi built from the approved template, not real course
-files.
+What this changes for the rest of v2.2:
+
+- The project file must store the locations and original text listed in the
+  findings (item 2).
+- The parser must start recording **paragraph numbers** for body text, counting
+  blank paragraphs. Today it records locations only for table cells. This is a
+  change to `syllabusbridge.js` and needs a reviewed baseline update.
+- Store each paragraph's text **without** the bullets or list numbers that
+  SyllabusBridge adds for display.
+- Microsoft Word itself has not opened the test files yet. That manual check is
+  required before v2.5 ships.
+
+### 6. Warn about unaccepted tracked changes at upload
+
+The approved template contains unaccepted tracked changes in about one
+paragraph in five, so syllabi built from it do too. Word export can't safely
+edit those paragraphs.
+
+- On upload, if the syllabus has unaccepted tracked changes, show: "This
+  syllabus has unaccepted tracked changes. In Word, choose Review → Accept All
+  Changes (or reject them), save, and upload again."
+- Faculty can continue anyway; the report then notes that those paragraphs
+  can't be exported automatically.
+
+Acceptance criteria:
+- A syllabus with tracked changes shows the message. One without them does not.
+- The message names the Word menu steps.
 
 ---
 
