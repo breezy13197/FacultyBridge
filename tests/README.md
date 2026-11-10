@@ -44,6 +44,9 @@ What it covers, using synthetic data only:
   SyllabusBridge, which must read the new text and ignore deleted text. The
   matching Node tests are in `syllabusbridge-writeback.test.mjs`; see
   [the round-trip findings](../docs/SYLLABUSBRIDGE-ROUNDTRIP.md).
+- `syllabusbridge-undo.spec.js`: SyllabusBridge editor undo/redo by button and
+  keyboard, one step per typing burst, redo cleared by a new edit, Reset edits
+  undoable, and typing undo left alone inside text boxes.
 - `offline.spec.js`: the same workflows with the network disabled after the page
   loads, to prove nothing is lazy-loaded from outside the computer.
 

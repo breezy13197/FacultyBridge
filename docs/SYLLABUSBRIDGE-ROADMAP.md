@@ -48,20 +48,29 @@ These pieces already exist and the plan below builds on them:
 Main purpose: make editing safe, let faculty save and come back later, and lay
 the groundwork that v2.5's Word export depends on.
 
-### 1. Undo and redo
+### 1. Undo and redo — done (unreleased)
 
-- Undo/redo for every edit in the structured editor (cell changes, added rows,
-  removed rows, faculty and CLO changes).
-- Built on the existing edit log, not on full copies of the whole syllabus.
-- **Ctrl+Z inside a text box keeps doing normal typing undo.** Whole-edit undo
-  happens only from the Undo/Redo buttons, or from the keyboard when focus is
-  not in a text box.
+- **Undo** and **Redo** buttons sit at the left of the editor's status bar.
+  They cover every edit in the structured editor: course fields, faculty,
+  CLOs, grading, schedule cells, added and removed rows, and **Reset edits**,
+  so an accidental reset can be undone.
+- Keyboard: Ctrl+Z undoes; Ctrl+Y or Ctrl+Shift+Z redoes (Cmd on a Mac).
+  **Inside a text box, Ctrl+Z keeps doing normal typing undo.**
+- Typing in one field without a 2-second pause counts as one step. Leaving a
+  field without changing it is not a step.
+- How it works: after each change, the whole editor state is copied onto a
+  history list (up to 100 steps). The roadmap first said "built on the edit
+  log"; full copies were chosen instead because the editor data is small and
+  copies make undo exact.
+- Uploading another syllabus starts a fresh history. History is not saved with
+  the project file.
 
-Acceptance criteria:
-- Make three different edits, undo three times: the editor matches the parsed
-  syllabus and the change count is 0.
-- Redo three times: all three edits come back.
-- Making a new edit after an undo clears the redo history.
+Acceptance criteria (each covered by `e2e/syllabusbridge-undo.spec.js`):
+- [x] Make three different edits, undo three times: the editor matches the
+  parsed syllabus and the change count is 0.
+- [x] Redo three times: all three edits come back.
+- [x] Making a new edit after an undo clears the redo history.
+- [x] Ctrl+Z inside a text box does not trigger whole-edit undo.
 
 ### 2. Save and reopen a SyllabusBridge project
 
