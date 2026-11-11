@@ -30,17 +30,14 @@ ordinary JSON data.
 
 ## Before the 2026-09-28 profile is released
 
-Two parts are marked `"confirmed": false` and must be checked against the
-official policy:
+The grading scale is confirmed (the official SUSOP scale supplied with the QA
+review). One part is still marked `"confirmed": false`:
 
-1. **Grading scale.** The middle rows (65–89%) were inferred, not copied:
-   each percent is (percent − 50) ÷ 10, so 76% = 2.6. Compare every row with
-   the policy's table and correct any that differ.
-2. **Accessibility statement.** The approved wording was not available, so the
-   check looks for three key phrases (disability or accessibility, reasonable
-   accommodations, Student Affairs). Replace or add phrases from the approved
-   statement, and fill in `campus.studentAffairsContact` if the contact should
-   be checked.
+- **Accessibility statement.** The approved wording was not available, so the
+  check looks for key phrases: disability or accessibility; reasonable (and
+  appropriate) accommodations; and whom to contact (Disability Services or
+  Student Affairs). Replace or add phrases from the approved statement, and
+  fill in `campus.studentAffairsContact` if the contact should be checked.
 
 ## Adding a new version of the policy
 

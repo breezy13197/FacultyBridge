@@ -122,12 +122,14 @@ export async function syntheticDocx({ paragraphs, table }) {
   return Buffer.from(await zip.generateAsync({ type: 'uint8array' }));
 }
 // Build a synthetic Word syllabus in reading order: each item is a paragraph
-// (string) or a table (array of rows, each an array of cell strings).
+// (string) or a table (array of rows, each an array of cell strings). A "\n"
+// in a cell makes separate paragraphs (lines) in that cell.
 export async function syntheticDocxBody(items) {
   const x = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const p = t => `<w:p><w:r><w:t xml:space="preserve">${x(t)}</w:t></w:r></w:p>`;
+  const cell = t => String(t).split('\n').map(p).join('');
   const body = items.map(item => typeof item === 'string' ? p(item)
-    : `<w:tbl>${item.map(r => '<w:tr>' + r.map(t => '<w:tc>' + p(t) + '</w:tc>').join('') + '</w:tr>').join('')}</w:tbl>`).join('');
+    : `<w:tbl>${item.map(r => '<w:tr>' + r.map(t => '<w:tc>' + cell(t) + '</w:tc>').join('') + '</w:tr>').join('')}</w:tbl>`).join('');
   const xml = `<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}</w:body></w:document>`;
   const zip = new JSZip(); zip.file('word/document.xml', xml);
   return Buffer.from(await zip.generateAsync({ type: 'uint8array' }));

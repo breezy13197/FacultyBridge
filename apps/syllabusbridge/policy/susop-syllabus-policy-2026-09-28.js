@@ -25,8 +25,8 @@
 
   "gradingScale": {
     "title": "Grading scale matches the official scale",
-    "confirmed": false,
-    "_note": "Only the two ends (>=90 = 4.0, <=64 = 0) come from the roadmap. The rows in between follow the pattern seen in the template (76 = 2.6): each whole percent from 65 to 89 is (percent - 50) / 10. Confirm against the policy.",
+    "confirmed": true,
+    "_note": "The official SUSOP grading scale, as supplied with the v2.3 QA review (2026-11-11). 70-89% go down by 0.1 per percent; 65-69% go down by 0.2 per percent.",
     "rows": [
       { "min": 90, "max": 100, "gpa": 4.0 },
       { "min": 89, "max": 89, "gpa": 3.9 }, { "min": 88, "max": 88, "gpa": 3.8 },
@@ -39,9 +39,9 @@
       { "min": 75, "max": 75, "gpa": 2.5 }, { "min": 74, "max": 74, "gpa": 2.4 },
       { "min": 73, "max": 73, "gpa": 2.3 }, { "min": 72, "max": 72, "gpa": 2.2 },
       { "min": 71, "max": 71, "gpa": 2.1 }, { "min": 70, "max": 70, "gpa": 2.0 },
-      { "min": 69, "max": 69, "gpa": 1.9 }, { "min": 68, "max": 68, "gpa": 1.8 },
-      { "min": 67, "max": 67, "gpa": 1.7 }, { "min": 66, "max": 66, "gpa": 1.6 },
-      { "min": 65, "max": 65, "gpa": 1.5 },
+      { "min": 69, "max": 69, "gpa": 1.8 }, { "min": 68, "max": 68, "gpa": 1.6 },
+      { "min": 67, "max": 67, "gpa": 1.4 }, { "min": 66, "max": 66, "gpa": 1.2 },
+      { "min": 65, "max": 65, "gpa": 1.0 },
       { "min": 0, "max": 64, "gpa": 0 }
     ]
   },
@@ -53,12 +53,12 @@
       "sections": ["accessibility"],
       "fixField": "accessibility",
       "confirmed": false,
-      "_note": "Compares key phrases, not the full approved wording, which was not available. Replace or extend these phrases from the approved statement. The campus Student Affairs contact is compared separately (campus.studentAffairsContact).",
+      "_note": "Compares key phrases, not the full approved wording, which was not available. The PHA4331 statement directs students to Disability Services, so that counts as naming whom to contact. Replace or extend these phrases from the approved statement. The campus contact is compared separately (campus.studentAffairsContact).",
       "campusSetting": "studentAffairsContact",
       "requirements": [
         { "label": "names disability or accessibility services", "patterns": ["\\bdisabilit", "\\baccessibility\\b"] },
-        { "label": "offers reasonable accommodations", "patterns": ["\\breasonable\\s+accommodations?\\b"] },
-        { "label": "tells students to contact Student Affairs", "patterns": ["\\bstudent\\s+affairs\\b"] }
+        { "label": "offers reasonable accommodations", "patterns": ["\\breasonable\\s+(?:and\\s+appropriate\\s+)?accommodations?\\b"] },
+        { "label": "tells students whom to contact (Disability Services or Student Affairs)", "patterns": ["\\bdisability\\s+services?\\b", "\\bstudent\\s+affairs\\b"] }
       ],
       "action": "Replace the statement with the approved accessibility wording from the syllabus policy, keeping your campus contact details."
     },
@@ -78,7 +78,7 @@
     {
       "id": "hardware",
       "title": "Required hardware and software",
-      "sections": ["hardware"],
+      "sections": ["hardware", "materials"],
       "fixField": "hardware",
       "confirmed": true,
       "requirements": [
@@ -97,6 +97,8 @@
       "confirmed": true,
       "onlyWhen": {
         "label": "assignments involve research",
+        "_note": "The standard Student Engagement wording mentions \"all research associated with completing assignments\" in every syllabus, so it is not read as a research assignment.",
+        "ignoreSections": ["engagement"],
         "patterns": ["\\bresearch\\b", "\\bliterature\\s+(?:search|review|evaluation)\\b", "\\bjournal\\s+club\\b", "\\bdrug\\s+information\\s+(?:question|request|assignment|response)s?\\b", "\\bprimary\\s+literature\\b", "\\bscholarly\\b"]
       },
       "requirements": [
@@ -113,7 +115,7 @@
       "requirements": [
         { "label": "ExamSoft", "patterns": ["\\bexam\\s*soft\\b"] },
         { "label": "the end-of-course survey", "patterns": ["\\bend[-\\s]+of[-\\s]+(?:the[-\\s]+)?(?:course|quarter)\\s+(?:survey|evaluation)s?\\b"] },
-        { "label": "course-embedded assessments", "patterns": ["\\bcourse[-\\s]+embedded\\s+assessments?\\b"] }
+        { "label": "course-embedded assessments", "patterns": ["\\bcourse[-\\s]+embedded\\s+(?:\\w+\\s+){0,2}assessments?\\b"] }
       ],
       "action": "Mention ExamSoft, the end-of-course survey, and course-embedded assessments under Program-wide Assessment Tools."
     },
@@ -121,6 +123,8 @@
       "id": "coursePolicies",
       "title": "Handbook references in course-specific policies",
       "sections": ["coursePolicies", "attendance", "assessmentPolicy", "absence", "incomplete", "integrity", "theftPolicy", "electronicPolicy", "professionalismPolicy"],
+      "_note": "The handbook sentence often sits under a bulleted list SyllabusBridge reads as separate sections, so the whole syllabus is searched.",
+      "searchWholeSyllabus": true,
       "fixField": "coursePolicies",
       "confirmed": true,
       "requirements": [

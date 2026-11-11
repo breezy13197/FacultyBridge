@@ -263,12 +263,16 @@ Acceptance criteria (each covered by `e2e/syllabusbridge-tracked-changes.spec.js
   SyllabusBridge uses the newest. Old printed reports still name theirs.
 - Campus-specific details are settings in the profile (`campus`). The Student
   Affairs contact is blank for now, so the report says it was not compared.
+- **Grading scale: confirmed.** The official SUSOP scale was supplied with the
+  QA review (2026-11-11): ≥90 = 4.0; 89–70% go down 0.1 per percent; 69–65%
+  go down 0.2 per percent (69 = 1.8 … 65 = 1.0); ≤64 = 0. (The first draft
+  had inferred 69 = 1.9 … 65 = 1.5, which some syllabi, such as PHA4331, still
+  use; the check now flags them.)
 - **Needs confirmation before release** (marked `"confirmed": false` in the
-  profile, and noted next to those results in the report): the grading scale's
-  middle rows were inferred (65–89% = (percent − 50) ÷ 10, matching 76% = 2.6
-  in the template), and the approved accessibility wording was not available,
-  so that check looks for key phrases instead. Decided 2026-11-10: build now,
-  confirm against the official policy before release.
+  profile, and noted next to that result in the report): the approved
+  accessibility wording was not available, so that check looks for key
+  phrases. The approved statement directs students to Disability Services, so
+  either Disability Services or Student Affairs counts.
 
 ### 2. New content checks from the 2026-09-28 policy — done (unreleased)
 
@@ -293,6 +297,33 @@ They appear in the report under **Policy content**.
   coordinator", as the start of a new section. A short policy sentence like
   that can end its section early, and the check then reports Not evaluated or
   a missing phrase. Changing that is a change to the protected parsing code.
+
+### QA review with real syllabi (PHA4330, PHA4331) — fixed
+
+Each has a regression test with synthetic data in
+`e2e/syllabusbridge-policy-checks.spec.js` (tests named "QA: …").
+
+- Grading scale: the official 65–69% values; a third side-by-side column pair
+  with blank headers is read; table boxes in the editor start one line tall.
+- Wording where real syllabi put it: a privacy filter listed under Required
+  Textbooks and Related Materials; "Course-embedded **Learning** Assessments";
+  the handbook sentence anywhere in the syllabus (it often follows a bulleted
+  list SyllabusBridge reads as separate sections); "reasonable and appropriate
+  accommodations" and Disability Services in the accessibility statement.
+- Library: the standard Student Engagement wording ("all research associated
+  with completing assignments") is not read as a research assignment.
+- Schedule (changes to the protected parsing code, reviewed):
+  - The schedule count compares dated entries, not table rows. One row can hold
+    several dates (PHA4330 showed "49 of 12"), and "Week 1" rows hold none
+    (PHA4331 showed "12 entries were not parsed").
+  - "Course coordinator" is a heading only at the start of a line, so "COURSE
+    CALENDAR: …at discretion of course coordinators" is the schedule heading.
+  - A row whose date is "TBD" (PHA4331's final exam) is kept, with the date
+    marked for faculty to fill in, instead of being dropped. CalendarBridge
+    gives that row the date of the row above; that is a separate CalendarBridge
+    issue, not changed here.
+  - Any two days sharing one time ("Tuesday and Thursday 1:30-2:50") make two
+    meeting times; before, only "Mon & Thurs" did.
 
 ### 3. Jump from a finding to the field — done (unreleased)
 

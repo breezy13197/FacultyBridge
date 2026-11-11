@@ -2,9 +2,10 @@
 // "Fix this" links from report findings into the editor. Synthetic data only.
 import { test, expect, downloadFrom, syntheticDocxBody, DOCX_MIME } from './fixtures.js';
 
-// The official scale as recorded in the policy profile: >=90 = 4.0,
-// 89..65 = (percent - 50) / 10, <=64 = 0.
-const officialScale = [['≥90', '4.0'], ...Array.from({ length: 25 }, (_, i) => [String(89 - i), ((39 - i) / 10).toFixed(1)]), ['≤64', '0']];
+// The official SUSOP scale: >=90 = 4.0; 89..70 go down 0.1 per percent;
+// 69..65 go down 0.2 per percent (69 = 1.8 ... 65 = 1.0); <=64 = 0.
+const gpaFor = p => p >= 70 ? (p - 50) / 10 : 2 - (70 - p) * 0.2;
+const officialScale = [['≥90', '4.0'], ...Array.from({ length: 25 }, (_, i) => [String(89 - i), gpaFor(89 - i).toFixed(1)]), ['≤64', '0']];
 const schedule = [['Date', 'Time', 'Topic', 'Faculty'],
   ['9/21/2026', '9:00 AM - 10:00 AM', 'Proteins', 'Dr. Ada Faculty'],
   ['9/23/2026', '9:00 AM - 10:00 AM', 'Enzymes', 'Dr. Ada Faculty']];
@@ -70,7 +71,7 @@ test('each check explains what is missing or different', async ({ page, openTool
   await expect(card(page, 'policy-engagement')).toContainText('Not found: 20 hours of outside work.');
   await expect(card(page, 'policy-coursePolicies')).toContainText('Not found: the University Handbook.');
   await expect(card(page, 'policy-programAssessment')).toContainText('Not found: the end-of-course survey and course-embedded assessments.');
-  await expect(card(page, 'policy-accessibility')).toContainText('Not found: offers reasonable accommodations and tells students to contact Student Affairs.');
+  await expect(card(page, 'policy-accessibility')).toContainText('Not found: offers reasonable accommodations and tells students whom to contact (Disability Services or Student Affairs).');
   await expect(card(page, 'policy-library')).toContainText('Research detected: "Complete the literature review using PubMed."');
   // Wording not yet confirmed against the official policy says so in the report.
   await expect(card(page, 'policy-accessibility')).toContainText('has not yet been confirmed against the official policy');
@@ -260,4 +261,78 @@ test('a Percent | GPA table can be fixed in the editor', async ({ page, openTool
   await page.locator('#runValidation').click();
   expect((await policyStatuses(page))['policy-grading-scale']).toBe('passed');
   await expect(card(page, 'policy-grading-scale')).toContainText('Resolved by your edit');
+});
+
+// QA review of real syllabi (PHA4330, PHA4331), reproduced with synthetic data.
+// Each failed before its fix.
+test('QA: the official 65-69% values, an unlabeled third column pair, and compact table boxes', async ({ page, openTool }) => {
+  // The PHA4331 layout: three side-by-side pairs, the third with blank headers.
+  const third = Math.ceil(officialScale.length / 3), cols = [0, 1, 2].map(k => officialScale.slice(k * third, (k + 1) * third));
+  const rows = cols[0].map((_, i) => cols.flatMap(c => c[i] || ['', '']));
+  const body = syllabus().map(x => Array.isArray(x) && x[0][0] === '% Grade' ? [['% Grade', 'GPA', '% Grade', 'GPA', '', ''], ...rows] : x);
+  await openTool('syllabusbridge');
+  await upload(page, { name: 'three-pairs.docx', mimeType: DOCX_MIME, buffer: await syntheticDocxBody(body) });
+  const box = page.locator('.sb-structured-editor').filter({ hasText: 'Grading scale' }).locator('textarea').first();
+  expect((await box.boundingBox()).height).toBeLessThan(80);
+  await report(page);
+  expect((await policyStatuses(page))['policy-grading-scale']).toBe('passed');
+  await expect(card(page, 'policy-grading-scale')).toContainText('All 27 rows match');
+  await expect(card(page, 'policy-grading-scale')).not.toContainText('has not yet been confirmed');
+  // A table using the old 65-69% values (1.9 ... 1.5) is flagged.
+  const old = syllabus({ scale: officialScale.map(([p, g]) => p === '67' ? [p, '1.7'] : [p, g]) });
+  await upload(page, { name: 'old.docx', mimeType: DOCX_MIME, buffer: await syntheticDocxBody(old) });
+  await report(page);
+  await expect(card(page, 'policy-grading-scale')).toContainText('67% shows 1.7; the official scale is 1.4');
+});
+
+test('QA: wording found where real syllabi put it', async ({ page, openTool }) => {
+  const body = [...syllabus({
+    // PHA4331: the privacy filter is listed under textbooks and materials.
+    hardware: 'A laptop computer with ExamSoft (current annual subscription) and the University standard browser requirements.',
+    materials: 'Required textbooks are listed on the course page. A 3M Privacy Filter or its equivalent is required for exams.',
+    // PHA4330/4331: "Course-embedded Learning Assessments".
+    programAssessment: 'ExamSoft is used in this course, an end of course survey is conducted, and Course-embedded Learning Assessments are used.',
+    // PHA4330: the handbook sentence sits outside Course Specific Policies (added after the schedule below).
+    coursePolicies: 'Course policies for this course are listed in the sections that follow below in this syllabus document.',
+    // PHA4331: the approved statement names Disability Services, not Student Affairs.
+    accessibility: 'The Disability Services office assists qualified students with disabilities in acquiring reasonable and appropriate accommodations.',
+    // The standard engagement wording mentions research; it is not a research assignment.
+    engagement: 'Students can expect 10 hours of instruction and 20 hours of outside work per quarter credit hour, including all research associated with completing assignments.',
+  }), 'Please refer to the SUSOP Student Handbook and University Handbook for details on the following policies:'];
+  await openTool('syllabusbridge');
+  await upload(page, { name: 'wording.docx', mimeType: DOCX_MIME, buffer: await syntheticDocxBody(body) });
+  await report(page);
+  const statuses = await policyStatuses(page);
+  expect(statuses).toMatchObject({ 'policy-hardware': 'passed', 'policy-programAssessment': 'passed', 'policy-coursePolicies': 'passed', 'policy-accessibility': 'passed' });
+  // No research assignment once the engagement wording is set aside.
+  expect(statuses['policy-library']).toBe('not-evaluated');
+});
+
+test('QA: schedule rows, headings, TBD dates, and shared meeting days are read like the real syllabi', async ({ page, openTool }) => {
+  const body = ['PHA9999 - Synthetic Course', 'Course Coordinator: Dr. Ada Faculty', 'Fall 2026',
+    'TIME AND LOCATION: Lecture: Tuesday and Thursday 1:30-2:50',
+    // PHA4330: the calendar heading mentions "course coordinators".
+    'COURSE CALENDAR: **Schedule is subject to change at discretion of course coordinators',
+    [['#', 'DAY', 'DATE', 'TIME', 'TOPIC'],
+      ['Week 1', '', '', '', ''],
+      // PHA4330: several dates in one row.
+      ['1-2', 'Tu\nTh', '9/22\n9/24', '1:30-2:50\n1:30-2:50', 'Proteins\nEnzymes'],
+      ['Week 2', '', '', '', ''],
+      ['3', 'Tu', '9/29', '1:30-2:50', 'Hemoglobin'],
+      ['Finals Week', '', '', '', ''],
+      // PHA4331: the final exam has no date yet.
+      ['', '', 'TBD', '8:00-12:30', 'Final Exam']]];
+  await openTool('syllabusbridge');
+  await upload(page, { name: 'schedule.docx', mimeType: DOCX_MIME, buffer: await syntheticDocxBody(body) });
+  expect(await page.evaluate(() => state.meetingPatterns.map(m => m.day))).toEqual(['Tuesday', 'Thursday']);
+  expect(await page.evaluate(() => state.schedule.map(e => [e.date, e.topic]))).toEqual([['9/22', 'Proteins'], ['9/24', 'Enzymes'], ['9/29', 'Hemoglobin'], ['TBD', 'Final Exam']]);
+  // The TBD row is shown for faculty to date, not silently dropped.
+  await expect(page.locator('#scheduleBody tr.sb-schedule-invalid')).toHaveCount(1);
+  await report(page);
+  const results = await page.evaluate(() => Object.fromEntries(state.results.map(r => [r.id, [r.status, r.evidence]])));
+  // Heading found, and 4 of 4 entries: week rows are not counted as missing.
+  expect(results['section-schedule']).toEqual(['passed', 'Heading found · 4 of 4 schedule rows extracted (100% coverage).']);
+  expect(results['schedule-internal'][1]).toContain('Parsed 4 schedule entries from 4 source schedule rows');
+  expect(results['schedule-internal'][1]).not.toContain('not represented');
+  expect(results['schedule-handoff-dates'][0]).toBe('issue');
 });

@@ -77,6 +77,10 @@ What it covers, using synthetic data only:
   in the editor no longer counts as library evidence, a fix undone and typed
   again stays linked, no research means Not evaluated even when the library is
   mentioned, and a "Percent | GPA" table can be fixed in the editor.
+  Tests named "QA: …" reproduce the PHA4330/PHA4331 QA review with synthetic
+  data: the official 65–69% values and an unlabeled third column pair, wording
+  in the places real syllabi put it, and schedules with several dates per
+  row, week heading rows, a TBD final exam, and "Tuesday and Thursday".
   `syllabusbridge-policy.test.mjs` (Node) checks every dated
   policy profile file: loaded by the page, a grading scale with no gaps or
   overlaps, patterns that work, and known section and editor field names.
