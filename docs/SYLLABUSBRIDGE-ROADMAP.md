@@ -285,7 +285,7 @@ They appear in the report under **Policy content**.
 | Accessibility statement | Each sentence of the approved wording must appear (capital letters, punctuation, and spacing are ignored). The contact details may differ. If a campus Student Affairs contact is set in the profile, it must be named (it is blank, so not compared). Differing sentences are quoted in the report. |
 | Student engagement | 10 hours of instruction and 20 hours of outside work per quarter credit hour. |
 | Required hardware and software | ExamSoft, a current annual subscription, and a privacy filter. |
-| Library resources | If the syllabus mentions research-type work, it points to South University Library resources. With no research found, the check is Not evaluated, even if the library is mentioned. It reads the editor's current text plus only the parts of the Word file the editor has no copy of, so wording deleted in the editor no longer counts. |
+| Library resources | If the syllabus mentions research-type work, it points to South University Library resources. With no research found, the check is Not evaluated, even if the library is mentioned. It reads the editor's current text plus only the parts of the Word file the editor has no copy of, found by where each line came from (every table, and each section the editor holds, including a heading line with text after its colon), so wording deleted in the editor no longer counts. |
 | Program-wide assessment tools | ExamSoft, the end-of-course survey, and course-embedded assessments. |
 | Course-specific policies | The SUSOP Student Handbook and the University Handbook, in Course Specific Policies or its policy subsections. |
 
@@ -320,7 +320,13 @@ Each has a regression test with synthetic data in
   - "Course coordinator" is a heading only at the start of a line, so "COURSE
     CALENDAR: …at discretion of course coordinators" is the schedule heading.
   - A row whose date is "TBD" (PHA4331's final exam) is kept, with the date
-    marked for faculty to fill in, instead of being dropped. CalendarBridge
+    marked for faculty to fill in, instead of being dropped.
+  - Reopening a project saved before this change keeps that row too. Schedule
+    entries are matched with the project's saved starting point by where they
+    are in the Word file (table, row, line); any entry the project never had is
+    added and named in the status line, and saved edits still line up.
+    Meeting times, which the editor does not edit, come from the newer reading
+    unless the project changed them. CalendarBridge
     gives that row the date of the row above; that is a separate CalendarBridge
     issue, not changed here.
   - Any two days sharing one time ("Tuesday and Thursday 1:30-2:50") make two

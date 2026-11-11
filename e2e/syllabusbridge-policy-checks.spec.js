@@ -366,3 +366,41 @@ test('the accessibility statement is compared with the approved wording, apart f
   await report(page);
   await expect(card(page, 'policy-accessibility')).toContainText('Matches the approved wording (8 sentences), with the campus contact.');
 });
+
+// Review findings, round 2. Each failed before its fix.
+test('wording deleted from an inline heading line is not evidence', async ({ page, openTool }) => {
+  const body = ['PHA9999 - Synthetic Course', 'Course Coordinator: Dr. Ada Faculty', 'Fall 2026',
+    'REQUIRED TEXTBOOKS AND RELATED MATERIALS: Use South University Library for the research paper.',
+    'Course Schedule', schedule];
+  await openTool('syllabusbridge');
+  await upload(page, { name: 'inline.docx', mimeType: DOCX_MIME, buffer: await syntheticDocxBody(body) });
+  const materials = page.locator('#review-materials textarea');
+  await expect(materials).toHaveValue('Use South University Library for the research paper.');
+  await materials.fill('Complete the research paper using PubMed.');
+  await materials.press('Tab');
+  await report(page);
+  expect((await policyStatuses(page))['policy-library']).toBe('warning');
+  await expect(card(page, 'policy-library')).not.toContainText('Use South University Library');
+});
+
+test('the same wording in a paragraph and a table counts until both are changed', async ({ page, openTool }) => {
+  const line = 'Use the South University Library research guide for this course.';
+  const body = ['PHA9999 - Synthetic Course', 'Course Coordinator: Dr. Ada Faculty', 'Fall 2026',
+    'REQUIRED TEXTBOOKS AND RELATED MATERIALS:', line,
+    'Project rubric', [['Component', 'Points'], [line, '10'], ['Presentation', '10']],
+    'Course Schedule', schedule];
+  await openTool('syllabusbridge');
+  await upload(page, { name: 'duplicate.docx', mimeType: DOCX_MIME, buffer: await syntheticDocxBody(body) });
+  await page.locator('#review-materials textarea').fill('Bring a calculator.');
+  await page.locator('#review-materials textarea').press('Tab');
+  await report(page);
+  // The rubric still says it, so the library is still referenced.
+  expect((await policyStatuses(page))['policy-library']).toBe('passed');
+  await page.locator('#screen-report').getByRole('button', { name: '← Structured editor' }).click();
+  const cell = page.locator('.sb-structured-editor').filter({ hasText: 'Project / Assignment Rubric' }).locator('tbody tr').first().locator('textarea').first();
+  await cell.fill('Write a research summary.');
+  await cell.press('Tab');
+  await report(page);
+  expect((await policyStatuses(page))['policy-library']).toBe('warning');
+  await expect(card(page, 'policy-library')).not.toContainText('South University Library research guide');
+});

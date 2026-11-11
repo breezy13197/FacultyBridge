@@ -1,5 +1,6 @@
 // SyllabusBridge v2.2 save and reopen a project. Synthetic data only.
 import { test, expect, downloadFrom, syntheticDocx, syntheticSyllabus, DOCX_MIME } from './fixtures.js';
+import fs from 'node:fs';
 
 const paragraphs = syntheticSyllabus.paragraphs.filter(p => p !== 'Course Schedule');
 const rubricDoc = rows => syntheticDocx({ paragraphs, table: [['Component', 'Points'], ...rows] });
@@ -186,4 +187,25 @@ test('damaged project contents are refused with a plain explanation before anyth
     await expect(page.locator('#projectPending')).toBeHidden();
     expect(await page.evaluate(() => state.sourceName)).toBe('rubric.docx');
   }
+});
+
+// Review finding: a project saved before SyllabusBridge kept "TBD" rows has no
+// final exam row. Reopening it must not silently drop the exam the newer
+// SyllabusBridge reads from the same Word file. The project in e2e/data was
+// saved by the earlier SyllabusBridge (main before v2.3) from that synthetic file.
+test('reopening a project saved before TBD rows were read keeps the newly found final exam', async ({ page, openTool }) => {
+  const data = new URL('./data/syllabusbridge/', import.meta.url);
+  const docx = { name: 'syllabus-with-tbd-final.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: fs.readFileSync(new URL('syllabus-with-tbd-final.docx', data)) };
+  const project = jsonFile('project-saved-before-tbd-rows.json', fs.readFileSync(new URL('project-saved-before-tbd-rows.json', data), 'utf8'));
+  expect(JSON.parse(project.buffer.toString()).editor.schedule.map(e => e.topic)).toEqual(['Proteins', 'Enzymes']);
+  await openTool('syllabusbridge');
+  await openProject(page, project);
+  await upload(page, docx);
+  // Same Word file (fingerprints match), so no warning; the saved edit comes back.
+  expect(await page.evaluate(() => ({ title: state.course.title, changes: editorDiffCount(), topics: state.schedule.map(e => [e.date, e.topic]) })))
+    .toEqual({ title: 'Revised Synthetic Course', changes: 1, topics: [['9/21/2026', 'Proteins'], ['9/23/2026', 'Enzymes'], ['TBD', 'Final Exam']] });
+  await expect(page.locator('#historyStatus')).toContainText('Final Exam');
+  // Its missing date still blocks the CalendarBridge handoff.
+  await expect(page.locator('#scheduleBody tr.sb-schedule-invalid')).toHaveCount(1);
+  expect(await page.evaluate(() => handoffBlockingProblems().length)).toBe(1);
 });

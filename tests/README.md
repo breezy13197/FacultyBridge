@@ -81,6 +81,13 @@ What it covers, using synthetic data only:
   data: the official 65–69% values and an unlabeled third column pair, wording
   in the places real syllabi put it, and schedules with several dates per
   row, week heading rows, a TBD final exam, and "Tuesday and Thursday".
+  Second-round review tests: wording deleted from an inline heading line is
+  not evidence, and wording in both a paragraph and a table counts until both
+  are changed. In `syllabusbridge-project.spec.js`, a project saved by the
+  earlier SyllabusBridge (before TBD rows were read) is reopened and keeps the
+  final exam. Its files, `e2e/data/syllabusbridge/project-saved-before-tbd-rows.json`
+  and `syllabus-with-tbd-final.docx`, are synthetic; the project was saved by
+  the build of `main` at 056eb67 and must not be regenerated with a newer one.
   `syllabusbridge-policy.test.mjs` (Node) checks every dated
   policy profile file: loaded by the page, a grading scale with no gaps or
   overlaps, patterns that work, and known section and editor field names.

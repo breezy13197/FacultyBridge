@@ -1,0 +1,457 @@
+{
+  "format": "SyllabusBridge project",
+  "formatVersion": 2,
+  "savedAt": "2026-11-11T21:04:18.400Z",
+  "savedBy": {
+    "tool": "SyllabusBridge",
+    "version": "2.1.2",
+    "suiteVersion": "1.5.0"
+  },
+  "source": {
+    "fileName": "syllabus-with-tbd-final.docx",
+    "size": 1959,
+    "sha256": "68b8f5c43a49c0c2ceb1d9e4b85025e5f444bea4b9c14e7ddb68f644438a1371"
+  },
+  "editor": {
+    "course": {
+      "code": "PHA9999",
+      "title": "Revised Synthetic Course",
+      "year": "2026",
+      "location": ""
+    },
+    "faculty": [
+      {
+        "name": "Dr. Ada Faculty",
+        "email": "",
+        "short": "Faculty",
+        "role": "coordinator",
+        "editorId": "faculty-source-1"
+      },
+      {
+        "name": "Course Schedule",
+        "email": "",
+        "short": "Schedule",
+        "role": "coordinator",
+        "editorId": "faculty-source-2"
+      },
+      {
+        "name": "Final Exam",
+        "email": "",
+        "short": "Exam",
+        "role": "coordinator",
+        "editorId": "faculty-source-3"
+      }
+    ],
+    "coordinator": {
+      "name": "Dr. Ada Faculty",
+      "email": "",
+      "short": "Faculty",
+      "role": "coordinator",
+      "editorId": "faculty-source-1"
+    },
+    "clos": [],
+    "cloMappings": [],
+    "plos": [],
+    "grading": [],
+    "assessments": [],
+    "policies": {
+      "description": "",
+      "accessibility": "",
+      "materials": "",
+      "hardware": "",
+      "engagement": "",
+      "programAssessment": "",
+      "coursePolicies": "",
+      "evaluations": "",
+      "attendance": "",
+      "assessmentPolicy": "",
+      "absence": "",
+      "incomplete": "",
+      "integrity": "",
+      "theftPolicy": "",
+      "electronicPolicy": "",
+      "professionalismPolicy": "",
+      "courseEvaluation": "",
+      "courseEvaluationEdited": false
+    },
+    "schedule": [
+      {
+        "date": "9/21/2026",
+        "day": "Monday",
+        "time": "9:00 AM – 10:00 AM",
+        "topic": "Proteins",
+        "faculty": "Dr. Ada Faculty",
+        "raw": "9/21/2026 | 9:00 AM - 10:00 AM | Proteins | Dr. Ada Faculty",
+        "source": {
+          "tableIndex": 0,
+          "rowIndex": 1,
+          "lineIndex": 0,
+          "columnMap": {
+            "date": 0,
+            "time": 1,
+            "topic": 2,
+            "faculty": 3
+          }
+        },
+        "editorId": "schedule-source-1"
+      },
+      {
+        "date": "9/23/2026",
+        "day": "Wednesday",
+        "time": "9:00 AM – 10:00 AM",
+        "topic": "Enzymes",
+        "faculty": "Dr. Ada Faculty",
+        "raw": "9/23/2026 | 9:00 AM - 10:00 AM | Enzymes | Dr. Ada Faculty",
+        "source": {
+          "tableIndex": 0,
+          "rowIndex": 2,
+          "lineIndex": 0,
+          "columnMap": {
+            "date": 0,
+            "time": 1,
+            "topic": 2,
+            "faculty": 3
+          }
+        },
+        "editorId": "schedule-source-2"
+      }
+    ],
+    "meetingPatterns": [],
+    "structuredTables": [
+      {
+        "tableIndex": 0,
+        "type": "courseSchedule",
+        "headers": [
+          "Date",
+          "Time",
+          "Topic",
+          "Faculty"
+        ],
+        "rows": [
+          {
+            "rowIndex": 1,
+            "cells": [
+              {
+                "columnIndex": 0,
+                "text": "9/21/2026",
+                "lines": [
+                  "9/21/2026"
+                ]
+              },
+              {
+                "columnIndex": 1,
+                "text": "9:00 AM - 10:00 AM",
+                "lines": [
+                  "9:00 AM - 10:00 AM"
+                ]
+              },
+              {
+                "columnIndex": 2,
+                "text": "Proteins",
+                "lines": [
+                  "Proteins"
+                ]
+              },
+              {
+                "columnIndex": 3,
+                "text": "Dr. Ada Faculty",
+                "lines": [
+                  "Dr. Ada Faculty"
+                ]
+              }
+            ]
+          },
+          {
+            "rowIndex": 2,
+            "cells": [
+              {
+                "columnIndex": 0,
+                "text": "9/23/2026",
+                "lines": [
+                  "9/23/2026"
+                ]
+              },
+              {
+                "columnIndex": 1,
+                "text": "9:00 AM - 10:00 AM",
+                "lines": [
+                  "9:00 AM - 10:00 AM"
+                ]
+              },
+              {
+                "columnIndex": 2,
+                "text": "Enzymes",
+                "lines": [
+                  "Enzymes"
+                ]
+              },
+              {
+                "columnIndex": 3,
+                "text": "Dr. Ada Faculty",
+                "lines": [
+                  "Dr. Ada Faculty"
+                ]
+              }
+            ]
+          },
+          {
+            "rowIndex": 3,
+            "cells": [
+              {
+                "columnIndex": 0,
+                "text": "TBD",
+                "lines": [
+                  "TBD"
+                ]
+              },
+              {
+                "columnIndex": 1,
+                "text": "8:00 AM - 12:30 PM",
+                "lines": [
+                  "8:00 AM - 12:30 PM"
+                ]
+              },
+              {
+                "columnIndex": 2,
+                "text": "Final Exam",
+                "lines": [
+                  "Final Exam"
+                ]
+              },
+              {
+                "columnIndex": 3,
+                "text": "",
+                "lines": [
+                  ""
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "cloEditorIds": []
+  },
+  "tableMutations": [],
+  "changeKinds": {},
+  "baseline": {
+    "course": {
+      "code": "PHA9999",
+      "title": "Synthetic Course",
+      "year": "2026",
+      "location": ""
+    },
+    "faculty": [
+      {
+        "name": "Dr. Ada Faculty",
+        "email": "",
+        "short": "Faculty",
+        "role": "coordinator",
+        "editorId": "faculty-source-1"
+      },
+      {
+        "name": "Course Schedule",
+        "email": "",
+        "short": "Schedule",
+        "role": "coordinator",
+        "editorId": "faculty-source-2"
+      },
+      {
+        "name": "Final Exam",
+        "email": "",
+        "short": "Exam",
+        "role": "coordinator",
+        "editorId": "faculty-source-3"
+      }
+    ],
+    "coordinator": {
+      "name": "Dr. Ada Faculty",
+      "email": "",
+      "short": "Faculty",
+      "role": "coordinator",
+      "editorId": "faculty-source-1"
+    },
+    "clos": [],
+    "cloMappings": [],
+    "plos": [],
+    "grading": [],
+    "assessments": [],
+    "policies": {
+      "description": "",
+      "accessibility": "",
+      "materials": "",
+      "hardware": "",
+      "engagement": "",
+      "programAssessment": "",
+      "coursePolicies": "",
+      "evaluations": "",
+      "attendance": "",
+      "assessmentPolicy": "",
+      "absence": "",
+      "incomplete": "",
+      "integrity": "",
+      "theftPolicy": "",
+      "electronicPolicy": "",
+      "professionalismPolicy": "",
+      "courseEvaluation": "",
+      "courseEvaluationEdited": false
+    },
+    "schedule": [
+      {
+        "date": "9/21/2026",
+        "day": "Monday",
+        "time": "9:00 AM – 10:00 AM",
+        "topic": "Proteins",
+        "faculty": "Dr. Ada Faculty",
+        "raw": "9/21/2026 | 9:00 AM - 10:00 AM | Proteins | Dr. Ada Faculty",
+        "source": {
+          "tableIndex": 0,
+          "rowIndex": 1,
+          "lineIndex": 0,
+          "columnMap": {
+            "date": 0,
+            "time": 1,
+            "topic": 2,
+            "faculty": 3
+          }
+        },
+        "editorId": "schedule-source-1"
+      },
+      {
+        "date": "9/23/2026",
+        "day": "Wednesday",
+        "time": "9:00 AM – 10:00 AM",
+        "topic": "Enzymes",
+        "faculty": "Dr. Ada Faculty",
+        "raw": "9/23/2026 | 9:00 AM - 10:00 AM | Enzymes | Dr. Ada Faculty",
+        "source": {
+          "tableIndex": 0,
+          "rowIndex": 2,
+          "lineIndex": 0,
+          "columnMap": {
+            "date": 0,
+            "time": 1,
+            "topic": 2,
+            "faculty": 3
+          }
+        },
+        "editorId": "schedule-source-2"
+      }
+    ],
+    "meetingPatterns": [],
+    "structuredTables": [
+      {
+        "tableIndex": 0,
+        "type": "courseSchedule",
+        "headers": [
+          "Date",
+          "Time",
+          "Topic",
+          "Faculty"
+        ],
+        "rows": [
+          {
+            "rowIndex": 1,
+            "cells": [
+              {
+                "columnIndex": 0,
+                "text": "9/21/2026",
+                "lines": [
+                  "9/21/2026"
+                ]
+              },
+              {
+                "columnIndex": 1,
+                "text": "9:00 AM - 10:00 AM",
+                "lines": [
+                  "9:00 AM - 10:00 AM"
+                ]
+              },
+              {
+                "columnIndex": 2,
+                "text": "Proteins",
+                "lines": [
+                  "Proteins"
+                ]
+              },
+              {
+                "columnIndex": 3,
+                "text": "Dr. Ada Faculty",
+                "lines": [
+                  "Dr. Ada Faculty"
+                ]
+              }
+            ]
+          },
+          {
+            "rowIndex": 2,
+            "cells": [
+              {
+                "columnIndex": 0,
+                "text": "9/23/2026",
+                "lines": [
+                  "9/23/2026"
+                ]
+              },
+              {
+                "columnIndex": 1,
+                "text": "9:00 AM - 10:00 AM",
+                "lines": [
+                  "9:00 AM - 10:00 AM"
+                ]
+              },
+              {
+                "columnIndex": 2,
+                "text": "Enzymes",
+                "lines": [
+                  "Enzymes"
+                ]
+              },
+              {
+                "columnIndex": 3,
+                "text": "Dr. Ada Faculty",
+                "lines": [
+                  "Dr. Ada Faculty"
+                ]
+              }
+            ]
+          },
+          {
+            "rowIndex": 3,
+            "cells": [
+              {
+                "columnIndex": 0,
+                "text": "TBD",
+                "lines": [
+                  "TBD"
+                ]
+              },
+              {
+                "columnIndex": 1,
+                "text": "8:00 AM - 12:30 PM",
+                "lines": [
+                  "8:00 AM - 12:30 PM"
+                ]
+              },
+              {
+                "columnIndex": 2,
+                "text": "Final Exam",
+                "lines": [
+                  "Final Exam"
+                ]
+              },
+              {
+                "columnIndex": 3,
+                "text": "",
+                "lines": [
+                  ""
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "cloEditorIds": []
+  }
+}
