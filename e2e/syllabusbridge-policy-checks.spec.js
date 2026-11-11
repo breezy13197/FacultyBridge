@@ -9,9 +9,9 @@ const officialScale = [['≥90', '4.0'], ...Array.from({ length: 25 }, (_, i) =>
 const schedule = [['Date', 'Time', 'Topic', 'Faculty'],
   ['9/21/2026', '9:00 AM - 10:00 AM', 'Proteins', 'Dr. Ada Faculty'],
   ['9/23/2026', '9:00 AM - 10:00 AM', 'Enzymes', 'Dr. Ada Faculty']];
-// The approved accessibility statement (policy profile), with a campus contact line
-// written differently from the template; only the contact's name is compared.
-const approvedAccessibility = 'South University provides accommodations to qualified students with disabilities. The Disability Services office assists qualified students with disabilities in acquiring reasonable and appropriate accommodations and in supporting equal access to services, programs, and activities at South University. Students who seek reasonable accommodations should notify the Student Affairs Office, Dean Alessandra Tavoloni at 555-0100 or by email. Students should let the Student Affairs Office know of their specific limitations and, if known, their specific requested accommodations. Students will be asked to supply medical documentation of the need for accommodation. Classroom accommodations are not retroactive, but are effective only upon the student sharing approved accommodations with the instructor. Therefore, students are encouraged to request accommodations as early as feasible with the Student Affairs Office to allow time to gather necessary documentation. Complaints will be handled in accordance with the school\u2019s Internal Grievance Procedure for Complaints of Discrimination and Harassment included in the General Complaint Procedure section of the Academic Catalog.';
+// The approved accessibility statement (policy profile), with a made-up campus
+// contact in place of the template's {studentAffairsContact} part.
+const approvedAccessibility = 'South University provides accommodations to qualified students with disabilities. The Disability Services office assists qualified students with disabilities in acquiring reasonable and appropriate accommodations and in supporting equal access to services, programs, and activities at South University. Students who seek reasonable accommodations should notify the Student Affairs Office, Dean Pat Example at 555-0100 or by email. Students should let the Student Affairs Office know of their specific limitations and, if known, their specific requested accommodations. Students will be asked to supply medical documentation of the need for accommodation. Classroom accommodations are not retroactive, but are effective only upon the student sharing approved accommodations with the instructor. Therefore, students are encouraged to request accommodations as early as feasible with the Student Affairs Office to allow time to gather necessary documentation. Complaints will be handled in accordance with the school\u2019s Internal Grievance Procedure for Complaints of Discrimination and Harassment included in the General Complaint Procedure section of the Academic Catalog.';
 const compliant = {
   scale: officialScale,
   materials: 'Use South University Library databases for the drug information research paper.',
@@ -74,7 +74,7 @@ test('each check explains what is missing or different', async ({ page, openTool
   await expect(card(page, 'policy-engagement')).toContainText('Not found: 20 hours of outside work.');
   await expect(card(page, 'policy-coursePolicies')).toContainText('Not found: the University Handbook.');
   await expect(card(page, 'policy-programAssessment')).toContainText('Not found: the end-of-course survey and course-embedded assessments.');
-  await expect(card(page, 'policy-accessibility')).toContainText('8 of 8 sentences of the approved wording are missing or different, and the campus contact is not named.');
+  await expect(card(page, 'policy-accessibility')).toContainText('8 of 8 sentences of the approved wording are missing or different.');
   await expect(card(page, 'policy-library')).toContainText('Research detected: "Complete the literature review using PubMed."');
   // Every part of the 2026-09-28 profile is now confirmed against the official policy.
   await expect(page.locator('#results')).not.toContainText('has not yet been confirmed');
@@ -344,7 +344,7 @@ test('the accessibility statement is compared with the approved wording, apart f
   await upload(page, await docx({ accessibility: restyled }));
   await report(page);
   expect((await policyStatuses(page))['policy-accessibility']).toBe('passed');
-  await expect(card(page, 'policy-accessibility')).toContainText('Matches the approved wording (8 sentences), with the campus contact.');
+  await expect(card(page, 'policy-accessibility')).toContainText('Matches the approved wording (8 sentences).');
 
   // PHA4331's version: students are sent to a coordinator, not the Student Affairs Office.
   const changed = approvedAccessibility.replace('let the Student Affairs Office know', 'let their Disability Service Coordinator know');
@@ -354,8 +354,15 @@ test('the accessibility statement is compared with the approved wording, apart f
   await expect(card(page, 'policy-accessibility')).toContainText('1 of 8 sentences of the approved wording is missing or different.');
   await expect(card(page, 'policy-accessibility')).toContainText('Missing or different: "Students should let the Student Affairs Office know');
 
-  // The approved wording with another campus contact: the configured contact is not named.
-  await upload(page, await docx({ accessibility: approvedAccessibility.replace('Dean Alessandra Tavoloni', 'Dean Pat Example') }));
+  // The campus contact is left blank in the profile, so any contact is accepted and the report says so.
+  await expect(card(page, 'policy-accessibility')).toContainText('The campus-specific contact is not set in the policy profile, so it was not compared.');
+  // When a campus sets a contact, a statement naming someone else is flagged.
+  await upload(page, await docx({ accessibility: approvedAccessibility }));
+  await page.evaluate(() => { policyProfile().campus.studentAffairsContact = 'Sam Sample'; });
   await report(page);
   await expect(card(page, 'policy-accessibility')).toContainText('The approved wording is present, but the campus contact is not named.');
+  await page.evaluate(() => { policyProfile().campus.studentAffairsContact = 'Pat Example'; });
+  await page.locator('#screen-report').getByRole('button', { name: '← Structured editor' }).click();
+  await report(page);
+  await expect(card(page, 'policy-accessibility')).toContainText('Matches the approved wording (8 sentences), with the campus contact.');
 });

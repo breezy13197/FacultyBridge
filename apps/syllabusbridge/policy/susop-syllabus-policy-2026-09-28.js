@@ -19,8 +19,8 @@
   "updated": "2026-09-28",
 
   "campus": {
-    "_note": "Campus-specific settings. Leave a value blank to skip that comparison; the report then says it was not compared. studentAffairsContact is the name the accessibility statement must give (from the approved template); phone and email may be written in any form.",
-    "studentAffairsContact": "Alessandra Tavoloni"
+    "_note": "Campus-specific settings. Leave a value blank to skip that comparison; the report then says it was not compared. studentAffairsContact: a name the accessibility statement must give. Left blank on purpose (no staff names are kept in the repository), so any contact is accepted and the report says the contact was not compared.",
+    "studentAffairsContact": ""
   },
 
   "gradingScale": {

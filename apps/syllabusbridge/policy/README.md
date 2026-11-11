@@ -38,9 +38,11 @@ from the syllabus template, supplied 2026-11-11).
 **Approved wording.** A check with `approvedText` compares the syllabus with
 that text sentence by sentence. Capital letters, punctuation, quote marks, and
 spacing are ignored. A word in braces, such as `{studentAffairsContact}`, marks
-a campus-specific part that may say anything; the value set under `campus` is
-then checked separately (for the accessibility statement, the Student Affairs
-contact's name). If a campus has a different contact, change that setting.
+a campus-specific part that may say anything. If a value is set under
+`campus`, it is then checked separately (for the accessibility statement, the
+Student Affairs contact's name). The contact is left blank on purpose, so no
+staff names are kept in this repository; the report then says the contact was
+not compared.
 
 ## Adding a new version of the policy
 

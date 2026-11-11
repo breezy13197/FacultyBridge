@@ -262,8 +262,10 @@ Acceptance criteria (each covered by `e2e/syllabusbridge-tracked-changes.spec.js
 - When the policy changes, add a new dated profile next to the old one;
   SyllabusBridge uses the newest. Old printed reports still name theirs.
 - Campus-specific details are settings in the profile (`campus`). The Student
-  Affairs contact named in the accessibility statement is one; only that name
-  is compared, so a phone number or email may be written in any form.
+  Affairs contact named in the accessibility statement is one. It is left blank
+  on purpose (decided 2026-11-11: no staff names in the repository), so any
+  contact is accepted and the report says the contact was not compared. If it
+  is set, only that name is compared; phone and email may be in any form.
 - **Grading scale: confirmed.** The official SUSOP scale was supplied with the
   QA review (2026-11-11): ≥90 = 4.0; 89–70% go down 0.1 per percent; 69–65%
   go down 0.2 per percent (69 = 1.8 … 65 = 1.0); ≤64 = 0. (The first draft
@@ -280,7 +282,7 @@ They appear in the report under **Policy content**.
 | Check | What it compares |
 |---|---|
 | Grading scale | Every row of the percent → GPA table against the official scale (≥90 = 4.0 … ≤64 = 0). A different GPA is an issue; a missing, extra, or unreadable row is a warning. Rows like "≥90", "90–100", "90 and above", "≤64", and side-by-side column pairs are read. |
-| Accessibility statement | Each sentence of the approved wording must appear (capital letters, punctuation, and spacing are ignored). The contact details may differ, but the configured campus Student Affairs contact must be named. Differing sentences are quoted in the report. |
+| Accessibility statement | Each sentence of the approved wording must appear (capital letters, punctuation, and spacing are ignored). The contact details may differ. If a campus Student Affairs contact is set in the profile, it must be named (it is blank, so not compared). Differing sentences are quoted in the report. |
 | Student engagement | 10 hours of instruction and 20 hours of outside work per quarter credit hour. |
 | Required hardware and software | ExamSoft, a current annual subscription, and a privacy filter. |
 | Library resources | If the syllabus mentions research-type work, it points to South University Library resources. With no research found, the check is Not evaluated, even if the library is mentioned. It reads the editor's current text plus only the parts of the Word file the editor has no copy of, so wording deleted in the editor no longer counts. |
