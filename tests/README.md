@@ -73,7 +73,11 @@ What it covers, using synthetic data only:
   checked against, grading scale rows written in other common ways are read,
   and "Fix this" opens the right field, links the edit to the finding (through
   Undo/Redo and in project format 3), and shows "Resolved by your edit" after
-  revalidating. `syllabusbridge-policy.test.mjs` (Node) checks every dated
+  revalidating. Four regression tests from the PR #34 review: wording deleted
+  in the editor no longer counts as library evidence, a fix undone and typed
+  again stays linked, no research means Not evaluated even when the library is
+  mentioned, and a "Percent | GPA" table can be fixed in the editor.
+  `syllabusbridge-policy.test.mjs` (Node) checks every dated
   policy profile file: loaded by the page, a grading scale with no gaps or
   overlaps, patterns that work, and known section and editor field names.
 - `syllabusbridge-tracked-changes.spec.js`: SyllabusBridge warns about

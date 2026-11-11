@@ -280,7 +280,7 @@ They appear in the report under **Policy content**.
 | Accessibility statement | Key phrases (disability or accessibility, reasonable accommodations, Student Affairs), plus the campus contact once it is set. |
 | Student engagement | 10 hours of instruction and 20 hours of outside work per quarter credit hour. |
 | Required hardware and software | ExamSoft, a current annual subscription, and a privacy filter. |
-| Library resources | If the syllabus mentions research-type work, it points to South University Library resources. With no research found, the check is Not evaluated. |
+| Library resources | If the syllabus mentions research-type work, it points to South University Library resources. With no research found, the check is Not evaluated, even if the library is mentioned. It reads the editor's current text plus only the parts of the Word file the editor has no copy of, so wording deleted in the editor no longer counts. |
 | Program-wide assessment tools | ExamSoft, the end-of-course survey, and course-embedded assessments. |
 | Course-specific policies | The SUSOP Student Handbook and the University Handbook, in Course Specific Policies or its policy subsections. |
 
@@ -300,10 +300,14 @@ They appear in the report under **Policy content**.
   **Fix this** button (not printed). It opens the structured editor at that
   field, with the cursor in it.
 - To make this possible, the **Grading scale** table and **Program-wide
-  assessment tools** are now editable in the structured editor.
+  assessment tools** are now editable in the structured editor. A table with a
+  percent column and a GPA column (for example "Percent | GPA") counts as the
+  grading scale table even when its header doesn't say "% Grade". If the
+  grading scale is in a table the editor can't edit, the suggested action says
+  to correct it in Word and upload again.
 - While fixing, a note at the top of the editor says "Fixing: [check]" and
   how many changes are linked. Every change made or altered then is linked to
-  that finding. **Revalidate now** says whether the finding now passes
+  that finding (including a change undone and then made again). **Revalidate now** says whether the finding now passes
   ("Resolved by your edit"). **Revalidate and return to report** goes back;
   **Stop linking changes** ends linking. Leaving the editor also ends it.
 - In the report, a finding that passes and has linked changes shows **Resolved

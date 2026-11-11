@@ -205,3 +205,59 @@ test('finding links follow Undo and are saved in the project (format 3); format 
   await page.locator('#projectFile').setInputFiles({ name: 'p.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(damaged)) });
   await expect(page.locator('#uploadError')).toContainText('problem found in: links to findings');
 });
+
+// Review findings (PR #34). Each failed before its fix.
+test('deleted library wording no longer counts as evidence after an edit', async ({ page, openTool }) => {
+  await openTool('syllabusbridge');
+  await upload(page, await docx());
+  const materials = page.locator('#review-materials textarea');
+  await materials.fill('Complete the research paper using PubMed.');
+  await materials.press('Tab');
+  await report(page);
+  expect((await policyStatuses(page))['policy-library']).toBe('warning');
+  await expect(card(page, 'policy-library')).not.toContainText('South University Library databases');
+  await expect(card(page, 'policy-library')).toContainText('Not found: points to South University Library resources.');
+});
+
+test('a fix that is undone and typed again is still linked to its finding', async ({ page, openTool }) => {
+  await openTool('syllabusbridge');
+  await upload(page, await docx({ hardware: 'A laptop with ExamSoft (current annual subscription).' }));
+  await report(page);
+  await card(page, 'policy-hardware').getByRole('button', { name: /^Fix this/ }).click();
+  const field = page.locator('#review-hardware textarea'), fixed = 'A laptop with ExamSoft (current annual subscription) and a privacy filter.';
+  await field.fill(fixed);
+  await field.press('Tab');
+  await page.locator('#undoEdit').click();
+  expect(await page.evaluate(() => state.changeFindings)).toEqual({});
+  await page.locator('#review-hardware textarea').fill(fixed);
+  await page.locator('#review-hardware textarea').press('Tab');
+  expect(Object.keys(await page.evaluate(() => state.changeFindings))).toEqual(['policy:hardware']);
+  await page.locator('#fixContext').getByRole('button', { name: 'Revalidate and return to report' }).click();
+  await expect(card(page, 'policy-hardware')).toContainText('Resolved by your edit');
+});
+
+test('with no research assignment the library check is Not evaluated, even when the library is mentioned', async ({ page, openTool }) => {
+  await openTool('syllabusbridge');
+  await upload(page, await docx({ materials: 'South University Library resources are available to every student in this course.' }));
+  await report(page);
+  expect((await policyStatuses(page))['policy-library']).toBe('not-evaluated');
+  await expect(card(page, 'policy-library')).toContainText('No assignment that involves research was detected');
+});
+
+test('a Percent | GPA table can be fixed in the editor', async ({ page, openTool }) => {
+  const body = syllabus({ scale: officialScale.map(([p, g]) => p === '76' ? [p, '2.5'] : [p, g]) })
+    .map(x => Array.isArray(x) && x[0][0] === '% Grade' ? [['Percent', 'GPA'], ...x.slice(1)] : x);
+  await openTool('syllabusbridge');
+  await upload(page, { name: 'percent.docx', mimeType: DOCX_MIME, buffer: await syntheticDocxBody(body) });
+  await report(page);
+  expect((await policyStatuses(page))['policy-grading-scale']).toBe('issue');
+  await card(page, 'policy-grading-scale').getByRole('button', { name: /^Fix this/ }).click();
+  const table = page.locator('.sb-structured-editor').filter({ hasText: 'Grading scale' });
+  await expect(table.locator('textarea').first()).toBeFocused();
+  const row = table.locator('tbody tr').filter({ has: page.locator('textarea', { hasText: /^76$/ }) });
+  await row.locator('textarea').nth(1).fill('2.6');
+  await row.locator('textarea').nth(1).press('Tab');
+  await page.locator('#runValidation').click();
+  expect((await policyStatuses(page))['policy-grading-scale']).toBe('passed');
+  await expect(card(page, 'policy-grading-scale')).toContainText('Resolved by your edit');
+});

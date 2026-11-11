@@ -311,10 +311,17 @@ function policyMatch(text,patterns){for(const re of policyPatterns(patterns)){co
 function policySnippet(text,m){const ls=text.lastIndexOf('\n',m.index)+1,nl=text.indexOf('\n',m.index+m[0].length),le=nl<0?text.length:nl,s=Math.max(ls,m.index-60),e=Math.min(le,m.index+m[0].length+60);return `${s>ls?'…':''}${clean(text.slice(s,e))}${e<le?'…':''}`}
 function listWords(items){return items.length<2?items.join(''):`${items.slice(0,-1).join(', ')}${items.length>2?',':''} and ${items.at(-1)}`}
 const POLICY_UNCONFIRMED=' Note: this part of the policy profile has not yet been confirmed against the official policy.';
-// Everything SyllabusBridge read, plus the editor's current text, so edits count.
+// The syllabus as it stands now: the editor's current text, plus only those
+// lines from the Word file that the editor holds no copy of. Text faculty
+// deleted or replaced in the editor is never used as evidence.
+function editorTextParts(snap){
+ const tables=(snap.structuredTables||[]).flatMap(t=>[...(t.headers||[]),...(t.rows||[]).flatMap(r=>(r.cells||[]).flatMap(c=>[c.text,...(c.lines||[])]))]);
+ return [...Object.values(snap.policies||{}).filter(v=>typeof v==='string'),...tables,...(snap.grading||[]).map(g=>g.label),...(snap.schedule||[]).map(e=>e.topic),...(snap.clos||[])]
+}
 function currentSyllabusText(){
- const p=state.policies||{},tables=(state.structuredTables||[]).flatMap(t=>[...(t.headers||[]),...(t.rows||[]).flatMap(r=>(r.cells||[]).map(tableCellValue))]);
- return [...(state.lines||[]),...Object.values(p).filter(v=>typeof v==='string'),...tables,...(state.grading||[]).map(g=>g.label),...(state.schedule||[]).map(e=>e.topic),...(state.clos||[])].join('\n')
+ const covered=new Set(editorTextParts(state.editorBaseline||{}).flatMap(t=>String(t||'').split(/\n+/)).map(norm).filter(Boolean));
+ const rest=(state.lines||[]).filter(l=>!covered.has(norm(l)));
+ return [...rest,...editorTextParts(state)].map(t=>String(t||'')).filter(t=>clean(t)).join('\n')
 }
 function policyContentResult(check,profile){
  const id='policy-'+check.id,sections=check.sections||[];
@@ -328,10 +335,9 @@ function policyContentResult(check,profile){
  if(check.campusSetting){const v=clean(profile.campus?.[check.campusSetting]);if(!v)extra=' The campus-specific contact is not set in the policy profile, so it was not compared.';else if(norm(text).includes(norm(v)))found.push(`the campus contact "${v}"`);else missing.push(`the campus contact "${v}"`)}
  if(check.onlyWhen){
   const trigger=policyMatch(text,check.onlyWhen.patterns);
-  if(!trigger){
-   if(!missing.length)return result(id,POLICY_CATEGORY,'passed',check.title,`The syllabus ${listWords((check.requirements||[]).map(r=>r.label))}.`,`Found: ${found.join(' · ')}. No research assignment was detected, so this is not required.${note}`,'No action needed.');
-   return result(id,POLICY_CATEGORY,'not-evaluated',check.title,`No assignment that involves research was detected, so this check does not apply.`,`Looked for research-type work (${check.onlyWhen.label}) and found none.${note}`,'If any assignment does involve research, point students to South University Library resources.',false)
-  }
+  // No research work found: the requirement does not apply, so the check is Not evaluated
+  // (never Passed), whether or not the library is mentioned.
+  if(!trigger)return result(id,POLICY_CATEGORY,'not-evaluated',check.title,'No assignment that involves research was detected, so this check does not apply.',`Looked for research-type work (${check.onlyWhen.label}) and found none.${found.length?` Found anyway: ${found.join(' · ')}.`:''}${note}`,'If any assignment does involve research, point students to South University Library resources.',false);
   extra=` Research detected: "${policySnippet(text,trigger)}".`+extra
  }
  const status=missing.length?'warning':'passed';
@@ -354,8 +360,7 @@ function parseGpa(s){const m=clean(s).match(/^(\d(?:\.\d{1,2})?)$/);return m&&+m
 function percentBandLabel(x){return x.min===x.max?`${x.min}%`:x.max===100?`≥${x.min}%`:x.min===0?`≤${x.max}%`:`${x.min}–${x.max}%`}
 // Finds the table whose header has a percent column next to a GPA column (one or
 // more side-by-side pairs) and reads its current, possibly edited, rows.
-function gradingScaleRows(){
- for(const t of state.structuredTables||[]){
+function gradingScaleColumns(t){
   const all=[{cells:(t.headers||[]).map((h,i)=>({columnIndex:i,text:clean(h),lines:[clean(h)]}))},...(t.rows||[])];
   let head=-1,pairs=[];
   for(let i=0;i<Math.min(all.length,3)&&head<0;i++){
@@ -364,8 +369,16 @@ function gradingScaleRows(){
    pairs=cells.filter(c=>/\bgpa\b|grade point/i.test(c.text)).map(g=>{const left=[...cells].reverse().filter(c=>c.columnIndex<g.columnIndex&&!/\bgpa\b|grade point/i.test(c.text)),p=left.find(c=>/%|percent/i.test(c.text))||left.find(c=>/grade/i.test(c.text)&&!/letter/i.test(c.text));return p?{pct:p.columnIndex,gpa:g.columnIndex}:null}).filter(Boolean);
    if(pairs.length)head=i
   }
-  if(head<0)continue;
-  const rows=[];
+  return head<0?null:{all,head,pairs}
+}
+// Tables the parser left as "generic" but whose header has a percent and a GPA
+// column (for example "Percent | GPA") become the editable Grading scale table,
+// so Fix this can open them.
+function promoteGradingScaleTables(){for(const t of state.structuredTables||[])if(t.type==='generic'&&gradingScaleColumns(t))t.type='gradingScale'}
+function gradingScaleRows(){
+ for(const t of state.structuredTables||[]){
+  const cols=gradingScaleColumns(t);if(!cols)continue;
+  const {all,head,pairs}=cols,rows=[];
   for(const row of all.slice(head+1))for(const p of pairs){
    const cellLines=col=>{const c=(row.cells||[]).find(x=>x.columnIndex===col);return(c?.lines?.length?c.lines:[c?.text||'']).map(clean)};
    const pl=cellLines(p.pct),gl=cellLines(p.gpa);
@@ -390,7 +403,7 @@ function gradingScaleResult(profile){
  if(missing.length)parts.push(`Missing: ${missing.join(', ')}.`);
  if(extra.length)parts.push(`Not on the official scale: ${extra.join(' · ')}.`);
  if(unreadable.length)parts.push(`Could not read: ${unreadable.join(' · ')}.`);
- return result(id,POLICY_CATEGORY,status,title,summary,parts.join(' ')+note,status==='passed'?'No action needed.':'Use the official grading scale from the syllabus policy. You can correct the Grading scale table in the structured editor.')
+ return result(id,POLICY_CATEGORY,status,title,summary,parts.join(' ')+note,status==='passed'?'No action needed.':found.table.type==='gradingScale'?'Use the official grading scale from the syllabus policy. You can correct the Grading scale table in the structured editor.':'Use the official grading scale from the syllabus policy. Correct the table in the Word syllabus, then upload it again.')
 }
 function policyResults(){
  const profile=policyProfile();
@@ -916,7 +929,8 @@ function fixSignatures(){const out=new Map;for(const g of changeSummary())for(co
 function linkFixEdits(){
  const f=state.activeFix;if(!f)return;
  state.changeFindings=state.changeFindings||{};
- for(const [key,sig] of fixSignatures())if(f.start.get(key)!==sig){state.changeFindings[key]={id:f.id,title:f.title};f.start.set(key,sig)}
+ // Compare with the state when Fix this was clicked (never updated), so a change undone and typed again is linked again.
+ for(const [key,sig] of fixSignatures())if(f.start.get(key)!==sig&&state.changeFindings[key]?.id!==f.id)state.changeFindings[key]={id:f.id,title:f.title}
 }
 function linkedChanges(id){return Object.values(state.changeFindings||{}).filter(x=>x.id===id).length}
 function startFix(id){
@@ -1090,7 +1104,7 @@ async function applyPendingProject(){
  state.projectNote=notes.join(' ');
  return true
 }
-async function handleFile(file){clearError();resetState();go('upload');if(!file?.name?.toLowerCase().endsWith('.docx')){showError('SyllabusBridge accepts .docx Word syllabi only.');return}showLoading(true,'Reading Word syllabus…',15);try{const fingerprint=await fileFingerprint(file),tracked=await trackedChangesIn(file);await parseDocx(file);state.sourceFingerprint=fingerprint;state.trackedChanges=tracked;showLoading(true,'Extracting syllabus structure…',72);captureEditorBaseline();if(pendingProject&&!await applyPendingProject()){showLoading(false);resetState();go('upload');return}renderReview();showTrackedChanges();if(state.openedProject){const st=$('historyStatus');if(st)st.textContent=state.projectNote||''}showLoading(true,'Extraction complete',100);setTimeout(()=>{showLoading(false);go('review')},180)}catch(e){console.error(e);showLoading(false);if(e instanceof SyllabusFileError)showError(e.message,'Word syllabus could not be read');else showError(`Something went wrong while reading this syllabus. SyllabusBridge v2.1.2.\n\nTechnical detail: ${e?.message||'Unknown error'}\n\nPlease send a screenshot of this message and the syllabus filename to the FacultyBridge project owner.`,'SyllabusBridge encountered an internal error')}}
+async function handleFile(file){clearError();resetState();go('upload');if(!file?.name?.toLowerCase().endsWith('.docx')){showError('SyllabusBridge accepts .docx Word syllabi only.');return}showLoading(true,'Reading Word syllabus…',15);try{const fingerprint=await fileFingerprint(file),tracked=await trackedChangesIn(file);await parseDocx(file);promoteGradingScaleTables();state.sourceFingerprint=fingerprint;state.trackedChanges=tracked;showLoading(true,'Extracting syllabus structure…',72);captureEditorBaseline();if(pendingProject&&!await applyPendingProject()){showLoading(false);resetState();go('upload');return}renderReview();showTrackedChanges();if(state.openedProject){const st=$('historyStatus');if(st)st.textContent=state.projectNote||''}showLoading(true,'Extraction complete',100);setTimeout(()=>{showLoading(false);go('review')},180)}catch(e){console.error(e);showLoading(false);if(e instanceof SyllabusFileError)showError(e.message,'Word syllabus could not be read');else showError(`Something went wrong while reading this syllabus. SyllabusBridge v2.1.2.\n\nTechnical detail: ${e?.message||'Unknown error'}\n\nPlease send a screenshot of this message and the syllabus filename to the FacultyBridge project owner.`,'SyllabusBridge encountered an internal error')}}
 $('exportCourseJson').onclick=exportCourseJson;if($('exportCourseJsonReport'))$('exportCourseJsonReport').onclick=exportCourseJson;$('choose').onclick=()=>$('file').click();$('openProject').onclick=()=>$('projectFile').click();$('projectFile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)openProjectFile(f)};$('saveProject').onclick=saveProject;$('saveProjectReport').onclick=saveProject;$('file').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)handleFile(f)};['dragenter','dragover'].forEach(ev=>$('drop').addEventListener(ev,e=>{e.preventDefault();$('drop').classList.add('drag')}));['dragleave','drop'].forEach(ev=>$('drop').addEventListener(ev,e=>{e.preventDefault();$('drop').classList.remove('drag')}));$('drop').addEventListener('drop',e=>e.dataTransfer.files[0]&&handleFile(e.dataTransfer.files[0]));$('runValidation').onclick=()=>{state.reviewComplete=true;syncCourseFields();renderReport();updateEditorStatus();go('report')};document.querySelectorAll('.sb-step').forEach(b=>b.onclick=()=>{if(b.getAttribute('aria-disabled')==='true')return;if(b.dataset.step==='report'){renderReport()}go(b.dataset.step)});const root=document.documentElement;const savedTheme=localStorage.getItem('ft-theme')||'light';root.dataset.theme=savedTheme;root.dataset.ftTheme=savedTheme;$('theme').onclick=()=>{const dark=root.dataset.theme==='dark',next=dark?'light':'dark';root.dataset.theme=next;root.dataset.ftTheme=next;localStorage.setItem('ft-theme',next)};
 // Undo/redo buttons and keyboard shortcuts. Inside a text box, Ctrl+Z / Cmd+Z
 // keeps doing the browser's own typing undo.
