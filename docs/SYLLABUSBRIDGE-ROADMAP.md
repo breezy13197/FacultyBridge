@@ -262,17 +262,16 @@ Acceptance criteria (each covered by `e2e/syllabusbridge-tracked-changes.spec.js
 - When the policy changes, add a new dated profile next to the old one;
   SyllabusBridge uses the newest. Old printed reports still name theirs.
 - Campus-specific details are settings in the profile (`campus`). The Student
-  Affairs contact is blank for now, so the report says it was not compared.
+  Affairs contact named in the accessibility statement is one; only that name
+  is compared, so a phone number or email may be written in any form.
 - **Grading scale: confirmed.** The official SUSOP scale was supplied with the
   QA review (2026-11-11): ≥90 = 4.0; 89–70% go down 0.1 per percent; 69–65%
   go down 0.2 per percent (69 = 1.8 … 65 = 1.0); ≤64 = 0. (The first draft
   had inferred 69 = 1.9 … 65 = 1.5, which some syllabi, such as PHA4331, still
   use; the check now flags them.)
-- **Needs confirmation before release** (marked `"confirmed": false` in the
-  profile, and noted next to that result in the report): the approved
-  accessibility wording was not available, so that check looks for key
-  phrases. The approved statement directs students to Disability Services, so
-  either Disability Services or Student Affairs counts.
+- **Accessibility statement: confirmed.** The approved wording from the
+  syllabus template was supplied on 2026-11-11 and is stored in the profile.
+  Every part of the 2026-09-28 profile is now confirmed.
 
 ### 2. New content checks from the 2026-09-28 policy — done (unreleased)
 
@@ -281,7 +280,7 @@ They appear in the report under **Policy content**.
 | Check | What it compares |
 |---|---|
 | Grading scale | Every row of the percent → GPA table against the official scale (≥90 = 4.0 … ≤64 = 0). A different GPA is an issue; a missing, extra, or unreadable row is a warning. Rows like "≥90", "90–100", "90 and above", "≤64", and side-by-side column pairs are read. |
-| Accessibility statement | Key phrases (disability or accessibility, reasonable accommodations, Student Affairs), plus the campus contact once it is set. |
+| Accessibility statement | Each sentence of the approved wording must appear (capital letters, punctuation, and spacing are ignored). The contact details may differ, but the configured campus Student Affairs contact must be named. Differing sentences are quoted in the report. |
 | Student engagement | 10 hours of instruction and 20 hours of outside work per quarter credit hour. |
 | Required hardware and software | ExamSoft, a current annual subscription, and a privacy filter. |
 | Library resources | If the syllabus mentions research-type work, it points to South University Library resources. With no research found, the check is Not evaluated, even if the library is mentioned. It reads the editor's current text plus only the parts of the Word file the editor has no copy of, so wording deleted in the editor no longer counts. |

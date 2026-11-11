@@ -18,7 +18,8 @@ printed report always shows which version of the policy it was checked against.
 - **`gradingScale`**: the official percent → GPA table. Each row is a band of
   whole percents (`min` to `max`) and its GPA.
 - **`contentChecks`**: one entry per check. Each lists the syllabus sections to
-  read, the wording each requirement looks for (`patterns`), the field "Fix
+  read, the wording each requirement looks for (`patterns`) or the exact
+  approved wording (`approvedText`), the field "Fix
   this" opens (`fixField`), and the suggested action shown when it fails.
 - **`confirmed`**: `false` means that part was not copied from the official
   policy document. The report says so next to the result. Once someone has
@@ -28,16 +29,18 @@ The file ends in `.js` rather than `.json` only so the single-file offline
 version of SyllabusBridge can include it. Everything inside the braces is
 ordinary JSON data.
 
-## Before the 2026-09-28 profile is released
+## The 2026-09-28 profile
 
-The grading scale is confirmed (the official SUSOP scale supplied with the QA
-review). One part is still marked `"confirmed": false`:
+Every part is confirmed against the official policy: the grading scale (the
+official SUSOP scale) and the accessibility statement (the approved wording
+from the syllabus template, supplied 2026-11-11).
 
-- **Accessibility statement.** The approved wording was not available, so the
-  check looks for key phrases: disability or accessibility; reasonable (and
-  appropriate) accommodations; and whom to contact (Disability Services or
-  Student Affairs). Replace or add phrases from the approved statement, and
-  fill in `campus.studentAffairsContact` if the contact should be checked.
+**Approved wording.** A check with `approvedText` compares the syllabus with
+that text sentence by sentence. Capital letters, punctuation, quote marks, and
+spacing are ignored. A word in braces, such as `{studentAffairsContact}`, marks
+a campus-specific part that may say anything; the value set under `campus` is
+then checked separately (for the accessibility statement, the Student Affairs
+contact's name). If a campus has a different contact, change that setting.
 
 ## Adding a new version of the policy
 

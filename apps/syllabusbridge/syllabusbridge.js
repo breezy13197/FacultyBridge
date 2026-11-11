@@ -328,12 +328,30 @@ function currentSyllabusText(ignore=[]){
  const rest=(state.lines||[]).filter(l=>!covered.has(norm(l)));
  return [...rest,...editorTextParts(state,ignore)].map(t=>String(t||'')).filter(t=>clean(t)).join('\n')
 }
+// Approved wording (v2.3): every sentence of the approved text must appear in the
+// syllabus. Capital letters, punctuation, quote marks, and spacing are ignored.
+// A {setting} placeholder marks a campus-specific part that may differ.
+function wordingKey(t){return String(t||'').toLowerCase().replace(/[’‘]/g,"'").replace(/[^a-z0-9{}]+/g,' ').trim()}
+function approvedSentences(text){return String(text||'').split(/(?<=[.!?])\s+/).map(x=>x.trim()).filter(Boolean)}
+function approvedWordingResult(check,profile,text,note){
+ const id='policy-'+check.id,have=` ${wordingKey(text)} `,sentences=approvedSentences(check.approvedText);
+ const esc=x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+ const found=sentences.filter(sn=>{const parts=wordingKey(sn).split(/\s*\{\w+\}\s*/);return new RegExp(` ${parts.map(esc).join(' .{1,200}? ')}${parts.at(-1)?' ':''}`).test(have)});
+ const missing=sentences.filter(sn=>!found.includes(sn)).map(sn=>sn.replace(/\s*\{\w+\}/g,' [campus contact]'));
+ let campus='';
+ if(check.campusSetting){const v=clean(profile.campus?.[check.campusSetting]);if(!v)campus=' The campus-specific contact is not set in the policy profile, so it was not compared.';else if(have.includes(` ${wordingKey(v)} `))campus=` The campus contact "${v}" is named.`;else missing.push(`the campus contact "${v}"`)}
+ const short=x=>x.length>140?x.slice(0,137)+'…':x,status=missing.length?'warning':'passed';
+ const summary=missing.length?`${sentences.length-found.length?`${sentences.length-found.length} of ${sentences.length} sentences of the approved wording ${sentences.length-found.length===1?'is':'are'} missing or different`:'The approved wording is present'}${missing.length>sentences.length-found.length?`${sentences.length-found.length?', and':', but'} the campus contact is not named`:''}.`:`Matches the approved wording (${sentences.length} sentences)${campus.includes('is named')?', with the campus contact':''}.`;
+ const evidence=`${found.length} of ${sentences.length} approved sentences found.${missing.length?` Missing or different: ${missing.map(x=>`"${short(x)}"`).join(' · ')}.`:''}${campus} Capital letters, punctuation, and spacing are ignored.${note}`;
+ return result(id,POLICY_CATEGORY,status,check.title,summary,evidence,missing.length?check.action:'No action needed.')
+}
 function policyContentResult(check,profile){
  const id='policy-'+check.id,sections=check.sections||[];
  const text=check.searchWholeSyllabus?currentSyllabusText():sections.map(k=>String(state.policies?.[k]||'')).filter(t=>clean(t)).join('\n');
  const note=check.confirmed===false?POLICY_UNCONFIRMED:'';
  const sectionNames=sections.map(k=>SECTION_RULES.find(r=>r.key===k)?.label||k);
  if(!clean(text))return result(id,POLICY_CATEGORY,'not-evaluated',check.title,`${check.title} could not be checked because no ${sectionNames[0]||'section'} text was found.`,`No text was extracted for: ${sectionNames.join(', ')}.${note}`,'Add the section in the structured editor (or check the section heading in the Word file), then revalidate.',false);
+ if(check.approvedText)return approvedWordingResult(check,profile,text,note);
  const found=[],missing=[];
  for(const req of check.requirements||[]){const m=policyMatch(text,req.patterns);if(m)found.push(`${req.label} ("${policySnippet(text,m)}")`);else missing.push(req.label)}
  let extra='';

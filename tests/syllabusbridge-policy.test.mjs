@@ -61,7 +61,10 @@ for (const file of files) test(`${file} is a well-formed policy profile`, () => 
     for (const k of c.sections) assert.ok(sectionKeys.has(k), `${c.id}: unknown section ${k}`);
     assert.ok(editorFields.has(c.fixField), `${c.id}: Fix this field ${c.fixField} is not in the editor`);
     if (c.campusSetting) assert.ok(c.campusSetting in p.campus, `${c.id}: campus setting ${c.campusSetting} is not defined`);
-    for (const r of [...c.requirements, ...(c.onlyWhen ? [c.onlyWhen] : [])]) {
+    // A check compares either required phrases or approved wording, whose {placeholders} are campus settings.
+    assert.ok(Array.isArray(c.requirements) !== (typeof c.approvedText === 'string'), `${c.id} needs requirements or approvedText, not both`);
+    for (const m of (c.approvedText || '').matchAll(/\{(\w+)\}/g)) assert.ok(m[1] in p.campus, `${c.id}: placeholder {${m[1]}} is not a campus setting`);
+    for (const r of [...(c.requirements || []), ...(c.onlyWhen ? [c.onlyWhen] : [])]) {
       assert.ok(r.label && r.patterns.length, `${c.id}: each requirement needs a label and patterns`);
       for (const pattern of r.patterns) assert.doesNotThrow(() => new RegExp(pattern, 'i'), `${c.id}: bad pattern ${pattern}`);
     }

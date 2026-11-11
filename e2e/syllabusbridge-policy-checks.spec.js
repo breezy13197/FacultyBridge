@@ -9,11 +9,14 @@ const officialScale = [['≥90', '4.0'], ...Array.from({ length: 25 }, (_, i) =>
 const schedule = [['Date', 'Time', 'Topic', 'Faculty'],
   ['9/21/2026', '9:00 AM - 10:00 AM', 'Proteins', 'Dr. Ada Faculty'],
   ['9/23/2026', '9:00 AM - 10:00 AM', 'Enzymes', 'Dr. Ada Faculty']];
+// The approved accessibility statement (policy profile), with a campus contact line
+// written differently from the template; only the contact's name is compared.
+const approvedAccessibility = 'South University provides accommodations to qualified students with disabilities. The Disability Services office assists qualified students with disabilities in acquiring reasonable and appropriate accommodations and in supporting equal access to services, programs, and activities at South University. Students who seek reasonable accommodations should notify the Student Affairs Office, Dean Alessandra Tavoloni at 555-0100 or by email. Students should let the Student Affairs Office know of their specific limitations and, if known, their specific requested accommodations. Students will be asked to supply medical documentation of the need for accommodation. Classroom accommodations are not retroactive, but are effective only upon the student sharing approved accommodations with the instructor. Therefore, students are encouraged to request accommodations as early as feasible with the Student Affairs Office to allow time to gather necessary documentation. Complaints will be handled in accordance with the school\u2019s Internal Grievance Procedure for Complaints of Discrimination and Harassment included in the General Complaint Procedure section of the Academic Catalog.';
 const compliant = {
   scale: officialScale,
   materials: 'Use South University Library databases for the drug information research paper.',
   hardware: 'A laptop with ExamSoft (current annual subscription) and a privacy filter.',
-  accessibility: 'Students with a disability who need reasonable accommodations should contact the Office of Student Affairs.',
+  accessibility: approvedAccessibility,
   // Policy sentences are kept longer than a heading: SyllabusBridge reads a short line that
   // contains a heading phrase ("quarter credit hour", "course coordinator") as a new section.
   engagement: 'Students are expected to engage with this course for 10 hours of instruction and 20 hours of outside work for every quarter credit hour earned.',
@@ -71,11 +74,10 @@ test('each check explains what is missing or different', async ({ page, openTool
   await expect(card(page, 'policy-engagement')).toContainText('Not found: 20 hours of outside work.');
   await expect(card(page, 'policy-coursePolicies')).toContainText('Not found: the University Handbook.');
   await expect(card(page, 'policy-programAssessment')).toContainText('Not found: the end-of-course survey and course-embedded assessments.');
-  await expect(card(page, 'policy-accessibility')).toContainText('Not found: offers reasonable accommodations and tells students whom to contact (Disability Services or Student Affairs).');
+  await expect(card(page, 'policy-accessibility')).toContainText('8 of 8 sentences of the approved wording are missing or different, and the campus contact is not named.');
   await expect(card(page, 'policy-library')).toContainText('Research detected: "Complete the literature review using PubMed."');
-  // Wording not yet confirmed against the official policy says so in the report.
-  await expect(card(page, 'policy-accessibility')).toContainText('has not yet been confirmed against the official policy');
-  await expect(card(page, 'policy-hardware')).not.toContainText('has not yet been confirmed');
+  // Every part of the 2026-09-28 profile is now confirmed against the official policy.
+  await expect(page.locator('#results')).not.toContainText('has not yet been confirmed');
 });
 
 test('checks SyllabusBridge cannot make say Not evaluated instead of passing', async ({ page, openTool }) => {
@@ -294,8 +296,6 @@ test('QA: wording found where real syllabi put it', async ({ page, openTool }) =
     programAssessment: 'ExamSoft is used in this course, an end of course survey is conducted, and Course-embedded Learning Assessments are used.',
     // PHA4330: the handbook sentence sits outside Course Specific Policies (added after the schedule below).
     coursePolicies: 'Course policies for this course are listed in the sections that follow below in this syllabus document.',
-    // PHA4331: the approved statement names Disability Services, not Student Affairs.
-    accessibility: 'The Disability Services office assists qualified students with disabilities in acquiring reasonable and appropriate accommodations.',
     // The standard engagement wording mentions research; it is not a research assignment.
     engagement: 'Students can expect 10 hours of instruction and 20 hours of outside work per quarter credit hour, including all research associated with completing assignments.',
   }), 'Please refer to the SUSOP Student Handbook and University Handbook for details on the following policies:'];
@@ -303,7 +303,7 @@ test('QA: wording found where real syllabi put it', async ({ page, openTool }) =
   await upload(page, { name: 'wording.docx', mimeType: DOCX_MIME, buffer: await syntheticDocxBody(body) });
   await report(page);
   const statuses = await policyStatuses(page);
-  expect(statuses).toMatchObject({ 'policy-hardware': 'passed', 'policy-programAssessment': 'passed', 'policy-coursePolicies': 'passed', 'policy-accessibility': 'passed' });
+  expect(statuses).toMatchObject({ 'policy-hardware': 'passed', 'policy-programAssessment': 'passed', 'policy-coursePolicies': 'passed' });
   // No research assignment once the engagement wording is set aside.
   expect(statuses['policy-library']).toBe('not-evaluated');
 });
@@ -335,4 +335,27 @@ test('QA: schedule rows, headings, TBD dates, and shared meeting days are read l
   expect(results['schedule-internal'][1]).toContain('Parsed 4 schedule entries from 4 source schedule rows');
   expect(results['schedule-internal'][1]).not.toContain('not represented');
   expect(results['schedule-handoff-dates'][0]).toBe('issue');
+});
+
+test('the accessibility statement is compared with the approved wording, apart from the campus contact', async ({ page, openTool }) => {
+  await openTool('syllabusbridge');
+  // Different capitals, spacing, and quote marks still match.
+  const restyled = approvedAccessibility.toUpperCase().replace(/ /g, '  ').replace('\u2019', "'");
+  await upload(page, await docx({ accessibility: restyled }));
+  await report(page);
+  expect((await policyStatuses(page))['policy-accessibility']).toBe('passed');
+  await expect(card(page, 'policy-accessibility')).toContainText('Matches the approved wording (8 sentences), with the campus contact.');
+
+  // PHA4331's version: students are sent to a coordinator, not the Student Affairs Office.
+  const changed = approvedAccessibility.replace('let the Student Affairs Office know', 'let their Disability Service Coordinator know');
+  await upload(page, await docx({ accessibility: changed }));
+  await report(page);
+  expect((await policyStatuses(page))['policy-accessibility']).toBe('warning');
+  await expect(card(page, 'policy-accessibility')).toContainText('1 of 8 sentences of the approved wording is missing or different.');
+  await expect(card(page, 'policy-accessibility')).toContainText('Missing or different: "Students should let the Student Affairs Office know');
+
+  // The approved wording with another campus contact: the configured contact is not named.
+  await upload(page, await docx({ accessibility: approvedAccessibility.replace('Dean Alessandra Tavoloni', 'Dean Pat Example') }));
+  await report(page);
+  await expect(card(page, 'policy-accessibility')).toContainText('The approved wording is present, but the campus contact is not named.');
 });

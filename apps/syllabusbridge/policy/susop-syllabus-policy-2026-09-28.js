@@ -19,8 +19,8 @@
   "updated": "2026-09-28",
 
   "campus": {
-    "_note": "Campus-specific settings. Leave a value blank to skip that comparison; the report then says it was not compared.",
-    "studentAffairsContact": ""
+    "_note": "Campus-specific settings. Leave a value blank to skip that comparison; the report then says it was not compared. studentAffairsContact is the name the accessibility statement must give (from the approved template); phone and email may be written in any form.",
+    "studentAffairsContact": "Alessandra Tavoloni"
   },
 
   "gradingScale": {
@@ -52,15 +52,11 @@
       "title": "Accessibility statement wording",
       "sections": ["accessibility"],
       "fixField": "accessibility",
-      "confirmed": false,
-      "_note": "Compares key phrases, not the full approved wording, which was not available. The PHA4331 statement directs students to Disability Services, so that counts as naming whom to contact. Replace or extend these phrases from the approved statement. The campus contact is compared separately (campus.studentAffairsContact).",
+      "confirmed": true,
+      "_note": "The approved statement from the syllabus template (supplied 2026-11-11). Each sentence must appear in the syllabus; capital letters, punctuation, and spacing are ignored. {studentAffairsContact} marks the campus-specific part, which may differ; the configured campus contact is then checked separately.",
       "campusSetting": "studentAffairsContact",
-      "requirements": [
-        { "label": "names disability or accessibility services", "patterns": ["\\bdisabilit", "\\baccessibility\\b"] },
-        { "label": "offers reasonable accommodations", "patterns": ["\\breasonable\\s+(?:and\\s+appropriate\\s+)?accommodations?\\b"] },
-        { "label": "tells students whom to contact (Disability Services or Student Affairs)", "patterns": ["\\bdisability\\s+services?\\b", "\\bstudent\\s+affairs\\b"] }
-      ],
-      "action": "Replace the statement with the approved accessibility wording from the syllabus policy, keeping your campus contact details."
+      "approvedText": "South University provides accommodations to qualified students with disabilities. The Disability Services office assists qualified students with disabilities in acquiring reasonable and appropriate accommodations and in supporting equal access to services, programs, and activities at South University. Students who seek reasonable accommodations should notify the Student Affairs Office, {studentAffairsContact}. Students should let the Student Affairs Office know of their specific limitations and, if known, their specific requested accommodations. Students will be asked to supply medical documentation of the need for accommodation. Classroom accommodations are not retroactive, but are effective only upon the student sharing approved accommodations with the instructor. Therefore, students are encouraged to request accommodations as early as feasible with the Student Affairs Office to allow time to gather necessary documentation. Complaints will be handled in accordance with the school’s Internal Grievance Procedure for Complaints of Discrimination and Harassment included in the General Complaint Procedure section of the Academic Catalog.",
+      "action": "Replace the statement with the approved accessibility wording from the syllabus template, keeping your campus Student Affairs contact details."
     },
     {
       "id": "engagement",
