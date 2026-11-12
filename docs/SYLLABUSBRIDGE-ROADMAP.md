@@ -423,7 +423,7 @@ What is placed, and what is listed for faculty to do by hand:
 |---|---|
 | Policies and narrative sections (course description, accessibility, and the rest): lines changed, added, or removed | Yes. A heading line with text after its colon ("ACCESSIBILITY: text") keeps its label. New lines copy the formatting of the line before; a new line typed with the bullet becomes a list item. |
 | Structured tables (grading scale, assignments, rubric, due dates, teams): cells, added rows, removed rows | Yes. A new row copies the formatting of the row it follows. |
-| Course schedule: changed date, time, topic, or faculty; added and removed entries | Yes, when the value is in its own cell and appears there once. A removed entry that shares its table row with entries you kept is listed. A time SyllabusBridge filled in from the meeting pattern is listed. |
+| Course schedule: changed date, time, topic, or faculty; added and removed entries | Yes, when the value is in its own cell and appears there once. A removed entry that shares its table row with entries you kept is listed. A time SyllabusBridge filled in from the meeting pattern is listed. A new entry is listed whole if the table has no column for something you typed (for example no Time or Faculty column); a weekday worked out from the date may be left out. |
 | Course code, title, location | Yes, when the old text appears once in the line it was read from. |
 | Faculty name or email; CLO wording; grade item name or weight | Yes, when the old text appears exactly once where it was read. |
 | Year; adding or removing faculty, CLOs, or grade items; PSLO mapping; moving someone between coordinator and course faculty; grade type or date (worked out by SyllabusBridge) | Listed, with the reason. |

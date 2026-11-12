@@ -183,3 +183,57 @@ test('a reopened project exports against the Word file chosen when reopening', a
   await upload(page, await accepted(out.bytes));
   expect(await page.evaluate(() => state.schedule.map(e => e.topic))).toEqual(['Protein structure', 'Enzymes', 'Hemoglobin']);
 });
+
+// Review finding on PR #35: a new schedule entry must not lose fields the Word
+// table has no column for. The whole entry is listed instead. A day worked out
+// from the date is not something the faculty member typed, so it may be left out.
+async function addEntry(page, { date, time, topic, faculty }) {
+  // Keyboard, as faculty can: the page may still be scrolling from the last row.
+  await page.locator('#addScheduleRow').focus();
+  await page.keyboard.press('Enter');
+  const row = page.locator('#scheduleBody tr').last();
+  await setField(row.locator('.s-date'), date);
+  if (time) await setField(row.locator('.s-time'), time);
+  await setField(row.locator('.s-topic'), topic);
+  if (faculty) await setField(row.locator('.s-faculty'), faculty);
+}
+const shortSchedule = [['Date', 'Topic'], ['9/21/2026', 'Proteins'], ['9/23/2026', 'Enzymes'], ['9/28/2026', 'Hemoglobin']];
+const scheduleOnly = async table => ({ name: 'syllabus.docx', mimeType: DOCX_MIME, buffer: await syntheticDocxBody(['PHA9999 - Synthetic Course', 'Course Coordinator: Dr. Ada Faculty', 'Fall 2026', 'Course Schedule', table]) });
+
+test('a new schedule entry with a time and faculty the table has no columns for is listed, not partly written', async ({ page, openTool }) => {
+  await openTool('syllabusbridge');
+  await upload(page, await scheduleOnly(shortSchedule));
+  await addEntry(page, { date: '10/1/2026', time: '9:00 AM - 10:00 AM', topic: 'Review session', faculty: 'Dr. Grace Teacher' });
+  await addEntry(page, { date: '10/5/2026', topic: 'Case discussion' });
+
+  await page.locator('#exportWord').click();
+  const dialog = exportDialog(page);
+  await expect(dialog).toContainText('1 syllabus edit will be written as tracked changes.');
+  await expect(dialog).toContainText('1 syllabus edit could not be placed');
+  const listed = dialog.locator('.sb-export-unplaced tbody tr');
+  await expect(listed).toHaveCount(1);
+  await expect(listed).toContainText('Review session');
+  await expect(listed).toContainText('has no time or faculty column');
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+
+  const out = await exportWord(page);
+  expect(out.xml).toContain('Case discussion');
+  for (const text of ['Review session', 'Grace Teacher', '9:00 AM']) expect(out.xml).not.toContain(text);
+  await upload(page, await accepted(out.bytes));
+  expect(await page.evaluate(() => state.schedule.map(e => `${e.date} ${e.topic}`))).toEqual(['9/21/2026 Proteins', '9/23/2026 Enzymes', '9/28/2026 Hemoglobin', '10/5/2026 Case discussion']);
+});
+
+test('a new schedule entry is written in full when the table has a column for each field', async ({ page, openTool }) => {
+  await openTool('syllabusbridge');
+  await upload(page, await scheduleOnly(schedule));
+  await addEntry(page, { date: '10/1/2026', time: '1:00 PM - 2:00 PM', topic: 'Review session', faculty: 'Dr. Grace Teacher' });
+  await page.locator('#exportWord').click();
+  await expect(exportDialog(page)).toContainText('1 syllabus edit will be written as tracked changes.');
+  await expect(exportDialog(page).locator('.sb-export-unplaced')).toHaveCount(0);
+  await exportDialog(page).getByRole('button', { name: 'Close', exact: true }).click();
+
+  const out = await exportWord(page);
+  await upload(page, await accepted(out.bytes));
+  const added = await page.evaluate(() => state.schedule.find(e => e.topic === 'Review session'));
+  expect([added.date, added.time, added.faculty]).toEqual(['10/1/2026', '1:00 PM – 2:00 PM', 'Dr. Grace Teacher']);
+});

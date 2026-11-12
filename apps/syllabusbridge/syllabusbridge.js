@@ -1190,7 +1190,16 @@ function wordExportTargets(key){
    const map=sourced.find(e=>e.source.tableIndex===t)?.source.columnMap;
    if(t==null||t<0||!map)return exportManual('SyllabusBridge did not find a schedule table in the Word file to add this entry to. Add it by hand in Word.');
    const n=(state.rawTables?.[t]||[]).reduce((m,r)=>Math.max(m,r.length),0),cells=Array.from({length:n},()=>[]);
-   for(const f of ['date','day','time','topic','faculty']){const col=map[f];if(col!=null&&col<n&&clean(ce[f]))cells[col].push(clean(ce[f]))}
+   // Every value typed for the new entry needs its own column in the Word table;
+   // otherwise the whole entry is listed, never written with values missing. The
+   // day is worked out from the date, so a table without a Day column may leave it out.
+   const missing=[];
+   for(const f of ['date','day','time','topic','faculty']){
+    const v=clean(ce[f]),col=map[f];if(!v)continue;
+    if(col!=null&&col<n)cells[col].push(v);
+    else if(!(f==='day'&&v===dayFromDate(ce.date)))missing.push(f)
+   }
+   if(missing.length)return exportManual(`The schedule table in the Word file has no ${missing.join(missing.length===2?' or ':', ')} column, so SyllabusBridge cannot add this entry without leaving part of it out. Add it by hand in Word.`);
    const list=c.schedule||[],i=list.indexOf(list.find(e=>e.editorId===id));
    return[{type:'add-row',tableIndex:t,afterRowIndex:exportRowPosition(list,i,t,e=>e.source?.tableIndex===t?e.source.rowIndex:null),order:i,id,cells:cells.map(x=>x.join(' '))}]
   }
