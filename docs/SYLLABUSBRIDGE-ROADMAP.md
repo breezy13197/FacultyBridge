@@ -123,7 +123,7 @@ Acceptance criteria (each covered by `e2e/syllabusbridge-project.spec.js`):
   plain explanation.
 - [x] The leave-page warning clears after saving and returns with new edits.
 
-### 3. Kinds of change — labels done (unreleased); finding links later
+### 3. Kinds of change — done (unreleased; finding links came with v2.3)
 
 What shipped (decided 2026-11-10: mark in the summary, labels only this round):
 
@@ -151,9 +151,9 @@ What shipped (decided 2026-11-10: mark in the summary, labels only this round):
 
 Still to come:
 
-- **Fix for a finding:** linking an edit to the validation warning it fixes,
-  and showing "Resolved by your edit" after revalidating. This comes with
-  v2.3's "Fix this" links, which create the link naturally.
+- ~~**Fix for a finding**~~: done in v2.3 (item 3). An edit made from a
+  finding's "Fix this" is linked to it, and the report shows "Resolved by your
+  edit" after revalidating.
 - **Paragraph locations** in the parser for body text (from the round-trip
   findings). This comes with the v2.5 Word export work, because it changes
   the protected parsing code.
@@ -246,42 +246,144 @@ Acceptance criteria (each covered by `e2e/syllabusbridge-tracked-changes.spec.js
 
 ---
 
-## v2.3 — Policy content checks
+## v2.3 — Policy content checks — done (unreleased)
 
-### 1. A separate, dated policy profile
+### 1. A separate, dated policy profile — done (unreleased)
 
-- Move policy rules into a data file such as
-  `apps/syllabusbridge/policy/susop-syllabus-policy-2026-09-28.json` instead of
-  writing them into the code.
-- The report states which policy it checked against, for example: "Checked
-  against SUSOP Syllabus Policy, updated 2026-09-28."
-- When the policy changes, add a new dated profile. Old reports can still say
-  which version they used.
-- Campus-specific details (for example, the Student Affairs contact named in
-  the accessibility statement) are settings in the profile, not fixed text in
-  the code.
+- The policy rules live in
+  `apps/syllabusbridge/policy/susop-syllabus-policy-2026-09-28.js`, not in the
+  code. (The roadmap first suggested a `.json` file. The single-file offline
+  version can only carry it as a `.js` file, so the file is JSON data with one
+  line around it.) How to read and update it, in plain language:
+  [policy/README.md](../apps/syllabusbridge/policy/README.md).
+- The report says "Checked against SUSOP Syllabus Policy, updated 2026-09-28.",
+  including when printed. If the profile is missing, the report says so and
+  the policy checks are Not evaluated.
+- When the policy changes, add a new dated profile next to the old one;
+  SyllabusBridge uses the newest. Old printed reports still name theirs.
+- Campus-specific details are settings in the profile (`campus`). The Student
+  Affairs contact named in the accessibility statement is one. It is left blank
+  on purpose (decided 2026-11-11: no staff names in the repository), so any
+  contact is accepted and the report says the contact was not compared. If it
+  is set, only that name is compared; phone and email may be in any form.
+- **Grading scale: confirmed.** The official SUSOP scale was supplied with the
+  QA review (2026-11-11): ≥90 = 4.0; 89–70% go down 0.1 per percent; 69–65%
+  go down 0.2 per percent (69 = 1.8 … 65 = 1.0); ≤64 = 0. (The first draft
+  had inferred 69 = 1.9 … 65 = 1.5, which some syllabi, such as PHA4331, still
+  use; the check now flags them.)
+- **Accessibility statement: confirmed.** The approved wording from the
+  syllabus template was supplied on 2026-11-11 and is stored in the profile.
+  Every part of the 2026-09-28 profile is now confirmed.
 
-### 2. New content checks from the 2026-09-28 policy
+### 2. New content checks from the 2026-09-28 policy — done (unreleased)
+
+They appear in the report under **Policy content**.
 
 | Check | What it compares |
 |---|---|
-| Grading scale | The percent → GPA table matches the official scale (≥90 = 4.0 … ≤64 = 0). |
-| Accessibility statement | Matches the approved wording, apart from the campus-specific parts. |
-| Student engagement | Includes the 10 hours of instruction and 20 hours of outside work per quarter credit hour. |
-| Required hardware and software | Lists ExamSoft (current annual subscription) and a privacy filter. |
-| Library resources | If assignments involve research, the syllabus points to South University Library resources. |
-| Program-wide assessment tools | Mentions ExamSoft, the end-of-course survey, and course-embedded assessments. |
-| Course-specific policies | References the SUSOP Student Handbook and University Handbook policies. |
+| Grading scale | Every row of the percent → GPA table against the official scale (≥90 = 4.0 … ≤64 = 0). A different GPA is an issue; a missing, extra, or unreadable row is a warning. Rows like "≥90", "90–100", "90 and above", "≤64", and side-by-side column pairs are read. |
+| Accessibility statement | Each sentence of the approved wording must appear (capital letters, punctuation, and spacing are ignored). The contact details may differ. If a campus Student Affairs contact is set in the profile, it must be named (it is blank, so not compared). Differing sentences are quoted in the report. |
+| Student engagement | 10 hours of instruction and 20 hours of outside work per quarter credit hour. |
+| Required hardware and software | ExamSoft, a current annual subscription, and a privacy filter. |
+| Library resources | If the syllabus mentions research-type work, it points to South University Library resources. With no research found, the check is Not evaluated, even if the library is mentioned. It reads the editor's current text plus only the parts of the Word file the editor has no copy of, found by where each line came from (every table, and each section the editor holds, including a heading line with text after its colon), so wording deleted in the editor no longer counts. |
+| Program-wide assessment tools | ExamSoft, the end-of-course survey, and course-embedded assessments. |
+| Course-specific policies | The SUSOP Student Handbook and the University Handbook, in Course Specific Policies or its policy subsections. |
 
-Each check follows the existing rule: if SyllabusBridge can't tell, it says
-**Not evaluated** rather than passing.
+- Each check names what it found (with the words around it) and what it did
+  not find. If the section was not found, the check says Not evaluated.
+- Wording checks are warnings, not issues, because a syllabus can say the same
+  thing in other words. Faculty decide.
+- Known limit: SyllabusBridge reads a short line (110 characters or fewer) that
+  contains a heading phrase, such as "quarter credit hour" or "course
+  coordinator", as the start of a new section. A short policy sentence like
+  that can end its section early, and the check then reports Not evaluated or
+  a missing phrase. Changing that is a change to the protected parsing code.
 
-### 3. Jump from a finding to the field
+### QA review with real syllabi (PHA4330, PHA4331) — fixed
 
-- Each finding in the report gets a **"Fix this"** link that opens the editor at
-  the matching field.
-- Edits made from there are automatically labeled "Fix for a finding" and
-  linked to that check (see v2.2 item 3).
+Each has a regression test with synthetic data in
+`e2e/syllabusbridge-policy-checks.spec.js` (tests named "QA: …").
+
+- Grading scale: the official 65–69% values; a third side-by-side column pair
+  with blank headers is read; table boxes in the editor start one line tall.
+- Wording where real syllabi put it: a privacy filter listed under Required
+  Textbooks and Related Materials; "Course-embedded **Learning** Assessments";
+  the handbook sentence anywhere in the syllabus (it often follows a bulleted
+  list SyllabusBridge reads as separate sections); "reasonable and appropriate
+  accommodations" and Disability Services in the accessibility statement.
+- Library: the standard Student Engagement wording ("all research associated
+  with completing assignments") is not read as a research assignment.
+- Schedule (changes to the protected parsing code, reviewed):
+  - The schedule count compares dated entries, not table rows. One row can hold
+    several dates (PHA4330 showed "49 of 12"), and "Week 1" rows hold none
+    (PHA4331 showed "12 entries were not parsed").
+  - "Course coordinator" is a heading only at the start of a line, so "COURSE
+    CALENDAR: …at discretion of course coordinators" is the schedule heading.
+  - A row whose date is "TBD" (PHA4331's final exam) is kept, with the date
+    marked for faculty to fill in, instead of being dropped.
+  - Reopening a project saved before this change keeps that row too. Schedule
+    entries are matched with the project's saved starting point by where they
+    are in the Word file (table, row, line); any entry the project never had is
+    added and named in the status line, and saved edits still line up.
+    Meeting times, which the editor does not edit, come from the newer reading
+    unless the project changed them. CalendarBridge
+    gives that row the date of the row above; that is a separate CalendarBridge
+    issue, not changed here.
+  - Any two days sharing one time ("Tuesday and Thursday 1:30-2:50") make two
+    meeting times; before, only "Mon & Thurs" did.
+
+### 3. Jump from a finding to the field — done (unreleased)
+
+- Each warning or issue in the report that has a matching editor field gets a
+  **Fix this** button (not printed). It opens the structured editor at that
+  field, with the cursor in it.
+- To make this possible, the **Grading scale** table and **Program-wide
+  assessment tools** are now editable in the structured editor. A table with a
+  percent column and a GPA column (for example "Percent | GPA") counts as the
+  grading scale table even when its header doesn't say "% Grade". If the
+  grading scale is in a table the editor can't edit, the suggested action says
+  to correct it in Word and upload again.
+- While fixing, a note at the top of the editor says "Fixing: [check]" and
+  how many changes are linked. Every change made or altered then is linked to
+  that finding (including a change undone and then made again). **Revalidate now** says whether the finding now passes
+  ("Resolved by your edit"). **Revalidate and return to report** goes back;
+  **Stop linking changes** ends linking. Leaving the editor also ends it.
+- **Template instructions and placeholder text** reads the syllabus as it
+  stands now (an edit in the editor resolves it) and says where each
+  placeholder is, for example "(in Absence policy)" or "(in Project /
+  Assignment Rubric, row 2)". Fix this opens the exact box of the first one
+  (table cell, CLO, or schedule row) with the placeholder text selected.
+  Schedule table cells are read from the edited schedule, so an edited or
+  removed schedule row is not evidence for any check. Headings and other text the editor
+  cannot open are still listed, to be changed in the Word file.
+- In the report, a finding that passes and has linked changes shows **Resolved
+  by your edit**. One that still fails says how many changes were made for it.
+- The change summary marks each linked change "Fix for a finding: [check]" and
+  counts them. A fix is still a syllabus edit or a reading correction; the link
+  sits alongside its kind (see v2.2 item 3).
+- Links follow Undo/Redo, are cleared when their change goes away, and are
+  saved in the project file as `changeFindings` (**format version 3**). Format 1
+  and 2 files still open, with no links.
+
+Acceptance criteria (covered by `e2e/syllabusbridge-policy-checks.spec.js` and
+`tests/syllabusbridge-policy.test.mjs`):
+- [x] A syllabus that follows the policy passes all seven checks, and the
+  report (including its printed copy) names the policy and its date.
+- [x] Each failing check says what is missing or different (for example
+  "76% shows 2.5; the official scale is 2.6").
+- [x] Missing sections, a missing grading scale table, and a syllabus without
+  research work are Not evaluated, not passed.
+- [x] Fix this opens the editor with the cursor in the right field; the edit is
+  linked; after revalidating, the finding shows "Resolved by your edit".
+- [x] Links follow Undo/Redo and are saved and restored in project format 3;
+  format 2 projects still open; damaged links are refused.
+- [x] Every profile file is loaded by the page, covers every percent exactly
+  once, and uses valid patterns, section names, and editor fields.
+
+Still to come:
+- Confirm the grading scale and accessibility wording against the official
+  policy (see item 1) and mark them confirmed.
+- Grouping the change summary by finding.
 
 ---
 

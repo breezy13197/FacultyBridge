@@ -65,7 +65,40 @@ What it covers, using synthetic data only:
   syllabus edit by default, "SyllabusBridge misread this" marks a reading
   correction (shown in the summary and report), marking undo/redo, marks
   cleared when their change goes away, and kinds saved in project format 2
-  while format 1 projects still open.
+  (now 3) while format 1 projects still open.
+- `syllabusbridge-policy-checks.spec.js`: SyllabusBridge v2.3 policy content
+  checks: a syllabus that follows the policy passes all seven, each failing
+  check says exactly what is missing or different, checks that can't be made
+  say Not evaluated, the report (and its printed copy) names the policy it
+  checked against, grading scale rows written in other common ways are read,
+  and "Fix this" opens the right field, links the edit to the finding (through
+  Undo/Redo and in project format 3), and shows "Resolved by your edit" after
+  revalidating. Four regression tests from the PR #34 review: wording deleted
+  in the editor no longer counts as library evidence, a fix undone and typed
+  again stays linked, no research means Not evaluated even when the library is
+  mentioned, and a "Percent | GPA" table can be fixed in the editor.
+  Tests named "QA: …" reproduce the PHA4330/PHA4331 QA review with synthetic
+  data: the official 65–69% values and an unlabeled third column pair, wording
+  in the places real syllabi put it, and schedules with several dates per
+  row, week heading rows, a TBD final exam, and "Tuesday and Thursday".
+  Second-round review tests: wording deleted from an inline heading line is
+  not evidence, and wording in both a paragraph and a table counts until both
+  are changed. In `syllabusbridge-project.spec.js`, a project saved by the
+  earlier SyllabusBridge (before TBD rows were read) is reopened and keeps the
+  final exam. Its files, `e2e/data/syllabusbridge/project-saved-before-tbd-rows.json`
+  and `syllabus-with-tbd-final.docx`, are synthetic; the project was saved by
+  the build of `main` at 056eb67 and must not be regenerated with a newer one.
+  Template cleanup tests: Fix this opens the field with the placeholder
+  selected and the edit resolves the finding; the textbooks heading (even
+  misspelled) is not a placeholder, and a table-header placeholder the editor
+  cannot change is still found.
+  Third-round review tests: an edited or removed schedule row is not
+  evidence (library check and template cleanup), and template cleanup's Fix
+  this opens the exact rubric cell (row 2, column 2), the second CLO, and the
+  second schedule row, with the placeholder selected.
+  `syllabusbridge-policy.test.mjs` (Node) checks every dated
+  policy profile file: loaded by the page, a grading scale with no gaps or
+  overlaps, patterns that work, and known section and editor field names.
 - `syllabusbridge-tracked-changes.spec.js`: SyllabusBridge warns about
   unaccepted Word tracked changes (with the Review ▸ Accept All Changes steps),
   shows nothing for a clean file, keeps working, and notes it in the report.
