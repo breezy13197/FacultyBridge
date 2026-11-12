@@ -1075,11 +1075,164 @@ async function trackedChangesIn(file){
 }
 function trackedChangesMessage(t){
  const n=t.changes,p=t.paragraphs;
- return`This syllabus has <strong>${n} unaccepted tracked change${n===1?'':'s'}</strong>${p?` in ${p} paragraph${p===1?'':'s'}`:''}. Word shows them as colored, underlined, or crossed-out text. SyllabusBridge reads the syllabus as if every change were accepted, but saving edits back into Word (coming in a later version) cannot safely change those paragraphs.<br><strong>To clear them:</strong> in Word, open the <strong>Review</strong> tab, choose <strong>Accept ▸ Accept All Changes</strong> (or <strong>Reject ▸ Reject All Changes</strong>), save, and upload the file again. You can also keep working with this file.`
+ return`This syllabus has <strong>${n} unaccepted tracked change${n===1?'':'s'}</strong>${p?` in ${p} paragraph${p===1?'':'s'}`:''}. Word shows them as colored, underlined, or crossed-out text. SyllabusBridge reads the syllabus as if every change were accepted, but <strong>Export edited Word syllabus</strong> cannot safely change those paragraphs; edits there are listed for you to make by hand.<br><strong>To clear them:</strong> in Word, open the <strong>Review</strong> tab, choose <strong>Accept ▸ Accept All Changes</strong> (or <strong>Reject ▸ Reject All Changes</strong>), save, and upload the file again. You can also keep working with this file.`
 }
 function showTrackedChanges(){
  const t=state.trackedChanges,has=!!t?.changes;
  for(const id of ['trackedChangesNotice','reportTrackedChanges']){const el=$(id);if(!el)continue;el.hidden=!has;el.innerHTML=has?trackedChangesMessage(t):''}
+}
+// Word export (v2.5). "Export edited Word syllabus" writes the syllabus edits into a
+// NEW copy of the original Word file, each as a Word tracked change by "SyllabusBridge"
+// that faculty accept or reject in Word. Reading corrections are never written.
+// Each change below says where in the Word file it belongs (docx-export.js explains
+// the target kinds). Anything that can't be placed safely is listed for faculty to
+// make by hand; nothing is dropped silently. The original file is never changed.
+const DOCX_TYPE='application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+let wordExport=null;
+function exportManual(reason){return[{type:'manual',reason}]}
+function lastWordRow(tableIndex){return Math.max(0,(state.rawTables?.[tableIndex]?.length||1)-1)}
+// Where a new table row goes: after the nearest row above it that came from the Word
+// file, or after the table's last row when nothing from the file follows it.
+function exportRowPosition(rows,index,tableIndex,sourceRow){
+ const later=rows.slice(index+1).some(r=>sourceRow(r)!=null);
+ if(!later)return lastWordRow(tableIndex);
+ for(let k=index-1;k>=0;k--){const s=sourceRow(rows[k]);if(s!=null)return s}
+ return 0
+}
+function cellLinesOf(cell){return cell?(cell.lines?.length?[...cell.lines]:[clean(cell.text)]):[]}
+function structuredExportTargets(mu){
+ const t=mu.tableIndex,base=baselineTable(t),cur=canonicalTable(t);
+ const addRow=row=>{
+  const rows=cur?.rows||[],i=rows.indexOf(row);if(!row||i<0)return exportManual('SyllabusBridge could not find this new row in its table.');
+  const n=Math.max(0,...(row.cells||[]).map(c=>(c.columnIndex??0)+1)),cells=Array.from({length:n},(_,ci)=>tableCellValue((row.cells||[]).find(c=>c.columnIndex===ci)));
+  return[{type:'add-row',tableIndex:t,afterRowIndex:exportRowPosition(rows,i,t,r=>r.rowIndex),order:i,id:row.editorRowId,cells}]
+ };
+ if(mu.action==='add-row'||(mu.action==='update-cell'&&mu.sourceRowIndex==null))return addRow((cur?.rows||[]).find(r=>r.editorRowId===mu.editorRowId));
+ if(mu.action==='remove-row'){const cells=[];for(const c of mu.row?.cells||[])cells[c.columnIndex??cells.length]=cellLinesOf(c);return[{type:'delete-row',tableIndex:t,rowIndex:mu.sourceRowIndex,before:Array.from(cells,x=>x||[])}]}
+ const cellIn=table=>((table?.rows||[]).find(r=>r.rowIndex===mu.sourceRowIndex)?.cells||[]).find(c=>c.columnIndex===mu.sourceColumnIndex);
+ const before=cellIn(base),after=cellIn(cur);
+ if(!before||!after)return exportManual('SyllabusBridge could not find this table cell in the Word file.');
+ return[{type:'cell',tableIndex:t,rowIndex:mu.sourceRowIndex,columnIndex:mu.sourceColumnIndex,before:cellLinesOf(before),after:cellLinesOf(after)}]
+}
+const bodyLineIndexes=()=>{const table=new Set(state.tableLineIndexes||[]);return(state.lines||[]).map((_,i)=>i).filter(i=>!table.has(i))};
+function wordExportTargets(key){
+ const b=state.editorBaseline,c=editorSnapshot(),mu=activeStructuredMutations().find(m=>m.key===key);
+ if(mu)return structuredExportTargets(mu);
+ const [section,...rest]=key.split(':'),id=rest.join(':'),lines=state.lines||[];
+ const blankBefore=label=>exportManual(`SyllabusBridge did not read ${label} from the Word file, so there is no place to put the new text. Add it in Word.`);
+ if(section==='course'){
+  const label={code:'a course code',title:'a course title',location:'a location'}[id];
+  if(id==='year')return exportManual('SyllabusBridge works out the year from the file name or the syllabus heading, so it cannot tell which words to change. Change the year by hand in Word.');
+  const from=b.course?.[id],to=c.course?.[id];if(!clean(from))return blankBefore(label);
+  let at=[];
+  if(id==='code'||id==='title'){let i=lines.findIndex(x=>/^[A-Z]{2,5}\s*\d{3,5}\s*[–-]\s*.+/i.test(x));if(i<0)i=lines.findIndex(x=>/^[A-Z]{2,5}\s*\d{3,5}\s+.+/i.test(x));if(i>=0)at=[i]}
+  else{at=lines.slice(0,180).map((l,i)=>/^LOCATION\s*:\s*\S/i.test(clean(l))?i:-1).filter(i=>i>=0).slice(0,1);if(!at.length){const tl=lines.findIndex(x=>/^TIME AND LOCATION\s*:/i.test(clean(x)));if(tl>=0)for(let i=tl;i<=Math.min(lines.length-1,tl+12);i++)at.push(i)}}
+  return[{type:'substitute',lines:at,from,to}]
+ }
+ if(section==='policy'){
+  const range=sectionLineRange({courseEvaluation:'assessment'}[id]||id);
+  return[{type:'lines',start:range?range[0]:0,before:String(b.policies?.[id]??'').split('\n'),after:String(c.policies?.[id]??'').split('\n')}]
+ }
+ if(section==='faculty'){
+  const bf=(b.faculty||[]).find(f=>f.editorId===id),cf=(c.faculty||[]).find(f=>f.editorId===id);
+  if(!bf||!cf)return exportManual('SyllabusBridge cannot add or remove a whole faculty entry in the Word file yet. Make this change by hand in Word.');
+  if((bf.role||'faculty')!==(cf.role||'faculty'))return exportManual('Moving someone between coordinator and course faculty changes where they are listed, which SyllabusBridge cannot do in the Word file yet. Make this change by hand in Word.');
+  const out=[];
+  for(const [k,label] of [['name','a name'],['email','an email address']])if(clean(bf[k])!==clean(cf[k])){if(!clean(bf[k]))return blankBefore(label);out.push({type:'substitute',lines:bodyLineIndexes(),from:bf[k],to:cf[k]})}
+  return out
+ }
+ if(section==='clo'){
+  const bc=cloRows(b).find(x=>x.editorId===id),cc=cloRows(c).find(x=>x.editorId===id);
+  if(!bc||!cc)return exportManual('SyllabusBridge cannot add or remove a whole course learning outcome in the Word file yet. Make this change by hand in Word.');
+  if(JSON.stringify(bc.pslos)!==JSON.stringify(cc.pslos))return exportManual('The PSLO mapping is in the Program Mapping table, which SyllabusBridge does not change in the Word file yet. Make this change by hand in Word.');
+  const r=sectionLineRange('clos'),body=new Set(bodyLineIndexes()),at=[];if(r)for(let i=r[0];i<r[1];i++)if(body.has(i))at.push(i);
+  return[{type:'substitute',lines:at,from:bc.clo,to:cc.clo}]
+ }
+ if(section==='grading'){
+  const bg=(b.grading||[]).find(g=>g.editorId===id),cg=(c.grading||[]).find(g=>g.editorId===id);
+  if(!bg||!cg)return exportManual('SyllabusBridge cannot add or remove a whole grading item in the Word file yet. Make this change by hand in Word.');
+  const x=comparableGrade(bg),y=comparableGrade(cg);
+  if(x.type!==y.type||x.date!==y.date)return exportManual('The type and date of a grading item are worked out by SyllabusBridge (for CalendarBridge); they are not written as such in the Word syllabus. Nothing in the Word file needs to change for them.');
+  const bullet=s=>clean(s).replace(/^[•▪◦\-–—]\s*/,'');
+  for(const [ti,rows] of (state.rawTables||[]).entries())for(const [ri,row] of rows.entries()){
+   if(row.length<2||bullet(row[0]?.text)!==x.label||!(clean(row[1]?.text).match(/\d{1,3}(?:\.\d+)?/g)||[]).map(Number).includes(x.pct))continue;
+   const out=[];if(x.label!==y.label)out.push({type:'cell-substitute',tableIndex:ti,rowIndex:ri,columnIndex:0,from:x.label,to:y.label});
+   if(x.pct!==y.pct)out.push({type:'cell-substitute',tableIndex:ti,rowIndex:ri,columnIndex:1,from:String(x.pct),to:String(y.pct)});
+   return out
+  }
+  return exportManual('SyllabusBridge could not find this grading item as its own row in a Word table, so it cannot place the change. Make it by hand in Word.')
+ }
+ if(section==='schedule'){
+  const be=(b.schedule||[]).find(e=>e.editorId===id),ce=(c.schedule||[]).find(e=>e.editorId===id);
+  if(be&&ce){
+   const src=be.source;if(src?.tableIndex==null||src?.rowIndex==null)return exportManual('SyllabusBridge did not read this schedule entry from a table row, so it cannot place the change. Make it by hand in Word.');
+   const out=[];
+   for(const f of ['date','day','time','topic','faculty']){
+    if(clean(be[f])===clean(ce[f]))continue;
+    const col=src.columnMap?.[f],what={date:'date',day:'day',time:'time',topic:'topic',faculty:'faculty'}[f];
+    if(col==null)return exportManual(`The ${what} for this entry is not in its own column of the schedule table (SyllabusBridge filled it in from elsewhere), so it cannot place the change. Make it by hand in Word.`);
+    const cell=((baselineTable(src.tableIndex)?.rows||[]).find(r=>r.rowIndex===src.rowIndex)?.cells||[]).find(x=>x.columnIndex===col);
+    const cl=cellLinesOf(cell);
+    if(!cl.some(l=>clean(l)))out.push({type:'cell',tableIndex:src.tableIndex,rowIndex:src.rowIndex,columnIndex:col,before:cl,after:[ce[f]]});
+    else out.push({type:'cell-substitute',tableIndex:src.tableIndex,rowIndex:src.rowIndex,columnIndex:col,from:be[f],to:ce[f]})
+   }
+   return out
+  }
+  if(be){
+   const src=be.source;if(src?.tableIndex==null||src?.rowIndex==null)return exportManual('SyllabusBridge did not read this schedule entry from a table row, so it cannot remove it. Remove it by hand in Word.');
+   const same=e=>e.source?.tableIndex===src.tableIndex&&e.source?.rowIndex===src.rowIndex;
+   if((c.schedule||[]).some(same))return exportManual('This table row also holds other schedule entries that you kept, so SyllabusBridge cannot remove only this one. Remove it by hand in Word.');
+   const row=(baselineTable(src.tableIndex)?.rows||[]).find(r=>r.rowIndex===src.rowIndex),cells=[];for(const x of row?.cells||[])cells[x.columnIndex]=cellLinesOf(x);
+   return[{type:'delete-row',tableIndex:src.tableIndex,rowIndex:src.rowIndex,before:Array.from(cells,x=>x||[])}]
+  }
+  if(ce){
+   const sourced=(b.schedule||[]).filter(e=>e.source?.tableIndex!=null),t=primaryCourseScheduleTable()?.tableIndex??sourced[0]?.source.tableIndex;
+   const map=sourced.find(e=>e.source.tableIndex===t)?.source.columnMap;
+   if(t==null||t<0||!map)return exportManual('SyllabusBridge did not find a schedule table in the Word file to add this entry to. Add it by hand in Word.');
+   const n=(state.rawTables?.[t]||[]).reduce((m,r)=>Math.max(m,r.length),0),cells=Array.from({length:n},()=>[]);
+   for(const f of ['date','day','time','topic','faculty']){const col=map[f];if(col!=null&&col<n&&clean(ce[f]))cells[col].push(clean(ce[f]))}
+   const list=c.schedule||[],i=list.indexOf(list.find(e=>e.editorId===id));
+   return[{type:'add-row',tableIndex:t,afterRowIndex:exportRowPosition(list,i,t,e=>e.source?.tableIndex===t?e.source.rowIndex:null),order:i,id,cells:cells.map(x=>x.join(' '))}]
+  }
+ }
+ return exportManual('SyllabusBridge cannot place this kind of edit in the Word file yet. Make it by hand in Word.')
+}
+function wordExportInput(){
+ return{lines:state.lines||[],changes:changeSummary().flatMap(g=>g.items.map(i=>({...i,section:g.section,targets:wordExportTargets(i.key)})))}
+}
+function wordExportName(){return `${String(state.sourceName||'Syllabus.docx').replace(/\.docx$/i,'')||'Syllabus'}-SyllabusBridge-edits.docx`}
+async function buildWordExport(){
+ syncCourseFields();
+ if(!state.sourceBytes)throw new Error('The original Word file is no longer available. Upload it again, then export.');
+ const result=await SyllabusDocxExport.exportDocx(JSZip,SyllabusDocxWriter,state.sourceBytes,wordExportInput(),{tracked:true,author:'SyllabusBridge'});
+ return{...result,name:wordExportName()}
+}
+function renderWordExport(r){
+ const body=$('wordExportBody'),btn=$('downloadWord'),n=r.placed.length,k=r.unplaced.length,m=r.skipped.length,s=x=>x===1?'':'s';
+ const text=v=>v?esc(v).replace(/\n/g,'<br>'):'<span class="muted">(blank)</span>';
+ let html=`<p>SyllabusBridge writes your syllabus edits into a <strong>new copy</strong> of <strong>${esc(state.sourceName)}</strong>, named <strong>${esc(r.name)}</strong>. Each edit appears in Word as a <strong>tracked change</strong> by “SyllabusBridge”. Your original file is not changed.</p><ul class="sb-export-counts">`
+  +`<li><span class="check-icon passed" aria-hidden="true">✓</span> <span><strong>${n} syllabus edit${s(n)}</strong> will be written as tracked changes.</span></li>`
+  +(m?`<li><span class="check-icon not-evaluated" aria-hidden="true">—</span> <span><strong>${m} reading correction${s(m)}</strong> ${m===1?'is':'are'} not written: the Word file was already right there.</span></li>`:'')
+  +(k?`<li><span class="check-icon warning" aria-hidden="true">!</span> <span><strong>${k} syllabus edit${s(k)} could not be placed</strong> safely. Make ${k===1?'it':'them'} by hand in Word (listed below).</span></li>`:'')+'</ul>';
+ if(k)html+=`<section class="sb-export-unplaced" aria-labelledby="wordExportUnplacedTitle"><h3 id="wordExportUnplacedTitle">Make these by hand in Word</h3><div class="ft-table-wrap"><table class="ft-table sb-change-table"><thead><tr><th scope="col">Item</th><th scope="col">Before</th><th scope="col">After</th><th scope="col">Why it was not placed</th></tr></thead><tbody>${r.unplaced.map(({change:c,reason})=>`<tr><td><div class="muted">${esc(c.section)}</div>${esc(c.action)}: ${esc(c.what)}</td><td>${c.action==='Added'?'<span class="muted">(new)</span>':text(c.before)}</td><td>${c.action==='Removed'?'<span class="muted">(removed)</span>':text(c.after)}</td><td>${esc(reason)}</td></tr>`).join('')}</tbody></table></div></section>`;
+ if(state.trackedChanges?.changes)html+=`<div class="notice warning">This syllabus already had ${state.trackedChanges.changes} unaccepted tracked change${s(state.trackedChanges.changes)} from before. SyllabusBridge does not change those paragraphs; edits there are in the list above. They stay in the new copy for you to accept or reject.</div>`;
+ if(n)html+='<p class="muted">Next: open the new file in Word. On the <strong>Review</strong> tab, use <strong>Next</strong> to go through each change and choose <strong>Accept</strong> or <strong>Reject</strong>. Keep your SyllabusBridge project too, in case you want to export again.</p>';
+ else html+=`<div class="notice info">${r.placed.length+k?'None of your syllabus edits could be placed in the Word file, so there is nothing to download. Make the edits listed above by hand in Word.':m?'All your changes are reading corrections, which are never written into the Word file, so there is nothing to download.':'You have not made any syllabus edits yet, so there is nothing to export.'}</div>`;
+ body.innerHTML=html+'<p class="sb-export-done" id="wordExportDone" role="status"></p>';
+ btn.disabled=!n
+}
+async function openWordExport(opener){
+ const body=$('wordExportBody'),btn=$('downloadWord');
+ wordExport=null;btn.disabled=true;body.innerHTML='<p class="muted" role="status">Preparing the edited Word syllabus…</p>';
+ FTDialog.manage($('wordExportDialog')).open(opener);
+ try{wordExport=await buildWordExport();renderWordExport(wordExport)}
+ catch(e){console.error(e);body.innerHTML=`<div class="notice error" role="alert"><strong>The edited Word syllabus could not be made.</strong><br>${esc(e?.message||'Unknown error')}<br>Your edits are still here. Save your SyllabusBridge project, then try again or send a screenshot of this message to the FacultyBridge project owner.</div>`}
+}
+function downloadWordExport(){
+ if(!wordExport?.placed.length)return;
+ downloadText(wordExport.bytes,wordExport.name,DOCX_TYPE);
+ const done=$('wordExportDone'),k=wordExport.unplaced.length;
+ if(done)done.textContent=`Downloaded ${wordExport.name}.${k?` Remember the ${k} edit${k===1?'':'s'} to make by hand, listed above.`:''}`
 }
 // SyllabusBridge project files (v2.2). A project saves the structured editor's
 // work so faculty can close the browser and continue later. It records which
@@ -1230,11 +1383,13 @@ async function applyPendingProject(){
  state.projectNote=notes.join(' ');
  return true
 }
-async function handleFile(file){clearError();resetState();go('upload');if(!file?.name?.toLowerCase().endsWith('.docx')){showError('SyllabusBridge accepts .docx Word syllabi only.');return}showLoading(true,'Reading Word syllabus…',15);try{const fingerprint=await fileFingerprint(file),tracked=await trackedChangesIn(file);await parseDocx(file);promoteGradingScaleTables();state.sourceFingerprint=fingerprint;state.trackedChanges=tracked;showLoading(true,'Extracting syllabus structure…',72);captureEditorBaseline();if(pendingProject&&!await applyPendingProject()){showLoading(false);resetState();go('upload');return}renderReview();showTrackedChanges();if(state.openedProject){const st=$('historyStatus');if(st)st.textContent=state.projectNote||''}showLoading(true,'Extraction complete',100);setTimeout(()=>{showLoading(false);go('review')},180)}catch(e){console.error(e);showLoading(false);if(e instanceof SyllabusFileError)showError(e.message,'Word syllabus could not be read');else showError(`Something went wrong while reading this syllabus. SyllabusBridge v2.1.2.\n\nTechnical detail: ${e?.message||'Unknown error'}\n\nPlease send a screenshot of this message and the syllabus filename to the FacultyBridge project owner.`,'SyllabusBridge encountered an internal error')}}
+async function handleFile(file){clearError();resetState();go('upload');if(!file?.name?.toLowerCase().endsWith('.docx')){showError('SyllabusBridge accepts .docx Word syllabi only.');return}showLoading(true,'Reading Word syllabus…',15);try{const fingerprint=await fileFingerprint(file),tracked=await trackedChangesIn(file);await parseDocx(file);promoteGradingScaleTables();state.sourceFingerprint=fingerprint;state.sourceBytes=await file.arrayBuffer();state.trackedChanges=tracked;showLoading(true,'Extracting syllabus structure…',72);captureEditorBaseline();if(pendingProject&&!await applyPendingProject()){showLoading(false);resetState();go('upload');return}renderReview();showTrackedChanges();if(state.openedProject){const st=$('historyStatus');if(st)st.textContent=state.projectNote||''}showLoading(true,'Extraction complete',100);setTimeout(()=>{showLoading(false);go('review')},180)}catch(e){console.error(e);showLoading(false);if(e instanceof SyllabusFileError)showError(e.message,'Word syllabus could not be read');else showError(`Something went wrong while reading this syllabus. SyllabusBridge v2.1.2.\n\nTechnical detail: ${e?.message||'Unknown error'}\n\nPlease send a screenshot of this message and the syllabus filename to the FacultyBridge project owner.`,'SyllabusBridge encountered an internal error')}}
 $('exportCourseJson').onclick=exportCourseJson;if($('exportCourseJsonReport'))$('exportCourseJsonReport').onclick=exportCourseJson;$('choose').onclick=()=>$('file').click();$('openProject').onclick=()=>$('projectFile').click();$('projectFile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)openProjectFile(f)};$('saveProject').onclick=saveProject;$('saveProjectReport').onclick=saveProject;$('file').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)handleFile(f)};['dragenter','dragover'].forEach(ev=>$('drop').addEventListener(ev,e=>{e.preventDefault();$('drop').classList.add('drag')}));['dragleave','drop'].forEach(ev=>$('drop').addEventListener(ev,e=>{e.preventDefault();$('drop').classList.remove('drag')}));$('drop').addEventListener('drop',e=>e.dataTransfer.files[0]&&handleFile(e.dataTransfer.files[0]));$('runValidation').onclick=()=>{state.reviewComplete=true;syncCourseFields();renderReport();updateEditorStatus();go('report')};document.querySelectorAll('.sb-step').forEach(b=>b.onclick=()=>{if(b.getAttribute('aria-disabled')==='true')return;if(b.dataset.step==='report'){renderReport()}go(b.dataset.step)});const root=document.documentElement;const savedTheme=localStorage.getItem('ft-theme')||'light';root.dataset.theme=savedTheme;root.dataset.ftTheme=savedTheme;$('theme').onclick=()=>{const dark=root.dataset.theme==='dark',next=dark?'light':'dark';root.dataset.theme=next;root.dataset.ftTheme=next;localStorage.setItem('ft-theme',next)};
 // Undo/redo buttons and keyboard shortcuts. Inside a text box, Ctrl+Z / Cmd+Z
 // keeps doing the browser's own typing undo.
 $('undoEdit').onclick=undoEdit;$('redoEdit').onclick=redoEdit;$('reviewChanges').onclick=openChangeSummary;
+// Word export (v2.5): preview what will be written, then download.
+for(const id of ['exportWord','exportWordReport'])if($(id))$(id).onclick=e=>openWordExport(e.currentTarget);$('downloadWord').onclick=downloadWordExport;
 document.addEventListener('keydown',e=>{
  if(!$('screen-review').classList.contains('active')||!(e.ctrlKey||e.metaKey)||e.altKey||typingTarget(e.target)||e.target?.tagName==='SELECT'||document.querySelector('dialog[open]'))return;
  const k=e.key.toLowerCase();

@@ -100,11 +100,14 @@ export async function docxParts(bytes) {
   return out;
 }
 
-// What Word shows after "Accept All Changes": deleted text and paragraphs
-// whose paragraph mark was deleted disappear; inserted text stays.
+// What Word shows after "Accept All Changes": deleted rows, deleted text, and
+// paragraphs whose paragraph mark was deleted disappear; inserted text, rows,
+// and paragraphs stay.
 export function acceptAll(xml) {
   return xml
+    .replace(/<w:tr\b[^>]*>(?:(?!<\/w:tr>)[\s\S])*?<w:trPr>(?:(?!<\/w:trPr>)[\s\S])*?<w:del [^>]*\/>[\s\S]*?<\/w:tr>/g, '')
     .replace(/<w:p\b(?:(?!<\/w:p>)[\s\S])*?<w:pPr>(?:(?!<\/w:pPr>)[\s\S])*?<w:rPr><w:del [^>]*\/>(?:(?!<\/w:p>)[\s\S])*?<\/w:p>/g, '')
+    .replace(/<w:(ins|del) [^>]*\/>/g, '')
     .replace(/<w:del\b[^>]*>[\s\S]*?<\/w:del>/g, '')
     .replace(/<w:ins\b[^>]*>([\s\S]*?)<\/w:ins>/g, '$1');
 }

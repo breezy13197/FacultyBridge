@@ -1,9 +1,9 @@
 'use strict';
-// SyllabusBridge Word write-back prototype (v2.2 round-trip test).
+// SyllabusBridge Word writer (v2.5 "Export edited Word syllabus").
 //
-// Not loaded by index.html and not shipped in the build. It exists so the
-// round-trip tests can show what v2.5 export needs before the v2.2 project file
-// format is fixed. See docs/SYLLABUSBRIDGE-ROUNDTRIP.md.
+// Began as the v2.2 round-trip prototype (docs/SYLLABUSBRIDGE-ROUNDTRIP.md).
+// Since v2.5 the page loads it: docx-export.js turns the editor's syllabus edits
+// into the edits below, and this file writes them into a copy of the Word file.
 //
 // Approach: edits are spliced into the original word/document.xml text. Only
 // the edited paragraph's characters change; every other byte of the file is
@@ -19,8 +19,19 @@
 //   paragraph: { type:'paragraph', paragraphIndex }
 //              position among paragraphs that are direct children of <w:body>,
 //              counting blank paragraphs (the parser's line list skips them).
-// Every edit also carries expectedText, the text originally read at that spot.
+//   row:       { type:'row', tableIndex, rowIndex }  (v2.5 row edits)
+// Every text edit also carries expectedText, the text originally read at that spot.
 // If the file no longer says that, the edit is refused instead of guessed.
+//
+// Kinds of edit (edit.action):
+//   'replace' (default)  newText replaces the paragraph's text; null deletes it.
+//   'insert-after' / 'insert-before'  a new paragraph with newText, next to the
+//        anchor paragraph and formatted like it. keepList:false drops the
+//        anchor's bullet or numbering from the new paragraph.
+//   'delete-row'         removes the table row at a row anchor (expectedText is
+//        the row's text).
+//   'insert-row-after'   adds a row after the row anchor, formatted like it;
+//        cells: one string per cell ("\n" starts a new line in the cell).
 (function (root) {
   const W = 'w:';
   const decode = s => s.replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos);/gi, (m, e) => {
@@ -109,6 +120,9 @@
     return { tree, body, paragraphs, tables };
   }
 
+  function locateRow(model, anchor) {
+    return anchor?.type === 'row' ? model.tables[anchor.tableIndex]?.rows[anchor.rowIndex] || null : null;
+  }
   function locate(model, anchor) {
     if (anchor?.type === 'paragraph') return model.paragraphs[anchor.paragraphIndex] || null;
     if (anchor?.type === 'cell') {
@@ -204,7 +218,8 @@
   // it changes. New text takes the formatting of the first changed character.
   // Paragraph properties (style, bullets/numbering, indentation) and bookmarks
   // are never touched. newText === null deletes the whole paragraph.
-  function rewriteParagraph(xml, p, parts, newText, opts, nextId) {
+  // markIns: also record the paragraph mark as inserted (a new paragraph follows; see applyEdits).
+  function rewriteParagraph(xml, p, parts, newText, opts, nextId, markIns = false) {
     // Positions are counted in whole characters, one per atom. A JavaScript
     // string counts some characters (emoji, rare symbols) as two units, which
     // would shift every position after them.
@@ -288,8 +303,67 @@
         pPrXml = xml.slice(pPr.start, at) + `<w:rPr>${mark}</w:rPr>` + xml.slice(at, pPr.end);
       }
     }
+    if (markIns && !remove) pPrXml = pPrWithMark(pPrXml, `<w:ins ${stamp()}/>`);
     const open = xml.slice(p.start, p.openEnd).replace(/\/>$/, '>');
     return `${open}${pPrXml}${body}</w:p>`;
+  }
+
+  // Properties copied from existing content for new content. Tracked-change
+  // records, page-layout sections, and earlier formatting changes are left out:
+  // they belong to the original, not to the copy.
+  const copyProps = x => String(x || '')
+    .replace(/<w:(pPrChange|rPrChange|tcPrChange|trPrChange|sectPr)\b[^>]*\/>/g, '')
+    .replace(/<w:(pPrChange|rPrChange|tcPrChange|trPrChange|sectPr)\b[\s\S]*?<\/w:\1>/g, '')
+    .replace(/<w:(ins|del|moveFrom|moveTo|cellIns|cellDel|cellMerge)\b[^>]*\/>/g, '');
+  // Paragraph properties with the paragraph mark recorded as a tracked change.
+  // In the paragraph mark's <w:rPr>, <w:ins>/<w:del> come first.
+  function pPrWithMark(pPrXml, mark) {
+    if (!mark) return pPrXml;
+    if (!pPrXml || /^<w:pPr\s*\/>$/.test(pPrXml)) return `<w:pPr><w:rPr>${mark}</w:rPr></w:pPr>`;
+    if (/<w:rPr\s*\/>/.test(pPrXml)) return pPrXml.replace(/<w:rPr\s*\/>/, `<w:rPr>${mark}</w:rPr>`);
+    if (/<w:rPr>/.test(pPrXml)) return pPrXml.replace(/<w:rPr>/, `<w:rPr>${mark}`);
+    if (/<w:rPr\s[^>]*>/.test(pPrXml)) return pPrXml.replace(/(<w:rPr\s[^>]*>)/, `$1${mark}`);
+    // <w:rPr> goes before <w:sectPr> and <w:pPrChange>, if the paragraph has them.
+    const at = pPrXml.search(/<w:(sectPr|pPrChange)\b/);
+    return at >= 0 ? pPrXml.slice(0, at) + `<w:rPr>${mark}</w:rPr>` + pPrXml.slice(at) : pPrXml.replace(/<\/w:pPr>$/, `<w:rPr>${mark}</w:rPr></w:pPr>`);
+  }
+  // A new paragraph formatted like `model` (an existing paragraph node).
+  // markOwn (tracked mode): record this paragraph's own mark as inserted.
+  function newParagraph(xml, model, text, opts, nextId, { keepList = true, runFrom = 'first', markOwn = true } = {}) {
+    const stamp = () => `w:id="${nextId()}" w:author="${encodeAttr(opts.author)}" w:date="${encodeAttr(opts.date)}"`;
+    const pPr = model && find(model, W + 'pPr');
+    let pPrXml = copyProps(pPr ? raw(xml, pPr) : '');
+    if (!keepList) pPrXml = pPrXml.replace(/<w:numPr\b[\s\S]*?<\/w:numPr>|<w:numPr\b[^>]*\/>/g, '');
+    if (/^<w:pPr>\s*<\/w:pPr>$/.test(pPrXml)) pPrXml = '';
+    const runs = model ? kids(model, W + 'r').filter(r => r.children.some(c => c.name === W + 't')) : [];
+    const run = runFrom === 'last' ? runs.at(-1) : runs[0];
+    const rPr = run && find(run, W + 'rPr');
+    const rPrXml = copyProps(rPr ? raw(xml, rPr) : '');
+    const content = String(text ?? '') === '' ? '' : `<w:r>${rPrXml}${textContent(text)}</w:r>`;
+    const body = content && opts.tracked ? `<w:ins ${stamp()}>${content}</w:ins>` : content;
+    return `<w:p>${opts.tracked && markOwn ? pPrWithMark(pPrXml, `<w:ins ${stamp()}/>`) : pPrXml}${body}</w:p>`;
+  }
+  // Row properties with the row recorded as inserted or deleted.
+  function trWithMark(xml, tr, mark) {
+    const trPr = find(tr, W + 'trPr');
+    if (!trPr) {
+      const ex = find(tr, W + 'tblPrEx');
+      const at = ex ? ex.end : tr.openEnd;
+      return { at, end: at, text: `<w:trPr>${mark}</w:trPr>` };
+    }
+    if (trPr.innerEnd === trPr.innerStart && raw(xml, trPr).endsWith('/>')) return { at: trPr.start, end: trPr.end, text: `<w:trPr>${mark}</w:trPr>` };
+    const change = find(trPr, W + 'trPrChange');
+    const at = change ? change.start : trPr.innerEnd;
+    return { at, end: at, text: mark };
+  }
+  // Apply replacements [{at, end, text}] to the span [start, end) of xml.
+  function spliceSpan(xml, start, end, reps) {
+    let out = xml.slice(start, end);
+    for (const r of [...reps].sort((a, b) => b.at - a.at || b.end - a.end)) out = out.slice(0, r.at - start) + r.text + out.slice(r.end - start);
+    return out;
+  }
+  function rowText(xml, row) {
+    return row.cells.map(c => c.paragraphs.map(p => paragraphText(xml, p)).join('\n')).join('\n');
   }
 
   // Text fingerprint used to confirm an edit still points at the right place.
@@ -298,9 +372,9 @@
   const fingerprint = s => String(s ?? '').replace(/\s+/g, '');
 
   // Apply edits to word/document.xml text.
-  // edits: [{ id?, anchor, expectedText, newText }]  (newText null = delete paragraph)
-  //        expectedText is the paragraph's text as stored in Word, without
-  //        automatic bullet or list numbers (Word adds those when it displays).
+  // edits: [{ id?, anchor, action?, expectedText, newText, keepList?, cells? }]
+  //        (see "Kinds of edit" at the top). expectedText is the text as stored
+  //        in Word, without automatic bullet or list numbers.
   // opts:  { tracked: boolean, author, date }
   // Returns { xml, applied, unchanged, refused: [{ edit, reason }] }.
   function applyEdits(xml, edits, opts = {}) {
@@ -311,14 +385,76 @@
     let maxId = 0;
     for (const m of xml.matchAll(/\sw:id="(-?\d+)"/g)) maxId = Math.max(maxId, +m[1]);
     const nextId = () => ++maxId;
+    // Two edits may not change the same part of the file. New paragraphs and
+    // rows go between existing ones, so they only clash with a change that
+    // replaces the content around them.
+    const clash = (start, end) => splices.some(s => (end > start && s.end > s.start) ? start < s.end && s.start < end
+      : end === start ? s.start < start && start < s.end : s.start > start && s.start < end);
+    const add = (edit, start, end, render, extra = {}) => {
+      if (clash(start, end)) { refuse(edit, 'Another edit already changes this part of the Word file (for example, its table row is being removed).'); return null; }
+      const s = { start, end, edit, render, order: splices.length, ...extra };
+      splices.push(s);
+      return s;
+    };
     for (const edit of edits) {
+      const action = edit.action || 'replace';
+      if (action === 'delete-row' || action === 'insert-row-after') {
+        const row = locateRow(model, edit.anchor);
+        if (!row) { refuse(edit, 'The table row no longer exists in this Word file.'); continue; }
+        const trPr = find(row.node, W + 'trPr');
+        if (trPr && descendants(trPr).some(n => /^w:(ins|del)$/.test(n.name))) { refuse(edit, 'This table row already has unaccepted tracked changes, so the edit must be made by hand in Word.'); continue; }
+        if (row.node.children.some(c => c.name !== W + 'tc' && c.name !== W + 'trPr' && c.name !== W + 'tblPrEx')) { refuse(edit, 'This table row contains a content control or other special markup, so the edit must be made by hand in Word.'); continue; }
+        if (action === 'delete-row') {
+          if (fingerprint(rowText(xml, row)) !== fingerprint(edit.expectedText)) { refuse(edit, 'The text in this table row is not what SyllabusBridge originally read, so the row was not removed.'); continue; }
+          const table = model.tables[edit.anchor.tableIndex];
+          if (table.rows.length < 2) { refuse(edit, 'Word requires a table to keep at least one row; delete the whole table in Word instead.'); continue; }
+          let why = '';
+          for (const c of row.cells) for (const p of c.paragraphs) why = why || unsafeReason(p) || paragraphAtoms(xml, p).unsafe || '';
+          if (why) { refuse(edit, `This table row ${why}, so it must be removed by hand in Word.`); continue; }
+          if (row.cells.some(c => descendants(c.node).some(n => n.name === W + 'tbl'))) { refuse(edit, 'This table row holds another table, so it must be removed by hand in Word.'); continue; }
+          add(edit, row.node.start, row.node.end, () => {
+            if (!options.tracked) return '';
+            // Like Word: the row, its text, and each paragraph mark in it are marked deleted.
+            const reps = [];
+            for (const c of row.cells) for (const p of c.paragraphs) reps.push({ at: p.start, end: p.end, text: rewriteParagraph(xml, p, paragraphAtoms(xml, p), null, options, nextId) });
+            const m = trWithMark(xml, row.node, `<w:del w:id="${nextId()}" w:author="${encodeAttr(options.author)}" w:date="${encodeAttr(options.date)}"/>`);
+            reps.push(m);
+            return spliceSpan(xml, row.node.start, row.node.end, reps);
+          });
+        } else {
+          const cells = (edit.cells || []).map(x => String(x ?? ''));
+          if (cells.length > row.cells.length) { refuse(edit, 'The new row has more columns than the table row it would copy, so it must be added by hand in Word.'); continue; }
+          if (row.cells.some(c => { const tcPr = find(c.node, W + 'tcPr'); return tcPr && descendants(tcPr).some(n => n.name === W + 'vMerge'); })) { refuse(edit, 'The table row next to it has merged cells, so the new row must be added by hand in Word.'); continue; }
+          add(edit, row.node.end, row.node.end, () => {
+            const stamp = () => `w:id="${nextId()}" w:author="${encodeAttr(options.author)}" w:date="${encodeAttr(options.date)}"`;
+            const ex = find(row.node, W + 'tblPrEx'), trPr = find(row.node, W + 'trPr');
+            let trPrXml = copyProps(trPr ? raw(xml, trPr) : '');
+            if (/^<w:trPr\s*\/>$|^<w:trPr>\s*<\/w:trPr>$/.test(trPrXml)) trPrXml = '';
+            if (options.tracked) trPrXml = trPrXml ? trPrXml.replace(/<\/w:trPr>$/, `<w:ins ${stamp()}/></w:trPr>`) : `<w:trPr><w:ins ${stamp()}/></w:trPr>`;
+            const tcs = row.cells.map((c, i) => {
+              const tcPr = find(c.node, W + 'tcPr');
+              const lines = String(cells[i] ?? '').split('\n');
+              const model0 = c.paragraphs[0];
+              const ps = lines.map(line => newParagraph(xml, model0, line, options, nextId, { keepList: false }));
+              return `<w:tc>${copyProps(tcPr ? raw(xml, tcPr) : '')}${ps.join('')}</w:tc>`;
+            });
+            return `<w:tr>${ex ? raw(xml, ex) : ''}${trPrXml}${tcs.join('')}</w:tr>`;
+          });
+        }
+        continue;
+      }
       const p = locate(model, edit.anchor);
       if (!p) { refuse(edit, 'The location no longer exists in this Word file.'); continue; }
-      if (seen.has(p.start)) { refuse(edit, 'Another edit already changes this paragraph.'); continue; }
       if (fingerprint(paragraphText(xml, p)) !== fingerprint(edit.expectedText)) {
         refuse(edit, 'The text at this location is not what SyllabusBridge originally read, so the edit was not placed.');
         continue;
       }
+      if (action === 'insert-after' || action === 'insert-before') {
+        const at = action === 'insert-after' ? p.end : p.start;
+        const s = add(edit, at, at, () => newParagraph(xml, p, edit.newText, options, nextId, { keepList: edit.keepList !== false, runFrom: action === 'insert-after' ? 'last' : 'first', markOwn: s.markOwn !== false }), { after: action === 'insert-after' ? p : null });
+        continue;
+      }
+      if (seen.has(p.start)) { refuse(edit, 'Another edit already changes this paragraph.'); continue; }
       const why = unsafeReason(p);
       if (why) { refuse(edit, `This paragraph ${why}, so the edit must be made by hand in Word.`); continue; }
       const parts = paragraphAtoms(xml, p);
@@ -338,20 +474,45 @@
           continue;
         }
       }
-      seen.add(p.start);
-      splices.push({ start: p.start, end: p.end, edit, p, parts });
+      const s = add(edit, p.start, p.end, () => rewriteParagraph(xml, p, parts, edit.newText, options, nextId, !!s.markIns), { replaces: p });
+      if (s) seen.add(p.start);
+    }
+    // New paragraphs after an existing one, recorded the way Word records pressing
+    // Enter at the end of it and typing: the existing paragraph's mark and each new
+    // one's except the last are "inserted". Rejecting them in Word then gives back
+    // exactly the original paragraph (otherwise some programs join it to the next).
+    // A paragraph that is itself being deleted, or whose mark already carries a
+    // tracked change, keeps the simpler form: each new paragraph's own mark.
+    if (options.tracked) {
+      const groups = new Map();
+      for (const s of splices) if (s.after) { if (!groups.has(s.after)) groups.set(s.after, []); groups.get(s.after).push(s); }
+      for (const [p, group] of groups) {
+        const replace = splices.find(s => s.replaces === p);
+        const pPr = find(p, W + 'pPr'), pRPr = pPr && find(pPr, W + 'rPr');
+        if (replace?.edit.newText === null || (pRPr && descendants(pRPr).some(n => /^w:(ins|del|moveFrom|moveTo)$/.test(n.name)))) continue;
+        group.forEach((s, i) => { s.markOwn = i < group.length - 1; });
+        if (replace) replace.markIns = true;
+        else splices.push({ start: p.start, end: p.end, edit: group[0].edit, order: splices.length, mark: true, render: () => {
+          const stamp = `<w:ins w:id="${nextId()}" w:author="${encodeAttr(options.author)}" w:date="${encodeAttr(options.date)}"/>`;
+          const open = xml.slice(p.start, p.openEnd).replace(/\/>$/, '>');
+          return `${open}${pPrWithMark(pPr ? raw(xml, pPr) : '', stamp)}${p.children.filter(c => c !== pPr).map(c => raw(xml, c)).join('')}</w:p>`;
+        } });
+      }
     }
     // Render in document order (so tracked-change ids read in order), then
     // splice from the end of the file backwards so earlier positions stay valid.
-    splices.sort((a, b) => a.start - b.start);
-    for (const s of splices) s.out = rewriteParagraph(xml, s.p, s.parts, s.edit.newText, options, nextId);
+    // At one position: content being replaced goes first, then new paragraphs or
+    // rows, so the first one asked for comes first in the file.
+    splices.sort((a, b) => a.start - b.start || a.order - b.order);
+    for (const s of splices) s.out = s.render();
     let out = xml;
-    for (let k = splices.length - 1; k >= 0; k--) {
-      const s = splices[k];
+    const backwards = [...splices].sort((a, b) => b.start - a.start || (b.end - b.start) - (a.end - a.start) || b.order - a.order);
+    for (const s of backwards) {
       if (s.out === null) continue;
       out = out.slice(0, s.start) + s.out + out.slice(s.end);
     }
-    for (const s of splices) (s.out === null ? unchanged : applied).push(s.edit);
+    const done = new Set(splices.filter(s => !s.mark).map(s => s.edit));
+    for (const edit of edits) if (done.has(edit)) (splices.find(s => s.edit === edit && !s.mark).out === null ? unchanged : applied).push(edit);
     return { xml: out, applied, unchanged, refused };
   }
 
@@ -369,5 +530,5 @@
     return { bytes: out, applied: result.applied, unchanged: result.unchanged, refused: result.refused };
   }
 
-  root.SyllabusDocxWriter = { parseTree, documentModel, paragraphText, locate, applyEdits, writeDocx };
+  root.SyllabusDocxWriter = { parseTree, documentModel, paragraphText, locate, locateRow, rowText, applyEdits, writeDocx };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

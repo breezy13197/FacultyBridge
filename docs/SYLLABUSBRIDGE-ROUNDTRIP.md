@@ -2,6 +2,14 @@
 
 Status: **done**. Roadmap item: [v2.2 item 5](SYLLABUSBRIDGE-ROADMAP.md#5-word-round-trip-test-groundwork-for-v25).
 
+> **Update (v2.5):** the prototype writer is now part of SyllabusBridge's
+> "Export edited Word syllabus" and is loaded by the page and included in the
+> build. It also adds and removes table rows and adds new paragraphs, all as
+> tracked changes. Instead of the parser recording paragraph numbers (finding
+> 4), the export reads the original Word file again the same way the parser
+> does, so the parser did not change. See the
+> [v2.5 section of the roadmap](SYLLABUSBRIDGE-ROADMAP.md#v25--export-an-edited-word-syllabus--done-unreleased).
+
 ## Why this test exists
 
 In v2.5, SyllabusBridge will write faculty edits back into their Word syllabus.
@@ -132,7 +140,7 @@ reason, ready for v2.5's "couldn't place" list.
 
 - **Open the exported files in Microsoft Word** (desktop and web), in both
   modes, and accept all changes. Required before v2.5 ships.
-- Adding and removing table rows (roadmap v2.5, stage 2).
+- ~~Adding and removing table rows~~: done in v2.5.
 - One edit that spans several paragraphs (for example a multi-paragraph course
   description).
 - Editing text that already has unaccepted tracked changes. The current answer
@@ -143,9 +151,11 @@ reason, ready for v2.5's "couldn't place" list.
 
 | File | What it is |
 |---|---|
-| `apps/syllabusbridge/docx-writeback.js` | The prototype writer. Not loaded by the app and not in the build. |
+| `apps/syllabusbridge/docx-writeback.js` | The writer. Since v2.5 it is loaded by the app and is in the build. |
+| `apps/syllabusbridge/docx-export.js` | v2.5: decides where each syllabus edit goes in the Word file. |
 | `tests/helpers/syllabus-docx.mjs` | Builds the synthetic test syllabus. All names and values are made up; its structure copies the template's tricky features. |
-| `tests/syllabusbridge-writeback.test.mjs` | 12 round-trip tests. They run with the other Node tests in `npm test` (part of `npm run check`). |
+| `tests/syllabusbridge-export.test.mjs` | v2.5 export tests (placing, refusing, rows, new paragraphs). |
+| `tests/syllabusbridge-writeback.test.mjs` | 15 round-trip tests. They run with the other Node tests in `npm test` (part of `npm run check`). |
 | `e2e/syllabusbridge-writeback.spec.js` | Uploads edited files into SyllabusBridge, in all three browsers and both builds. Part of `npm run test:e2e`. |
 
 To run just the round-trip tests from the repository folder:
