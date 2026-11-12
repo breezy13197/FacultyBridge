@@ -350,8 +350,11 @@ Each has a regression test with synthetic data in
   **Stop linking changes** ends linking. Leaving the editor also ends it.
 - **Template instructions and placeholder text** reads the syllabus as it
   stands now (an edit in the editor resolves it) and says where each
-  placeholder is, for example "(in Absence policy)". Fix this opens the first
-  one with the placeholder text selected. Headings and other text the editor
+  placeholder is, for example "(in Absence policy)" or "(in Project /
+  Assignment Rubric, row 2)". Fix this opens the exact box of the first one
+  (table cell, CLO, or schedule row) with the placeholder text selected.
+  Schedule table cells are read from the edited schedule, so an edited or
+  removed schedule row is not evidence for any check. Headings and other text the editor
   cannot open are still listed, to be changed in the Word file.
 - In the report, a finding that passes and has linked changes shows **Resolved
   by your edit**. One that still fails says how many changes were made for it.

@@ -92,6 +92,10 @@ What it covers, using synthetic data only:
   selected and the edit resolves the finding; the textbooks heading (even
   misspelled) is not a placeholder, and a table-header placeholder the editor
   cannot change is still found.
+  Third-round review tests: an edited or removed schedule row is not
+  evidence (library check and template cleanup), and template cleanup's Fix
+  this opens the exact rubric cell (row 2, column 2), the second CLO, and the
+  second schedule row, with the placeholder selected.
   `syllabusbridge-policy.test.mjs` (Node) checks every dated
   policy profile file: loaded by the page, a grading scale with no gaps or
   overlaps, patterns that work, and known section and editor field names.

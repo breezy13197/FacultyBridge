@@ -438,3 +438,76 @@ test('template cleanup: the textbooks heading is not a placeholder; Word-only pl
   await expect(finding).toContainText('must be changed in the Word file');
   await expect(finding.locator('.sb-fix')).toHaveCount(0);
 });
+
+// Review findings, round 3. Each failed before its fix.
+const withSchedule = (rows, overrides = {}, extra = []) => [...syllabus(overrides).map(x => Array.isArray(x) && x[0][0] === 'Date' ? [['Date', 'Time', 'Topic', 'Faculty'], ...rows] : x), ...extra];
+const libraryRows = [['9/21/2026', '9:00 AM - 10:00 AM', 'Proteins', 'Dr. Ada Faculty'],
+  ['9/23/2026', '9:00 AM - 10:00 AM', 'Use South University Library for the research paper', 'Dr. Ada Faculty'],
+  ['9/28/2026', '9:00 AM - 10:00 AM', 'Hemoglobin', 'Dr. Ada Faculty']];
+
+test('an edited schedule topic is evidence, not the table text it replaced', async ({ page, openTool }) => {
+  await openTool('syllabusbridge');
+  await upload(page, { name: 's.docx', mimeType: DOCX_MIME, buffer: await syntheticDocxBody(withSchedule(libraryRows, { materials: 'Bring a calculator.' })) });
+  const topic = page.locator('#scheduleBody .s-topic').nth(1);
+  await expect(topic).toHaveValue('Use South University Library for the research paper');
+  await topic.fill('Complete the research paper using PubMed.');
+  await topic.press('Tab');
+  await report(page);
+  expect((await policyStatuses(page))['policy-library']).toBe('warning');
+  await expect(card(page, 'policy-library')).not.toContainText('Use South University Library');
+});
+
+test('a removed schedule row is not evidence', async ({ page, openTool }) => {
+  await openTool('syllabusbridge');
+  await upload(page, { name: 's.docx', mimeType: DOCX_MIME, buffer: await syntheticDocxBody(withSchedule(libraryRows, { materials: 'Bring a calculator.' })) });
+  await page.locator('#scheduleBody tr').nth(1).locator('.sb-mini-remove').click();
+  await report(page);
+  // With that row gone there is no research assignment, and no library reference.
+  expect((await policyStatuses(page))['policy-library']).toBe('not-evaluated');
+  await expect(card(page, 'policy-library')).not.toContainText('Use South University Library');
+});
+
+test('template cleanup follows schedule edits and removals', async ({ page, openTool }) => {
+  const rows = [['9/21/2026', '9:00 AM - 10:00 AM', 'Proteins', 'Dr. Ada Faculty'],
+    ['9/23/2026', '9:00 AM - 10:00 AM', 'Insert text for this topic', 'Dr. Ada Faculty'],
+    ['9/28/2026', '9:00 AM - 10:00 AM', 'Insert text for this topic too', 'Dr. Ada Faculty']];
+  await openTool('syllabusbridge');
+  await upload(page, { name: 's.docx', mimeType: DOCX_MIME, buffer: await syntheticDocxBody(withSchedule(rows)) });
+  await page.locator('#scheduleBody .s-topic').nth(1).fill('Enzymes');
+  await page.locator('#scheduleBody .s-topic').nth(1).press('Tab');
+  await page.locator('#scheduleBody tr').nth(2).locator('.sb-mini-remove').click();
+  await report(page);
+  expect(await page.evaluate(() => state.results.find(r => r.id === 'template-cleanup').status)).toBe('passed');
+});
+
+test('template cleanup Fix this opens the exact cell, CLO, and schedule row, with the placeholder selected', async ({ page, openTool }) => {
+  const rows = [['9/21/2026', '9:00 AM - 10:00 AM', 'Proteins', 'Dr. Ada Faculty'],
+    ['9/23/2026', '9:00 AM - 10:00 AM', 'Insert text for this topic', 'Dr. Ada Faculty']];
+  const body = withSchedule(rows, {}, ['Project rubric', [['Component', 'Points'], ['Exam', '50'], ['Project', 'Copy and paste the rubric points here']]]);
+  body.splice(3, 0, 'COURSE LEARNING OUTCOMES:', 'CLO1 - Describe the structure of proteins and enzymes.', 'CLO2 - Insert text describing the second outcome here.');
+  await openTool('syllabusbridge');
+  await upload(page, { name: 'targets.docx', mimeType: DOCX_MIME, buffer: await syntheticDocxBody(body) });
+  const selected = async () => page.evaluate(() => { const t = document.activeElement; return [t.className, t.value.slice(t.selectionStart, t.selectionEnd)]; });
+  const fixNext = async () => { await report(page); await card(page, 'template-cleanup').getByRole('button', { name: /^Fix this/ }).click(); };
+  // 1. Rubric: row 2, column 2.
+  await fixNext();
+  const rubricCell = page.locator('.sb-structured-editor').filter({ hasText: 'Project / Assignment Rubric' }).locator('tbody tr').nth(1).locator('textarea').nth(1);
+  await expect(rubricCell).toBeFocused();
+  expect((await selected())[1]).toBe('Copy and paste');
+  await rubricCell.fill('50');
+  await rubricCell.press('Tab');
+  // 2. Second CLO.
+  await fixNext();
+  await expect(page.locator('#review-clos .clo-text').nth(1)).toBeFocused();
+  expect((await selected())[1]).toBe('Insert text');
+  await page.locator('#review-clos .clo-text').nth(1).fill('Explain how enzymes speed up reactions.');
+  await page.locator('#review-clos .clo-text').nth(1).press('Tab');
+  // 3. Second schedule row.
+  await fixNext();
+  await expect(page.locator('#scheduleBody .s-topic').nth(1)).toBeFocused();
+  expect((await selected())[1]).toBe('Insert text');
+  await page.locator('#scheduleBody .s-topic').nth(1).fill('Enzymes');
+  await page.locator('#scheduleBody .s-topic').nth(1).press('Tab');
+  await report(page);
+  expect(await page.evaluate(() => state.results.find(r => r.id === 'template-cleanup').status)).toBe('passed');
+});

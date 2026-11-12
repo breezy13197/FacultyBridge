@@ -319,9 +319,19 @@ const POLICY_UNCONFIRMED=' Note: this part of the policy profile has not yet bee
 // The syllabus as it stands now: the editor's current text, plus only those
 // lines from the Word file that the editor holds no copy of. Text faculty
 // deleted or replaced in the editor is never used as evidence.
+// Schedule edits change the schedule (state.schedule), not the table it was read from,
+// so those table cells are stale copies. A cell the schedule was read from (its date,
+// day, time, topic, and faculty columns) is represented by the schedule entry instead,
+// and every cell of a row whose schedule entries were all removed is left out.
+function scheduleTableCellSkipped(){
+ const base=state.editorBaseline?.schedule||[],now=new Set((state.schedule||[]).map(e=>e.source&&`${e.source.tableIndex}:${e.source.rowIndex}`).filter(Boolean)),cells=new Set,rows=new Set;
+ for(const e of base){const s=e.source;if(!s||s.tableIndex==null||s.rowIndex==null)continue;const row=`${s.tableIndex}:${s.rowIndex}`;for(const col of Object.values(s.columnMap||{}))if(col!=null)cells.add(`${row}:${col}`);if(!now.has(row))rows.add(row)}
+ return(t,r,c)=>rows.has(`${t}:${r}`)||cells.has(`${t}:${r}:${c}`)
+}
 function editorTextParts(snap,ignore=[]){
- const tables=(snap.structuredTables||[]).flatMap(t=>[...(t.headers||[]),...(t.rows||[]).flatMap(r=>(r.cells||[]).flatMap(c=>[c.text,...(c.lines||[])]))]);
- return [...Object.entries(snap.policies||{}).filter(([k,v])=>typeof v==='string'&&!ignore.includes(k)).map(([,v])=>v),...tables,...(snap.grading||[]).map(g=>g.label),...(snap.schedule||[]).map(e=>e.topic),...(snap.clos||[])]
+ const skip=scheduleTableCellSkipped();
+ const tables=(snap.structuredTables||[]).flatMap(t=>[...(t.headers||[]),...(t.rows||[]).flatMap(r=>(r.cells||[]).filter(c=>!skip(t.tableIndex,r.rowIndex,c.columnIndex)).flatMap(c=>[c.text,...(c.lines||[])]))]);
+ return [...Object.entries(snap.policies||{}).filter(([k,v])=>typeof v==='string'&&!ignore.includes(k)).map(([,v])=>v),...tables,...(snap.grading||[]).map(g=>g.label),...(snap.schedule||[]).flatMap(e=>[e.topic,e.faculty]),...(snap.clos||[])]
 }
 // The lines of the Word file a section's editor text was read from: the heading
 // line (which can carry text after its colon) up to the next section, as in sectionText().
@@ -461,13 +471,22 @@ function templatePlaceholders(placeholders){
  const tableIdx=new Set(state.tableLineIndexes||[]),tableTextIn=k=>{const r=sectionLineRange(k==='courseEvaluation'?'assessment':k),out=new Set;if(r)for(let i=r[0];i<r[1];i++)if(tableIdx.has(i))out.add(norm(state.lines[i]));return out};
  for(const [k,v] of Object.entries(state.policies||{}))if(typeof v==='string'){const inTables=tableTextIn(k);for(const l of v.split(/\n+/))if(!inTables.has(norm(l)))add(l,label(k),k==='courseEvaluation'?{anchor:'review-assessments',focus:['#courseEvaluationText']}:card(k))}
  for(const t of state.structuredTables||[]){
-  const editable=editableStructuredTables().includes(t),where=editable?structuredTableTitle(t.type):'a table',fixAt=editable?{anchor:`review-structured-${t.tableIndex}`,focus:[`#review-structured-${t.tableIndex} textarea`]}:null;
-  for(const h of t.headers||[])add(h,where,null);
-  for(const row of t.rows||[])for(const c of row.cells||[])for(const l of (c.lines?.length?c.lines:[c.text]))add(l,where,fixAt)
+  const editable=editableStructuredTables().includes(t),title=editable?structuredTableTitle(t.type):'a table',skip=scheduleTableCellSkipped();
+  for(const h of t.headers||[])add(h,title,null);
+  // The exact box: the row (by its source row or editor row id) and the column.
+  const model=editable?structuredDisplayModel(t):null;
+  for(const row of t.rows||[]){
+   const shown=model?model.rows.indexOf(row):-1,rowId=row.editorRowId||`source-${t.tableIndex}-${row.rowIndex}`;
+   for(const c of row.cells||[]){
+    if(skip(t.tableIndex,row.rowIndex,c.columnIndex))continue;
+    const fixAt=editable&&shown>=0?{anchor:`review-structured-${t.tableIndex}`,focus:[`#review-structured-${t.tableIndex} tr[data-editor-row-id="${rowId}"] textarea[data-col="${c.columnIndex}"]`]}:null;
+    for(const l of (c.lines?.length?c.lines:[c.text]))add(l,shown>=0?`${title}, row ${shown+1}`:title,fixAt)
+   }
+  }
  }
  for(const [f,lab] of [['code','Course code'],['title','Course title'],['year','Year'],['location','Location']])add(state.course?.[f],lab,{anchor:'review-course-info',focus:['#course'+f[0].toUpperCase()+f.slice(1)]});
- (state.clos||[]).forEach(c=>add(c,'Course learning outcomes',{anchor:'review-clos',focus:['#review-clos .clo-text']}));
- (state.schedule||[]).forEach(e=>add(e.topic,'Course schedule',{anchor:'review-schedule',focus:['#scheduleBody .s-topic']}));
+ (state.clos||[]).forEach((c,i)=>add(c,`Course learning outcomes, ${(c.match(/\bCL?O\s*[-–—]?\s*\d+/i)||[`outcome ${i+1}`])[0]}`,{anchor:'review-clos',focus:[`#review-clos .clo-text@${i}`]}));
+ (state.schedule||[]).forEach((e,i)=>{const where=`Course schedule, ${clean(e.date)||`row ${i+1}`}`;add(e.topic,where,{anchor:'review-schedule',focus:[`#scheduleBody .s-topic@${i}`]});add(e.faculty,where,{anchor:'review-schedule',focus:[`#scheduleBody .s-faculty@${i}`]})});
  const covered=editorCoveredLines();
  (state.lines||[]).forEach((l,i)=>{if(!covered.has(i))add(l,'',null)});
  // Heading labels (the words before a colon) stay in the Word file whatever the editor holds.
@@ -1011,7 +1030,9 @@ function startFix(id){
  state.activeFix={id:r.id,title:r.title,start:fixSignatures()};showFixContext();
  document.querySelectorAll('.sb-fix-target').forEach(x=>x.classList.remove('sb-fix-target'));
  const el=$(t.anchor);el.classList.add('sb-fix-target');
- const field=t.focus.map(s=>document.querySelector(s)).find(Boolean);field?.focus({preventScroll:true});
+ // A focus entry is a selector; "selector@n" means its nth match (a CLO or schedule row).
+ const pick=x=>{const m=x.match(/^(.*)@(\d+)$/);return m?document.querySelectorAll(m[1])[+m[2]]:document.querySelector(x)};
+ const field=t.focus.map(pick).find(Boolean);field?.focus({preventScroll:true});
  // Select the placeholder text the finding points at, so it can be typed over.
  const want=r.fixSelect&&field&&'value' in field?field.value.toLowerCase().indexOf(String(r.fixSelect).toLowerCase()):-1;if(want>=0)field.setSelectionRange(want,want+r.fixSelect.length);
  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
