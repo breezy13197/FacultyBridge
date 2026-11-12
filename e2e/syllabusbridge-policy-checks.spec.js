@@ -404,3 +404,30 @@ test('the same wording in a paragraph and a table counts until both are changed'
   expect((await policyStatuses(page))['policy-library']).toBe('warning');
   await expect(card(page, 'policy-library')).not.toContainText('South University Library research guide');
 });
+
+test('template cleanup: Fix this opens the field with the placeholder selected, and the edit resolves it', async ({ page, openTool }) => {
+  const body = [...syllabus(), 'ABSENCE POLICY: Policy is at the discretion of the course coordinator'];
+  await openTool('syllabusbridge');
+  await upload(page, { name: 'cleanup.docx', mimeType: DOCX_MIME, buffer: await syntheticDocxBody(body) });
+  await report(page);
+  const finding = card(page, 'template-cleanup');
+  await expect(finding).toContainText('Policy is at the discretion of the course coordinator (in Absence policy)');
+  await finding.getByRole('button', { name: /^Fix this/ }).click();
+  const field = page.locator('#review-absence textarea');
+  await expect(field).toBeFocused();
+  expect(await field.evaluate(t => t.value.slice(t.selectionStart, t.selectionEnd))).toBe('Policy is at the discretion of the course coordinator');
+  await field.fill('Students who miss a graded assessment must notify the course coordinator within 24 hours.');
+  await field.press('Tab');
+  await page.locator('#runValidation').click();
+  await expect(finding).toContainText('Resolved by your edit');
+  expect(await page.evaluate(() => state.results.find(r => r.id === 'template-cleanup').status)).toBe('passed');
+});
+
+test('template cleanup still finds placeholders the editor cannot change, such as a misspelled heading', async ({ page, openTool }) => {
+  const body = [...syllabus({ materials: null }), 'REQUIRED TEXBOOKS AND RELATED MATERIALS', 'Bring a calculator to every class session.'];
+  await openTool('syllabusbridge');
+  await upload(page, { name: 'heading.docx', mimeType: DOCX_MIME, buffer: await syntheticDocxBody(body) });
+  await report(page);
+  await expect(card(page, 'template-cleanup')).toContainText('REQUIRED TEXBOOKS AND RELATED MATERIALS');
+  expect(await page.evaluate(() => state.results.find(r => r.id === 'template-cleanup').status)).toBe('issue');
+});

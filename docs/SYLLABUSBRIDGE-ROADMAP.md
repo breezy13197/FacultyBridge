@@ -348,6 +348,11 @@ Each has a regression test with synthetic data in
   that finding (including a change undone and then made again). **Revalidate now** says whether the finding now passes
   ("Resolved by your edit"). **Revalidate and return to report** goes back;
   **Stop linking changes** ends linking. Leaving the editor also ends it.
+- **Template instructions and placeholder text** reads the syllabus as it
+  stands now (an edit in the editor resolves it) and says where each
+  placeholder is, for example "(in Absence policy)". Fix this opens the first
+  one with the placeholder text selected. Headings and other text the editor
+  cannot open are still listed, to be changed in the Word file.
 - In the report, a finding that passes and has linked changes shows **Resolved
   by your edit**. One that still fails says how many changes were made for it.
 - The change summary marks each linked change "Fix for a finding: [check]" and

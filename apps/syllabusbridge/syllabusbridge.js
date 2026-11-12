@@ -449,6 +449,28 @@ function gradingScaleResult(profile){
  if(unreadable.length)parts.push(`Could not read: ${unreadable.join(' · ')}.`);
  return result(id,POLICY_CATEGORY,status,title,summary,parts.join(' ')+note,status==='passed'?'No action needed.':found.table.type==='gradingScale'?'Use the official grading scale from the syllabus policy. You can correct the Grading scale table in the structured editor.':'Use the official grading scale from the syllabus policy. Correct the table in the Word syllabus, then upload it again.')
 }
+// Template placeholders in the syllabus as it stands now, each with where it is:
+// the editor field that holds it (with a Fix this target), or nowhere for text only
+// the Word file can change (lines outside the editor, and heading labels).
+function templatePlaceholders(placeholders){
+ const out=[],seen=new Set,card=k=>({anchor:'review-'+k,focus:[`#review-${k} textarea`]});
+ const label=k=>k==='courseEvaluation'?'Course evaluation':SECTION_RULES.find(r=>r.key===k)?.label||k;
+ const add=(text,where,fixAt)=>{const t=clean(text),m=placeholders.map(p=>t.match(p)).find(Boolean);if(!t||!m)return;const key=t+'|'+where;if(seen.has(key))return;seen.add(key);out.push({text:t,where,fixAt:fixAt&&$(fixAt.anchor)?fixAt:null,match:m[0]})};
+ for(const [k,v] of Object.entries(state.policies||{}))if(typeof v==='string')for(const l of v.split(/\n+/))add(l,label(k),k==='courseEvaluation'?{anchor:'review-assessments',focus:['#courseEvaluationText']}:card(k));
+ for(const t of state.structuredTables||[]){
+  const editable=editableStructuredTables().includes(t),where=editable?structuredTableTitle(t.type):'a table',fixAt=editable?{anchor:`review-structured-${t.tableIndex}`,focus:[`#review-structured-${t.tableIndex} textarea`]}:null;
+  for(const h of t.headers||[])add(h,where,null);
+  for(const row of t.rows||[])for(const c of row.cells||[])for(const l of (c.lines?.length?c.lines:[c.text]))add(l,where,fixAt)
+ }
+ for(const [f,lab] of [['code','Course code'],['title','Course title'],['year','Year'],['location','Location']])add(state.course?.[f],lab,{anchor:'review-course-info',focus:['#course'+f[0].toUpperCase()+f.slice(1)]});
+ (state.clos||[]).forEach(c=>add(c,'Course learning outcomes',{anchor:'review-clos',focus:['#review-clos .clo-text']}));
+ (state.schedule||[]).forEach(e=>add(e.topic,'Course schedule',{anchor:'review-schedule',focus:['#scheduleBody .s-topic']}));
+ const covered=editorCoveredLines();
+ (state.lines||[]).forEach((l,i)=>{if(!covered.has(i))add(l,'',null)});
+ // Heading labels (the words before a colon) stay in the Word file whatever the editor holds.
+ for(const h of state.sections||[]){const c=h.line.indexOf(':');add(c>=0?h.line.slice(0,c):h.line,'',null)}
+ return out
+}
 function policyResults(){
  const profile=policyProfile();
  if(!profile)return[result('policy-profile',POLICY_CATEGORY,'not-evaluated','Syllabus policy profile','No syllabus policy profile was loaded, so policy wording was not checked.','The policy profile file is missing from this copy of SyllabusBridge.','Reload SyllabusBridge, or download a fresh copy. If this keeps happening, contact the FacultyBridge project owner.',false)];
@@ -474,9 +496,11 @@ function validate(){const r=[],hasSection=k=>state.sections.some(x=>x.key===k),a
   /all items listed in red/i,/example optional course specific policies/i,/course number\s*[-–]\s*course title/i,
   /course number,\s*quarter,\s*year/i,/name,\s*degree/i,/rank and department/i,/room\(s\)\s*&\s*time/i
  ];
- const unresolved=state.lines.filter(l=>placeholders.some(p=>p.test(l)));
- const cleanupAll=[...new Set(unresolved)],cleanup=cleanupAll.slice(0,20);
- r.push(result('template-cleanup','Template cleanup',cleanupAll.length?'issue':'passed','Template instructions and placeholder text',cleanupAll.length?`${cleanupAll.length} unresolved template instruction or placeholder${cleanupAll.length===1?' was':'s were'} detected${cleanupAll.length>20?' (showing first 20)':''}.`:'No obvious template instructions were detected.',cleanup.length?cleanup.join(' · '):'Checked for unresolved template placeholders and faculty-facing instructional phrases. Text color alone is not treated as a template error.',cleanupAll.length?'Replace course-specific placeholders and remove template-only instructional text before releasing the syllabus.':'No action needed.'));
+ // Read the syllabus as it stands now (edits count) and note where each placeholder is,
+ // so Fix this can open it. Heading labels are checked too: only Word can change them.
+ const unresolved=templatePlaceholders(placeholders),cleanupAll=unresolved.map(x=>x.text+(x.where?` (in ${x.where})`:'')),cleanup=cleanupAll.slice(0,20),first=unresolved.find(x=>x.fixAt),wordOnly=unresolved.some(x=>!x.fixAt);
+ r.push(result('template-cleanup','Template cleanup',cleanupAll.length?'issue':'passed','Template instructions and placeholder text',cleanupAll.length?`${cleanupAll.length} unresolved template instruction or placeholder${cleanupAll.length===1?' was':'s were'} detected${cleanupAll.length>20?' (showing first 20)':''}.`:'No obvious template instructions were detected.',cleanup.length?cleanup.join(' · '):'Checked for unresolved template placeholders and faculty-facing instructional phrases. Text color alone is not treated as a template error.',cleanupAll.length?`Replace course-specific placeholders and remove template-only instructional text before releasing the syllabus.${first?' Fix this opens the first one in the structured editor.':''}${wordOnly?' Anything the structured editor cannot open (such as headings) must be changed in the Word file.':''}`:'No action needed.'));
+ if(first)Object.assign(r.at(-1),{fixAt:first.fixAt,fixSelect:first.match});
  const courseFields=[['code','Course code'],['title','Course title'],['year','Course year / term year']];for(const [k,label] of courseFields){const v=clean(state.course[k]);r.push(result('course-'+k,'Course information',v?'passed':'warning',label,v?`${label} was detected.`:`${label} could not be confidently detected.`,v||'No value extracted.',v?'No action needed.':'Confirm the extracted course information before relying on downstream checks.'))}
  r.push(result('coordinator-record','Course information',state.coordinator?'passed':'warning','Coordinator contact record',state.coordinator?'A coordinator name/email record was identified.':'The coordinator section exists, but a complete coordinator contact record was not confidently extracted.',state.coordinator?state.faculty.filter(f=>f.role==='coordinator').map(f=>`${f.name} · ${f.email||'email not detected'}`).join('; '):(sectionText('coordinator')||'No coordinator record extracted.'),state.coordinator?'Confirm the information is current.':'Confirm coordinator name, rank/department, office, phone, and email are completed.'));
  const facDup=state.faculty.filter((f,i,a)=>{if(!clean(f.email))return false;return a.findIndex(x=>clean(x.email)&&x.email.toLowerCase()===f.email.toLowerCase())!==i});r.push(result('faculty-consistency','Course information',facDup.length?'issue':state.faculty.length?'passed':'warning','Faculty information consistency',facDup.length?'Duplicate faculty email records were detected.':state.faculty.length?'No duplicate faculty email records were detected.':'Faculty contact records were not confidently extracted.',facDup.length?facDup.map(f=>f.email).join(', '):state.faculty.length?`Evaluated ${state.faculty.length} faculty record${state.faculty.length===1?'':'s'}.`:(sectionText('faculty')||'No faculty records extracted.'),facDup.length?'Review duplicate or inconsistent faculty listings.':state.faculty.length?'Confirm names, roles, office, phone, and email are current.':'Complete or review the Course Faculty section.'));
@@ -955,6 +979,7 @@ function renderResults(filter){const host=$('results');host.innerHTML='';const i
 // change that exists now, like a reading-correction mark. After revalidating, a
 // finding that passes and has linked changes shows "Resolved by your edit".
 function fixTarget(id){
+ const own=(state.results||[]).find(x=>x.id===id)?.fixAt;if(own)return $(own.anchor)?own:null;
  const card=k=>({anchor:'review-'+k,focus:[`#review-${k} textarea`]});
  const scale=(state.structuredTables||[]).find(t=>t.type==='gradingScale'),scaleTarget=scale?{anchor:`review-structured-${scale.tableIndex}`,focus:[`#review-structured-${scale.tableIndex} textarea`,`#review-structured-${scale.tableIndex} .add-structured-row`]}:null;
  const faculty={anchor:'review-faculty',focus:['#facultyList .f-name','#addFacultyRow']},clos={anchor:'review-clos',focus:['#review-clos .clo-text','#addCloRow']},mapping={anchor:'review-clos',focus:['#review-clos .clo-map','#addCloRow']};
@@ -984,6 +1009,8 @@ function startFix(id){
  document.querySelectorAll('.sb-fix-target').forEach(x=>x.classList.remove('sb-fix-target'));
  const el=$(t.anchor);el.classList.add('sb-fix-target');
  const field=t.focus.map(s=>document.querySelector(s)).find(Boolean);field?.focus({preventScroll:true});
+ // Select the placeholder text the finding points at, so it can be typed over.
+ const want=r.fixSelect&&field&&'value' in field?field.value.toLowerCase().indexOf(String(r.fixSelect).toLowerCase()):-1;if(want>=0)field.setSelectionRange(want,want+r.fixSelect.length);
  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
  // Scroll the field to just below the sticky status bar (which now shows the Fixing note).
  requestAnimationFrame(()=>{const bar=$('editorStatus'),cs=getComputedStyle(bar),offset=cs.position==='sticky'?(parseFloat(cs.top)||0)+bar.offsetHeight+12:100;window.scrollTo({top:Math.max(0,el.getBoundingClientRect().top+window.scrollY-offset),behavior:reduce?'auto':'smooth'})})
