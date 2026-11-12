@@ -89,7 +89,8 @@ What it covers, using synthetic data only:
   and `syllabus-with-tbd-final.docx`, are synthetic; the project was saved by
   the build of `main` at 056eb67 and must not be regenerated with a newer one.
   Template cleanup tests: Fix this opens the field with the placeholder
-  selected and the edit resolves the finding; a misspelled heading the editor
+  selected and the edit resolves the finding; the textbooks heading (even
+  misspelled) is not a placeholder, and a table-header placeholder the editor
   cannot change is still found.
   `syllabusbridge-policy.test.mjs` (Node) checks every dated
   policy profile file: loaded by the page, a grading scale with no gaps or

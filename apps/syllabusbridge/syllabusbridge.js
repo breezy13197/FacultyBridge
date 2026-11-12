@@ -456,7 +456,10 @@ function templatePlaceholders(placeholders){
  const out=[],seen=new Set,card=k=>({anchor:'review-'+k,focus:[`#review-${k} textarea`]});
  const label=k=>k==='courseEvaluation'?'Course evaluation':SECTION_RULES.find(r=>r.key===k)?.label||k;
  const add=(text,where,fixAt)=>{const t=clean(text),m=placeholders.map(p=>t.match(p)).find(Boolean);if(!t||!m)return;const key=t+'|'+where;if(seen.has(key))return;seen.add(key);out.push({text:t,where,fixAt:fixAt&&$(fixAt.anchor)?fixAt:null,match:m[0]})};
- for(const [k,v] of Object.entries(state.policies||{}))if(typeof v==='string')for(const l of v.split(/\n+/))add(l,label(k),k==='courseEvaluation'?{anchor:'review-assessments',focus:['#courseEvaluationText']}:card(k));
+ // A section's text can include a table that sits under its heading; such lines are
+ // listed once, under the table they came from.
+ const tableIdx=new Set(state.tableLineIndexes||[]),tableTextIn=k=>{const r=sectionLineRange(k==='courseEvaluation'?'assessment':k),out=new Set;if(r)for(let i=r[0];i<r[1];i++)if(tableIdx.has(i))out.add(norm(state.lines[i]));return out};
+ for(const [k,v] of Object.entries(state.policies||{}))if(typeof v==='string'){const inTables=tableTextIn(k);for(const l of v.split(/\n+/))if(!inTables.has(norm(l)))add(l,label(k),k==='courseEvaluation'?{anchor:'review-assessments',focus:['#courseEvaluationText']}:card(k))}
  for(const t of state.structuredTables||[]){
   const editable=editableStructuredTables().includes(t),where=editable?structuredTableTitle(t.type):'a table',fixAt=editable?{anchor:`review-structured-${t.tableIndex}`,focus:[`#review-structured-${t.tableIndex} textarea`]}:null;
   for(const h of t.headers||[])add(h,where,null);
@@ -491,7 +494,7 @@ function validate(){const r=[],hasSection=k=>state.sections.some(x=>x.key===k),a
  ];
  for(const [k,label] of required){const c=sectionCoverage(k),status=coverageStatus(c),hasDen=Number.isFinite(c.candidate)&&c.candidate>0,ratio=hasDen?`${c.count} of ${c.candidate}`:`${c.count}`,summary=status==='passed'?`${label} was detected and usable content was extracted.`:status==='warning'&&!c.heading&&c.count>0?`${label} content was extracted, but the approved-template heading was not detected.`:status==='warning'?`${label} was detected, but extraction was incomplete or empty.`:`${label} was not confidently detected.`,failureDetail=k==='schedule'&&state.extraction?.scheduleFailures?.length?` Unreadable schedule entries: ${state.extraction.scheduleFailures.slice(0,12).map(x=>`table ${x.tableIndex+1}, row ${x.rowIndex}: "${x.raw}"`).join(' · ')}${state.extraction.scheduleFailures.length>12?` · plus ${state.extraction.scheduleFailures.length-12} more`:''}`:'',evidence=`Heading ${c.heading?'found':'not found'} · ${ratio} ${c.label} extracted${hasDen?` (${Math.round(c.count/c.candidate*100)}% coverage)`:''}.${failureDetail}`;r.push(result('section-'+k,'Approved template',status,label,summary,evidence,status==='passed'?'No action needed.':status==='issue'?'Restore the required section or confirm the approved template has changed.':'Review the section heading and extracted content before relying on downstream checks.',true))}
  const placeholders=[
-  /copy and paste/i,/insert (?:text|course|applicable|additional|additoinal)/i,/required texbooks? and related materials/i,/identify if ipads? or tablets? are acceptable/i,
+  /copy and paste/i,/insert (?:text|course|applicable|additional|additoinal)/i,/identify if ipads? or tablets? are acceptable/i,
   /policy is at the discretion of the course coordinator/i,/list pslo number/i,/replace highlighted sections/i,
   /all items listed in red/i,/example optional course specific policies/i,/course number\s*[-–]\s*course title/i,
   /course number,\s*quarter,\s*year/i,/name,\s*degree/i,/rank and department/i,/room\(s\)\s*&\s*time/i

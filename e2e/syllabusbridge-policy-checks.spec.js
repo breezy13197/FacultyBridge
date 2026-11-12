@@ -423,11 +423,18 @@ test('template cleanup: Fix this opens the field with the placeholder selected, 
   expect(await page.evaluate(() => state.results.find(r => r.id === 'template-cleanup').status)).toBe('passed');
 });
 
-test('template cleanup still finds placeholders the editor cannot change, such as a misspelled heading', async ({ page, openTool }) => {
-  const body = [...syllabus({ materials: null }), 'REQUIRED TEXBOOKS AND RELATED MATERIALS', 'Bring a calculator to every class session.'];
+test('template cleanup: the textbooks heading is not a placeholder; Word-only placeholders are still listed', async ({ page, openTool }) => {
+  // The heading is a real section heading, even with the template's spelling ("TEXBOOKS").
+  const body = [...syllabus({ materials: null }), 'REQUIRED TEXBOOKS AND RELATED MATERIALS', 'Bring a calculator to every class session.',
+    // A placeholder in a table header: only the Word file can change it.
+    [['List PSLO number', 'Notes'], ['1.1', 'Mapped']]];
   await openTool('syllabusbridge');
   await upload(page, { name: 'heading.docx', mimeType: DOCX_MIME, buffer: await syntheticDocxBody(body) });
   await report(page);
-  await expect(card(page, 'template-cleanup')).toContainText('REQUIRED TEXBOOKS AND RELATED MATERIALS');
-  expect(await page.evaluate(() => state.results.find(r => r.id === 'template-cleanup').status)).toBe('issue');
+  const finding = card(page, 'template-cleanup');
+  await expect(finding).not.toContainText('TEXBOOKS');
+  await expect(finding).toContainText('1 unresolved template instruction or placeholder was detected.');
+  await expect(finding).toContainText('List PSLO number (in a table)');
+  await expect(finding).toContainText('must be changed in the Word file');
+  await expect(finding.locator('.sb-fix')).toHaveCount(0);
 });
