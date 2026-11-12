@@ -8,4 +8,6 @@ Keep tool business logic independent. Promote genuinely reused UI into packages/
 
 suite.json is the source of version metadata, tool identities, source provenance, and routes. Bump a tool version only for an intentional tool release. Shared build changes use suiteVersion/uiVersion and visible build labels. Update tests/import-baseline.json only after a reviewed, intentional business-logic change; the imported hashes establish processing-code parity with the supplied attachments.
 
+Claude Code configuration lives in .claude/ (see .claude/README.md): hooks block dist/ and private-fixture edits, a /bridge-change skill covers the change workflow, and design-reviewer and privacy-reviewer subagents review UI changes and new data before commits.
+
 Start nontrivial work with observable acceptance criteria. For reproducible bugs, demonstrate a regression check failing before the fix and passing after it where practical. Every handoff states changed behavior, commands/results, and remaining verification or release limitations. Never push a release tag or publish a release as part of routine implementation; these are separate release actions.
