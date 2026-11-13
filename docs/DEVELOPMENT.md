@@ -46,6 +46,7 @@ CI uses Node 22; local Node must satisfy the package's supported engine range.
 
 | Command | Use |
 |---|---|
+| `npm run lint` | Conservative ESLint bug checks across editable browser scripts and Node modules; no formatting enforcement. |
 | `npm run check` | Fast build, structural, syntax, token, baseline, and reproducibility checks. |
 | `npm run validate:quick` | Build checks plus Chromium browser smoke for site and standalone. |
 | `npm run test:e2e -- --project=chromium --grep QuestionBridge` | Example focused development run for one tool/browser. |
