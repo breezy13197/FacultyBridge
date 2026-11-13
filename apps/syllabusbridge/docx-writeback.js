@@ -26,8 +26,8 @@
 // Kinds of edit (edit.action):
 //   'replace' (default)  newText replaces the paragraph's text; null deletes it.
 //   'insert-after' / 'insert-before'  a new paragraph with newText, next to the
-//        anchor paragraph and formatted like it. keepList:false drops the
-//        anchor's bullet or numbering from the new paragraph.
+//        anchor paragraph and formatted like it (or like formatAnchor, another
+//        paragraph, when given). keepList:false drops the bullet or numbering.
 //   'delete-row'         removes the table row at a row anchor (expectedText is
 //        the row's text).
 //   'insert-row-after'   adds a row after the row anchor, formatted like it;
@@ -451,7 +451,8 @@
       }
       if (action === 'insert-after' || action === 'insert-before') {
         const at = action === 'insert-after' ? p.end : p.start;
-        const s = add(edit, at, at, () => newParagraph(xml, p, edit.newText, options, nextId, { keepList: edit.keepList !== false, runFrom: action === 'insert-after' ? 'last' : 'first', markOwn: s.markOwn !== false }), { after: action === 'insert-after' ? p : null });
+        const like = (edit.formatAnchor && locate(model, edit.formatAnchor)) || p;
+        const s = add(edit, at, at, () => newParagraph(xml, like, edit.newText, options, nextId, { keepList: edit.keepList !== false, runFrom: like !== p || action === 'insert-before' ? 'first' : 'last', markOwn: s.markOwn !== false }), { after: action === 'insert-after' ? p : null });
         continue;
       }
       if (seen.has(p.start)) { refuse(edit, 'Another edit already changes this paragraph.'); continue; }

@@ -33,11 +33,17 @@
 //   { type:'cell-substitute', tableIndex, rowIndex, columnIndex, from, to }
 //   { type:'delete-row', tableIndex, rowIndex, before:[[line]] }  (one array per cell)
 //   { type:'add-row', tableIndex, afterRowIndex, order, id, cells:[string] }
+//   { type:'new-section', before|after: lineIndex, heading, lines:[line], headingLike, bodyLike }
+//        A section the Word file lacks: new paragraphs before or after that
+//        line; the heading formatted like line headingLike, the text like bodyLike.
 //   { type:'manual', reason }   cannot be placed; listed with the reason.
 (function (root) {
   const clean = s => String(s ?? '').replace(/\s+/g, ' ').trim();
   const fp = s => String(s ?? '').replace(/\s+/g, '');
   const dashes = s => String(s ?? '').replace(/[–—−]/g, '-');
+  // A bullet pasted from Word as a symbol-font character (shown as a box
+  // elsewhere) is written as an ordinary bullet.
+  const bulletText = s => clean(s).replace(/^[\uF000-\uF0FF•▪◦]\s*/, '• ');
   class PlaceError extends Error {}
   const fail = reason => { throw new PlaceError(reason); };
   const NOT_MATCHED = 'SyllabusBridge could not match this text to one place in the Word file, so it was not placed.';
@@ -332,6 +338,17 @@
         const { ref, at, line } = hits[0];
         setSeg(ref.key, ref.seg, line.slice(0, at) + to + line.slice(at + from.length));
       },
+      'new-section'(t) {
+        const at = t.before ?? t.after, ref = lineRef(at), e = map.paragraphs.get(ref.key);
+        if (e.inCell) fail('SyllabusBridge could not place this section without changing a table. Add the heading and text by hand in Word.');
+        const format = i => { const r = map.lines[i]; const f = r && r.ok && map.paragraphs.get(r.key); return f && !f.inCell ? f.anchor : e.anchor; };
+        const entries = [];
+        if (t.heading) entries.push({ text: clean(t.heading), keepList: false, format: format(t.headingLike), key: owner });
+        for (const line of t.lines || []) if (clean(line)) entries.push({ text: bulletText(line), keepList: false, format: format(t.bodyLike), key: owner });
+        if (!entries.length) fail('This section is empty. Type its text in SyllabusBridge, or add it by hand in Word.');
+        const w = state(ref.key); touch(w, false);
+        w[t.before != null ? 'before' : 'after'].push(...entries);
+      },
       'delete-row'(t) {
         const row = map.rows.get(`${t.tableIndex}:${t.rowIndex}`);
         if (!row) fail('This table row is not in the Word file where SyllabusBridge read it.');
@@ -384,13 +401,13 @@
         for (const w of work.values()) {
           const e = map.paragraphs.get(w.key);
           if (!w.touched) continue;
-          for (const ins of w.before) out.push({ anchor: e.anchor, action: 'insert-before', expectedText: e.raw, newText: ins.text, keepList: ins.keepList, keys: new Set([ins.key]) });
+          for (const ins of w.before) out.push({ anchor: e.anchor, action: 'insert-before', expectedText: e.raw, newText: ins.text, keepList: ins.keepList, formatAnchor: ins.format, keys: new Set([ins.key]) });
           if (w.deleted) out.push({ anchor: e.anchor, expectedText: e.raw, newText: null, keys: w.keys });
           else {
             const text = w.segs.map(s => s.raw).join('\n');
             if (text !== e.raw) out.push({ anchor: e.anchor, expectedText: e.raw, newText: text, keys: w.keys });
           }
-          for (const ins of w.after) out.push({ anchor: e.anchor, action: 'insert-after', expectedText: e.raw, newText: ins.text, keepList: ins.keepList, keys: new Set([ins.key]) });
+          for (const ins of w.after) out.push({ anchor: e.anchor, action: 'insert-after', expectedText: e.raw, newText: ins.text, keepList: ins.keepList, formatAnchor: ins.format, keys: new Set([ins.key]) });
         }
         const rows = [...rowOps.values()].sort((a, b) => a.tableIndex - b.tableIndex || a.rowIndex - b.rowIndex || (a.order ?? 0) - (b.order ?? 0));
         for (const r of rows) {

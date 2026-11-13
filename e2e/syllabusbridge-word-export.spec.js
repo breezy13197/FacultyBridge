@@ -237,3 +237,70 @@ test('a new schedule entry is written in full when the table has a column for ea
   const added = await page.evaluate(() => state.schedule.find(e => e.topic === 'Review session'));
   expect([added.date, added.time, added.faculty]).toEqual(['10/1/2026', '1:00 PM – 2:00 PM', 'Dr. Grace Teacher']);
 });
+
+// Faculty feedback on real syllabi, reproduced with synthetic data.
+// 1. A required section missing from the Word file, written in the editor, counts
+//    as the section, and export adds it (heading and text) where the template puts it.
+const withoutIncomplete = ['PHA9999 - Synthetic Course', 'Course Coordinator: Dr. Ada Faculty', 'Fall 2026',
+  'EXCUSED ABSENCE POLICY', 'Students who miss an exam must notify the coordinator before the exam begins.',
+  'ELECTRONIC DEVICES', 'Phones are silenced during class.', 'Course Schedule', schedule];
+const incompleteText = 'Synthetic incomplete wording for testing only.\n\uF0B7\tA synthetic pasted bullet.\nIncompletes are given at the discretion of the faculty member.';
+
+test('a required section written in the editor counts as found, and export adds it with its heading', async ({ page, openTool }) => {
+  await openTool('syllabusbridge');
+  await upload(page, { name: 'syllabus.docx', mimeType: DOCX_MIME, buffer: await syntheticDocxBody(withoutIncomplete) });
+  await page.locator('#runValidation').click();
+  const card = page.locator('#check-section-incomplete');
+  await expect(card.locator('.pill')).toHaveText('Issue');
+  await card.getByRole('button', { name: /^Fix this/ }).click();
+  await setField(page.locator('#review-incomplete textarea'), incompleteText);
+  await page.locator('#fixContext').getByRole('button', { name: 'Revalidate and return to report' }).click();
+  await expect(card.locator('.pill')).toHaveText('Passed');
+  await expect(card).toContainText('Resolved by your edit');
+  await expect(card).toContainText('Incomplete policy was added in SyllabusBridge.');
+  await expect(card).toContainText('Choose “Export edited Word syllabus” to add it to the Word file.');
+
+  const out = await exportWord(page, '#exportWordReport');
+  await upload(page, await accepted(out.bytes));
+  const read = await page.evaluate(() => ({ lines: state.lines, incomplete: state.policies.incomplete }));
+  const at = read.lines.indexOf('INCOMPLETE POLICY:');
+  expect(at).toBeGreaterThan(read.lines.indexOf('Students who miss an exam must notify the coordinator before the exam begins.'));
+  expect(at).toBeLessThan(read.lines.indexOf('ELECTRONIC DEVICES'));
+  expect(read.incomplete).toBe('Synthetic incomplete wording for testing only.\n• A synthetic pasted bullet.\nIncompletes are given at the discretion of the faculty member.');
+  await page.locator('#runValidation').click();
+  await expect(card.locator('.pill')).toHaveText('Passed');
+});
+
+test('a heading typed at the top of section text read without one counts as the heading', async ({ page, openTool }) => {
+  const body = ['PHA9999 - Synthetic Course', 'Course Coordinator: Dr. Ada Faculty', 'Fall 2026',
+    'Incompletes are given at the discretion of the faculty member when course requirements remain.', 'Course Schedule', schedule];
+  await openTool('syllabusbridge');
+  await upload(page, { name: 'syllabus.docx', mimeType: DOCX_MIME, buffer: await syntheticDocxBody(body) });
+  await page.locator('#runValidation').click();
+  const card = page.locator('#check-section-incomplete');
+  await expect(card.locator('.pill')).toHaveText('Warning');
+  await page.locator('#screen-report').getByRole('button', { name: '← Structured editor' }).click();
+  const box = page.locator('#review-incomplete textarea');
+  await setField(box, `Incomplete Policy:\n${await box.inputValue()}`);
+  await page.locator('#runValidation').click();
+  await expect(card.locator('.pill')).toHaveText('Passed');
+});
+
+// 2. A date cell that also names the day ("Friday 2/13/26"): changing the date
+//    changes the day word in the same cell, in the same form.
+test('changing a date in a "Friday 2/13/26" cell also changes the day word', async ({ page, openTool }) => {
+  const table = [['Lecture', 'Date', 'Course Topics', 'Instructor'], ['Week 1'],
+    ['1', 'Monday 1/4/27', 'Bacteria I', 'Dr. Ada Faculty'], ['2', 'Fri 1/8/27', 'Bacteria II', 'Dr. Ada Faculty'],
+    ['3', 'Friday 2/13/26', 'Innate Immunity', 'Dr. Ada Faculty']];
+  await openTool('syllabusbridge');
+  await upload(page, await scheduleOnly(table));
+  await setField(page.locator('#scheduleBody .s-date').nth(2), '2/12/27');
+  await setField(page.locator('#scheduleBody .s-date').nth(1), '1/7/27');
+  await page.locator('#exportWord').click();
+  await expect(exportDialog(page)).toContainText('2 syllabus edits will be written as tracked changes.');
+  await expect(exportDialog(page).locator('.sb-export-unplaced')).toHaveCount(0);
+  await exportDialog(page).getByRole('button', { name: 'Close', exact: true }).click();
+  const out = await exportWord(page);
+  await upload(page, await accepted(out.bytes));
+  expect(await page.evaluate(() => state.rawTables.at(-1).slice(2).map(r => r[1].text))).toEqual(['Monday 1/4/27', 'Thu 1/7/27', 'Friday 2/12/27']);
+});

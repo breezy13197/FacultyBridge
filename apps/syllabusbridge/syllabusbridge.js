@@ -275,8 +275,18 @@ function editedScheduleDateProblems(){
  return (state.schedule||[]).map((e,index)=>({e,index,iso:isoDate(e.date)})).filter(x=>!x.iso)
 }
 function handoffBlockingProblems(){return editedScheduleDateProblems()}
+// A required section the Word file lacks (or has without its heading) can be
+// written in the structured editor. It counts as found when the faculty member
+// added the whole section there, or typed its heading as the first line: Export
+// edited Word syllabus then writes it into the Word file with that heading.
+function editorSectionHeading(key){
+ const pk={assessment:'courseEvaluation'}[key]||key,base=state.editorBaseline?.policies,cur=state.policies?.[pk];
+ if(!base||typeof cur!=='string'||!clean(cur)||clean(base[pk])===clean(cur))return false;
+ const rule=SECTION_RULES.find(r=>r.key===key),first=clean(cur.split('\n').find(l=>clean(l))||'');
+ return !clean(base[pk])||!!rule?.patterns.some(p=>p.test(first))
+}
 function sectionCoverage(key){
- const heading=state.sections.some(x=>x.key===key), text=clean(sectionText(key));
+ const inFile=state.sections.some(x=>x.key===key),added=!inFile&&editorSectionHeading(key),heading=inFile||added, text=clean(sectionText(key));
  const ex=state.extraction||{};
  const map={
   description:{count:clean(state.policies.description)?1:0,label:'course description'},
@@ -294,7 +304,7 @@ function sectionCoverage(key){
   attendance:{count:clean(state.policies.attendance)?1:0,label:'attendance policy'},assessmentPolicy:{count:clean(state.policies.assessmentPolicy)?1:0,label:'assessment policy'},
   absence:{count:clean(state.policies.absence)?1:0,label:'absence policy'},incomplete:{count:clean(state.policies.incomplete)?1:0,label:'incomplete policy'}
  };
- return {heading,...(map[key]||{count:text?1:0,label:'section content'})};
+ return {heading,added,...(map[key]||{count:text?1:0,label:'section content'})};
 }
 function coverageStatus(c){
  if(!c.heading&&c.count===0)return'issue';
@@ -511,7 +521,7 @@ function validate(){const r=[],hasSection=k=>state.sections.some(x=>x.key===k),a
  ['attendance','Attendance/tardy policy'],['assessmentPolicy','Assessment policy'],
  ['absence','Absence policy'],['incomplete','Incomplete policy']
  ];
- for(const [k,label] of required){const c=sectionCoverage(k),status=coverageStatus(c),hasDen=Number.isFinite(c.candidate)&&c.candidate>0,ratio=hasDen?`${c.count} of ${c.candidate}`:`${c.count}`,summary=status==='passed'?`${label} was detected and usable content was extracted.`:status==='warning'&&!c.heading&&c.count>0?`${label} content was extracted, but the approved-template heading was not detected.`:status==='warning'?`${label} was detected, but extraction was incomplete or empty.`:`${label} was not confidently detected.`,failureDetail=k==='schedule'&&state.extraction?.scheduleFailures?.length?` Unreadable schedule entries: ${state.extraction.scheduleFailures.slice(0,12).map(x=>`table ${x.tableIndex+1}, row ${x.rowIndex}: "${x.raw}"`).join(' · ')}${state.extraction.scheduleFailures.length>12?` · plus ${state.extraction.scheduleFailures.length-12} more`:''}`:'',evidence=`Heading ${c.heading?'found':'not found'} · ${ratio} ${c.label} extracted${hasDen?` (${Math.round(c.count/c.candidate*100)}% coverage)`:''}.${failureDetail}`;r.push(result('section-'+k,'Approved template',status,label,summary,evidence,status==='passed'?'No action needed.':status==='issue'?'Restore the required section or confirm the approved template has changed.':'Review the section heading and extracted content before relying on downstream checks.',true))}
+ for(const [k,label] of required){const c=sectionCoverage(k),status=coverageStatus(c),hasDen=Number.isFinite(c.candidate)&&c.candidate>0,ratio=hasDen?`${c.count} of ${c.candidate}`:`${c.count}`,summary=status==='passed'&&c.added?`${label} was added in SyllabusBridge.`:status==='passed'?`${label} was detected and usable content was extracted.`:status==='warning'&&!c.heading&&c.count>0?`${label} content was extracted, but the approved-template heading was not detected.`:status==='warning'?`${label} was detected, but extraction was incomplete or empty.`:`${label} was not confidently detected.`,failureDetail=k==='schedule'&&state.extraction?.scheduleFailures?.length?` Unreadable schedule entries: ${state.extraction.scheduleFailures.slice(0,12).map(x=>`table ${x.tableIndex+1}, row ${x.rowIndex}: "${x.raw}"`).join(' · ')}${state.extraction.scheduleFailures.length>12?` · plus ${state.extraction.scheduleFailures.length-12} more`:''}`:'',evidence=`${c.added?'Heading added in SyllabusBridge. It goes into the Word file when you choose “Export edited Word syllabus”':`Heading ${c.heading?'found':'not found'}`} · ${ratio} ${c.label} extracted${hasDen?` (${Math.round(c.count/c.candidate*100)}% coverage)`:''}.${failureDetail}`;r.push(result('section-'+k,'Approved template',status,label,summary,evidence,status==='passed'&&c.added?'Choose “Export edited Word syllabus” to add it to the Word file.':status==='passed'?'No action needed.':status==='issue'?'Restore the required section or confirm the approved template has changed.':'Review the section heading and extracted content before relying on downstream checks.',true))}
  const placeholders=[
   /copy and paste/i,/insert (?:text|course|applicable|additional|additoinal)/i,/identify if ipads? or tablets? are acceptable/i,
   /policy is at the discretion of the course coordinator/i,/list pslo number/i,/replace highlighted sections/i,
@@ -1130,7 +1140,8 @@ function wordExportTargets(key){
   return[{type:'substitute',lines:at,from,to}]
  }
  if(section==='policy'){
-  const range=sectionLineRange({courseEvaluation:'assessment'}[id]||id);
+  const key={courseEvaluation:'assessment'}[id]||id,range=sectionLineRange(key);
+  if(!range&&!clean(b.policies?.[id])&&clean(c.policies?.[id]))return newSectionTargets(key,String(c.policies[id]).split('\n'));
   return[{type:'lines',start:range?range[0]:0,before:String(b.policies?.[id]??'').split('\n'),after:String(c.policies?.[id]??'').split('\n')}]
  }
  if(section==='faculty'){
@@ -1169,6 +1180,7 @@ function wordExportTargets(key){
    const out=[];
    for(const f of ['date','day','time','topic','faculty']){
     if(clean(be[f])===clean(ce[f]))continue;
+    if(f==='day'){const t=scheduleDayTargets(be,ce,src);if(!t)return exportManual('SyllabusBridge could not tell which day to change in this row of the schedule table (the day is missing or appears more than once). Change the day by hand in Word.');out.push(...t);continue}
     const col=src.columnMap?.[f],what={date:'date',day:'day',time:'time',topic:'topic',faculty:'faculty'}[f];
     if(col==null)return exportManual(`The ${what} for this entry is not in its own column of the schedule table (SyllabusBridge filled it in from elsewhere), so it cannot place the change. Make it by hand in Word.`);
     const cell=((baselineTable(src.tableIndex)?.rows||[]).find(r=>r.rowIndex===src.rowIndex)?.cells||[]).find(x=>x.columnIndex===col);
@@ -1205,6 +1217,47 @@ function wordExportTargets(key){
   }
  }
  return exportManual('SyllabusBridge cannot place this kind of edit in the Word file yet. Make it by hand in Word.')
+}
+// A section the Word file does not have, written in the editor: it goes where the
+// template puts it, at the end of the nearest earlier section the file does have,
+// with its heading (unless the faculty member typed one) formatted like the next
+// heading, and its text formatted like the earlier section's text.
+function newSectionTargets(key,after){
+ const rule=SECTION_RULES.find(r=>r.key===key),order=SECTION_RULES.map(r=>r.key),table=new Set(state.tableLineIndexes||[]),lines=state.lines||[];
+ const label=rule?.label||key,manual=exportManual(`The Word file has no “${label}” section, and SyllabusBridge could not tell where it belongs. Add the heading and text by hand in Word.`);
+ if(!rule)return manual;
+ let prev=null;for(let k=order.indexOf(key)-1;k>=0&&!prev;k--){const r=sectionLineRange(order[k]);if(r)prev=r}
+ if(!prev)return manual;
+ const text=after.map(clean).filter(Boolean),typed=rule.patterns.some(p=>p.test(text[0]||''));
+ const heading=typed?null:`${label.toUpperCase()}:`;
+ let body=prev[0];for(let i=prev[0]+1;i<prev[1];i++)if(!table.has(i)){body=i;break}
+ const end=prev[1];
+ if(end<lines.length&&!table.has(end))return[{type:'new-section',before:end,heading,lines:text,headingLike:end,bodyLike:body}];
+ if(!table.has(end-1))return[{type:'new-section',after:end-1,heading,lines:text,headingLike:prev[0],bodyLike:body}];
+ return manual
+}
+// The day can be printed in the date cell ("Friday 2/13/26") or a Day column, in
+// full or short ("Fri"). Changing the date changes the day there too, in the same
+// form. A day printed nowhere, and worked out from the date, needs no change.
+const DAY_FORMS={Monday:['Monday','Mon'],Tuesday:['Tuesday','Tues','Tue'],Wednesday:['Wednesday','Wed'],Thursday:['Thursday','Thurs','Thur','Thu'],Friday:['Friday','Fri'],Saturday:['Saturday','Sat'],Sunday:['Sunday','Sun']};
+function scheduleDayTargets(be,ce,src){
+ const cellOf=col=>cellLinesOf(((baselineTable(src.tableIndex)?.rows||[]).find(r=>r.rowIndex===src.rowIndex)?.cells||[]).find(x=>x.columnIndex===col));
+ const target=col=>({tableIndex:src.tableIndex,rowIndex:src.rowIndex,columnIndex:col});
+ const newForms=DAY_FORMS[ce.day]||null;
+ for(const col of [...new Set([src.columnMap?.day,src.columnMap?.date].filter(x=>x!=null))]){
+  const text=cellOf(col).join('\n');
+  for(const [i,form] of (DAY_FORMS[be.day]||[]).entries()){
+   const found=text.match(new RegExp(`\\b${form}\\b`,'gi'))||[];
+   if(found.length>1)return null;
+   if(!found.length)continue;
+   let to=newForms?(i===0?newForms[0]:newForms.at(-1)):'';
+   if(found[0]===found[0].toUpperCase())to=to.toUpperCase();
+   return[{type:'cell-substitute',...target(col),from:found[0],to}]
+  }
+ }
+ const dayCol=src.columnMap?.day;
+ if(dayCol!=null){const cl=cellOf(dayCol);return cl.some(l=>clean(l))?null:[{type:'cell',...target(dayCol),before:cl,after:[ce.day]}]}
+ return clean(ce.day)===dayFromDate(ce.date)?[]:null
 }
 function wordExportInput(){
  return{lines:state.lines||[],changes:changeSummary().flatMap(g=>g.items.map(i=>({...i,section:g.section,targets:wordExportTargets(i.key)})))}

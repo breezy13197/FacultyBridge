@@ -421,9 +421,10 @@ What is placed, and what is listed for faculty to do by hand:
 
 | Change | Placed? |
 |---|---|
+| A required section the Word file does not have, written in the editor | Yes. It goes at the end of the nearest earlier section the file has (in template order), with its heading in capitals (unless you typed one) formatted like the next heading. Bullets pasted from Word as symbols are written as "•". |
 | Policies and narrative sections (course description, accessibility, and the rest): lines changed, added, or removed | Yes. A heading line with text after its colon ("ACCESSIBILITY: text") keeps its label. New lines copy the formatting of the line before; a new line typed with the bullet becomes a list item. |
 | Structured tables (grading scale, assignments, rubric, due dates, teams): cells, added rows, removed rows | Yes. A new row copies the formatting of the row it follows. |
-| Course schedule: changed date, time, topic, or faculty; added and removed entries | Yes, when the value is in its own cell and appears there once. A removed entry that shares its table row with entries you kept is listed. A time SyllabusBridge filled in from the meeting pattern is listed. A new entry is listed whole if the table has no column for something you typed (for example no Time or Faculty column); a weekday worked out from the date may be left out. |
+| Course schedule: changed date, time, topic, or faculty; added and removed entries | Yes, when the value is in its own cell and appears there once. A day printed in the date cell ("Friday 2/13/26") or a Day column changes with the date, in the same form ("Fri" stays short); a day printed nowhere needs no change. A removed entry that shares its table row with entries you kept is listed. A time SyllabusBridge filled in from the meeting pattern is listed. A new entry is listed whole if the table has no column for something you typed (for example no Time or Faculty column); a weekday worked out from the date may be left out. |
 | Course code, title, location | Yes, when the old text appears once in the line it was read from. |
 | Faculty name or email; CLO wording; grade item name or weight | Yes, when the old text appears exactly once where it was read. |
 | Year; adding or removing faculty, CLOs, or grade items; PSLO mapping; moving someone between coordinator and course faculty; grade type or date (worked out by SyllabusBridge) | Listed, with the reason. |
@@ -448,6 +449,17 @@ Acceptance criteria (covered by `e2e/syllabusbridge-word-export.spec.js` and
   and reject changes. Required before release; this environment has no Word.
 - [ ] Run the export on the real template and the syllabus regression set
   (`docs/RELEASE-CHECKLIST.md`), outside the repository.
+
+Faculty feedback, fixed (2026-11-13; regressions with synthetic data in the same spec):
+- A required section missing from the Word file and written in the editor
+  stayed a warning ("heading was not detected") even with the heading typed in
+  the box. Now the Approved template check passes with "[Section] was added in
+  SyllabusBridge." and the next step "Choose “Export edited Word syllabus” to
+  add it to the Word file."; typing the heading as the first line of section
+  text read without one also counts. Export writes the section into the Word file.
+- Changing a date in a cell that also names the day ("Friday 2/13/26") was
+  listed as "could not place", because the day changed with it and has no
+  column of its own. The day word in that cell now changes with the date.
 
 Known limits:
 - A removed row that is still a pending tracked change is read by
