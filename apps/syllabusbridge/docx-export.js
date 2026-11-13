@@ -33,9 +33,10 @@
 //   { type:'cell-substitute', tableIndex, rowIndex, columnIndex, from, to }
 //   { type:'delete-row', tableIndex, rowIndex, before:[[line]] }  (one array per cell)
 //   { type:'add-row', tableIndex, afterRowIndex, order, id, cells:[string] }
-//   { type:'new-section', before|after: lineIndex, heading, lines:[line], headingLike, bodyLike }
+//   { type:'new-section', before|after: lineIndex, heading, lines:[line], headingLike, bodyLike, order }
 //        A section the Word file lacks: new paragraphs before or after that
 //        line; the heading formatted like line headingLike, the text like bodyLike.
+//        Sections added at the same place are written in `order` (template order).
 //   { type:'manual', reason }   cannot be placed; listed with the reason.
 (function (root) {
   const clean = s => String(s ?? '').replace(/\s+/g, ' ').trim();
@@ -343,8 +344,9 @@
         if (e.inCell) fail('SyllabusBridge could not place this section without changing a table. Add the heading and text by hand in Word.');
         const format = i => { const r = map.lines[i]; const f = r && r.ok && map.paragraphs.get(r.key); return f && !f.inCell ? f.anchor : e.anchor; };
         const entries = [];
-        if (t.heading) entries.push({ text: clean(t.heading), keepList: false, format: format(t.headingLike), key: owner });
-        for (const line of t.lines || []) if (clean(line)) entries.push({ text: bulletText(line), keepList: false, format: format(t.bodyLike), key: owner });
+        const section = { order: t.order ?? 0 };
+        if (t.heading) entries.push({ text: clean(t.heading), keepList: false, format: format(t.headingLike), key: owner, section });
+        for (const line of t.lines || []) if (clean(line)) entries.push({ text: bulletText(line), keepList: false, format: format(t.bodyLike), key: owner, section });
         if (!entries.length) fail('This section is empty. Type its text in SyllabusBridge, or add it by hand in Word.');
         const w = state(ref.key); touch(w, false);
         w[t.before != null ? 'before' : 'after'].push(...entries);
@@ -401,6 +403,13 @@
         for (const w of work.values()) {
           const e = map.paragraphs.get(w.key);
           if (!w.touched) continue;
+          // Added sections that share a place go in template order; other new
+          // lines keep the order they were made in (the sort is stable).
+          for (const list of [w.before, w.after]) {
+            const slots = list.map((x, i) => (x.section ? i : -1)).filter(i => i >= 0);
+            const sorted = slots.map(i => list[i]).sort((a, b) => a.section.order - b.section.order);
+            slots.forEach((i, k) => { list[i] = sorted[k]; });
+          }
           for (const ins of w.before) out.push({ anchor: e.anchor, action: 'insert-before', expectedText: e.raw, newText: ins.text, keepList: ins.keepList, formatAnchor: ins.format, keys: new Set([ins.key]) });
           if (w.deleted) out.push({ anchor: e.anchor, expectedText: e.raw, newText: null, keys: w.keys });
           else {

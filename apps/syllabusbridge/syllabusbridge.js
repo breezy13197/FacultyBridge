@@ -723,7 +723,7 @@ function recordScheduleCellMutation(e,field,newValue){
  let original=sourceLine;
  if(field==='date')original=extractDates(sourceLine)[0]||clean(sourceLine);
  else if(field==='time')original=extractTime(sourceLine)||clean(sourceLine);
- else if(field==='day')original=normalizeDay(sourceLine)||clean(sourceLine);
+ else if(field==='day')original=namedDay(sourceLine)||clean(sourceLine);
  const key=`schedule:${x.table.tableIndex}:${e.source.rowIndex}:${x.col}:${x.lineIndex}:${field}`,i=state.tableMutations.findIndex(m=>m.key===key);
  if(clean(newValue)===clean(original)){if(i>=0)state.tableMutations.splice(i,1);return}
  const mutation={key,action:'update-cell',active:true,origin:'schedule-editor',field,tableIndex:x.table.tableIndex,tableType:'courseSchedule',sourceRowIndex:e.source.rowIndex,sourceColumnIndex:x.col,sourceLineIndex:x.lineIndex,originalValue:original,newValue:clean(newValue),scheduleEditorId:e.editorId||null};
@@ -1232,29 +1232,32 @@ function newSectionTargets(key,after){
  const heading=typed?null:`${label.toUpperCase()}:`;
  let body=prev[0];for(let i=prev[0]+1;i<prev[1];i++)if(!table.has(i)){body=i;break}
  const end=prev[1];
- if(end<lines.length&&!table.has(end))return[{type:'new-section',before:end,heading,lines:text,headingLike:end,bodyLike:body}];
- if(!table.has(end-1))return[{type:'new-section',after:end-1,heading,lines:text,headingLike:prev[0],bodyLike:body}];
+ if(end<lines.length&&!table.has(end))return[{type:'new-section',before:end,heading,lines:text,headingLike:end,bodyLike:body,order:order.indexOf(key)}];
+ if(!table.has(end-1))return[{type:'new-section',after:end-1,heading,lines:text,headingLike:prev[0],bodyLike:body,order:order.indexOf(key)}];
  return manual
 }
-// The day can be printed in the date cell ("Friday 2/13/26") or a Day column, in
-// full or short ("Fri"). Changing the date changes the day there too, in the same
-// form. A day printed nowhere, and worked out from the date, needs no change.
+// The day can be printed in the date cell ("Friday 2/13/26"), a Day column, or
+// both, in full or short ("Fri"). Changing the date changes the day in every
+// one of those cells, in the same form. If a cell names the old day more than
+// once, it is not clear which to change, so the whole change is listed. A day
+// printed nowhere, and worked out from the date, needs no change.
 const DAY_FORMS={Monday:['Monday','Mon'],Tuesday:['Tuesday','Tues','Tue'],Wednesday:['Wednesday','Wed'],Thursday:['Thursday','Thurs','Thur','Thu'],Friday:['Friday','Fri'],Saturday:['Saturday','Sat'],Sunday:['Sunday','Sun']};
 function scheduleDayTargets(be,ce,src){
  const cellOf=col=>cellLinesOf(((baselineTable(src.tableIndex)?.rows||[]).find(r=>r.rowIndex===src.rowIndex)?.cells||[]).find(x=>x.columnIndex===col));
  const target=col=>({tableIndex:src.tableIndex,rowIndex:src.rowIndex,columnIndex:col});
- const newForms=DAY_FORMS[ce.day]||null;
+ const newForms=DAY_FORMS[ce.day]||null,out=[];
  for(const col of [...new Set([src.columnMap?.day,src.columnMap?.date].filter(x=>x!=null))]){
   const text=cellOf(col).join('\n');
-  for(const [i,form] of (DAY_FORMS[be.day]||[]).entries()){
-   const found=text.match(new RegExp(`\\b${form}\\b`,'gi'))||[];
-   if(found.length>1)return null;
-   if(!found.length)continue;
-   let to=newForms?(i===0?newForms[0]:newForms.at(-1)):'';
-   if(found[0]===found[0].toUpperCase())to=to.toUpperCase();
-   return[{type:'cell-substitute',...target(col),from:found[0],to}]
-  }
+  // Every form of the old day in this cell ("Friday" and "Fri" count together).
+  const found=(DAY_FORMS[be.day]||[]).flatMap((form,i)=>(text.match(new RegExp(`\\b${form}\\b`,'gi'))||[]).map(m=>({m,i})));
+  if(found.length>1)return null;
+  if(!found.length)continue;
+  const {m,i}=found[0];
+  let to=newForms?(i===0?newForms[0]:newForms.at(-1)):'';
+  if(m===m.toUpperCase())to=to.toUpperCase();
+  out.push({type:'cell-substitute',...target(col),from:m,to})
  }
+ if(out.length)return out;
  const dayCol=src.columnMap?.day;
  if(dayCol!=null){const cl=cellOf(dayCol);return cl.some(l=>clean(l))?null:[{type:'cell',...target(dayCol),before:cl,after:[ce.day]}]}
  return clean(ce.day)===dayFromDate(ce.date)?[]:null

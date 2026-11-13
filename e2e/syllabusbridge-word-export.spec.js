@@ -304,3 +304,49 @@ test('changing a date in a "Friday 2/13/26" cell also changes the day word', asy
   await upload(page, await accepted(out.bytes));
   expect(await page.evaluate(() => state.rawTables.at(-1).slice(2).map(r => r[1].text))).toEqual(['Monday 1/4/27', 'Thu 1/7/27', 'Friday 2/12/27']);
 });
+
+// Review findings: a weekday printed in both the Date cell and a Day column
+// changes in both places; when it is not clear which word to change, the whole
+// change is listed instead.
+test('a date change updates the weekday in the Date cell and the Day column; an unclear weekday is listed', async ({ page, openTool }) => {
+  const table = [['Lecture', 'Date', 'Day', 'Course Topics', 'Instructor'],
+    ['1', 'Monday 1/4/27', 'Mon', 'Bacteria I', 'Dr. Ada Faculty'],
+    ['2', 'Friday 2/13/26', 'Fri', 'Innate Immunity', 'Dr. Ada Faculty'],
+    ['3', 'Friday 2/20/27 (Friday lab)', 'Fri', 'Lab review', 'Dr. Ada Faculty']];
+  await openTool('syllabusbridge');
+  await upload(page, await scheduleOnly(table));
+  await setField(page.locator('#scheduleBody .s-date').nth(1), '2/11/27');
+  await setField(page.locator('#scheduleBody .s-date').nth(2), '2/18/27');
+  await page.locator('#exportWord').click();
+  const dialog = exportDialog(page);
+  await expect(dialog).toContainText('1 syllabus edit will be written as tracked changes.');
+  const listed = dialog.locator('.sb-export-unplaced tbody tr');
+  await expect(listed).toHaveCount(1);
+  await expect(listed).toContainText('Lab review');
+  await expect(listed).toContainText('could not tell which day to change');
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  const out = await exportWord(page);
+  await upload(page, await accepted(out.bytes));
+  expect(await page.evaluate(() => state.rawTables.at(-1).slice(1).map(r => `${r[1].text} | ${r[2].text}`)))
+    .toEqual(['Monday 1/4/27 | Mon', 'Thursday 2/11/27 | Thu', 'Friday 2/20/27 (Friday lab) | Fri']);
+});
+
+// Review finding: several sections added at the same place follow the template order.
+test('two missing sections added together are written in template order', async ({ page, openTool }) => {
+  const body = ['PHA9999 - Synthetic Course', 'Course Coordinator: Dr. Ada Faculty', 'Fall 2026',
+    'REQUIRED TEXTBOOKS AND RELATED MATERIALS:', 'A synthetic textbook, 1st edition.',
+    'STUDENT ENGAGEMENT:', 'Synthetic engagement wording for testing only.', 'Course Schedule', schedule];
+  await openTool('syllabusbridge');
+  await upload(page, { name: 'syllabus.docx', mimeType: DOCX_MIME, buffer: await syntheticDocxBody(body) });
+  await setField(page.locator('#review-accessibility textarea'), 'Synthetic accessibility wording for testing only.');
+  await setField(page.locator('#review-hardware textarea'), 'Synthetic hardware wording for testing only.');
+  const out = await exportWord(page);
+  await upload(page, await accepted(out.bytes));
+  const lines = await page.evaluate(() => state.lines);
+  const at = t => lines.indexOf(t);
+  expect(at('REQUIRED HARDWARE AND SOFTWARE:')).toBeGreaterThan(at('A synthetic textbook, 1st edition.'));
+  expect(at('Synthetic hardware wording for testing only.')).toBe(at('REQUIRED HARDWARE AND SOFTWARE:') + 1);
+  expect(at('ACCESSIBILITY AND DISABILITY ACCOMMODATION:')).toBe(at('Synthetic hardware wording for testing only.') + 1);
+  expect(at('Synthetic accessibility wording for testing only.')).toBe(at('ACCESSIBILITY AND DISABILITY ACCOMMODATION:') + 1);
+  expect(at('STUDENT ENGAGEMENT:')).toBe(at('Synthetic accessibility wording for testing only.') + 1);
+});

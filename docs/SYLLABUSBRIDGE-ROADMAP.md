@@ -421,10 +421,10 @@ What is placed, and what is listed for faculty to do by hand:
 
 | Change | Placed? |
 |---|---|
-| A required section the Word file does not have, written in the editor | Yes. It goes at the end of the nearest earlier section the file has (in template order), with its heading in capitals (unless you typed one) formatted like the next heading. Bullets pasted from Word as symbols are written as "•". |
+| A required section the Word file does not have, written in the editor | Yes. It goes at the end of the nearest earlier section the file has (in template order; several sections added at one place keep template order), with its heading in capitals (unless you typed one) formatted like the next heading. Bullets pasted from Word as symbols are written as "•". |
 | Policies and narrative sections (course description, accessibility, and the rest): lines changed, added, or removed | Yes. A heading line with text after its colon ("ACCESSIBILITY: text") keeps its label. New lines copy the formatting of the line before; a new line typed with the bullet becomes a list item. |
 | Structured tables (grading scale, assignments, rubric, due dates, teams): cells, added rows, removed rows | Yes. A new row copies the formatting of the row it follows. |
-| Course schedule: changed date, time, topic, or faculty; added and removed entries | Yes, when the value is in its own cell and appears there once. A day printed in the date cell ("Friday 2/13/26") or a Day column changes with the date, in the same form ("Fri" stays short); a day printed nowhere needs no change. A removed entry that shares its table row with entries you kept is listed. A time SyllabusBridge filled in from the meeting pattern is listed. A new entry is listed whole if the table has no column for something you typed (for example no Time or Faculty column); a weekday worked out from the date may be left out. |
+| Course schedule: changed date, time, topic, or faculty; added and removed entries | Yes, when the value is in its own cell and appears there once. A day printed in the date cell ("Friday 2/13/26"), a Day column, or both changes with the date in every one of those cells, in the same form ("Fri" stays short); if a cell names the old day more than once, the change is listed. A day printed nowhere needs no change. A removed entry that shares its table row with entries you kept is listed. A time SyllabusBridge filled in from the meeting pattern is listed. A new entry is listed whole if the table has no column for something you typed (for example no Time or Faculty column); a weekday worked out from the date may be left out. |
 | Course code, title, location | Yes, when the old text appears once in the line it was read from. |
 | Faculty name or email; CLO wording; grade item name or weight | Yes, when the old text appears exactly once where it was read. |
 | Year; adding or removing faculty, CLOs, or grade items; PSLO mapping; moving someone between coordinator and course faculty; grade type or date (worked out by SyllabusBridge) | Listed, with the reason. |
@@ -460,6 +460,14 @@ Faculty feedback, fixed (2026-11-13; regressions with synthetic data in the same
 - Changing a date in a cell that also names the day ("Friday 2/13/26") was
   listed as "could not place", because the day changed with it and has no
   column of its own. The day word in that cell now changes with the date.
+
+Review findings, fixed (2026-11-13):
+- A weekday printed in both the Date cell and a Day column changed only in the
+  Day column. Every printed copy now changes; an unclear one lists the change.
+- Missing sections added together followed the order the changes were made in,
+  not the template order. They now follow the template order.
+- Changing a date in a schedule table with a Day column showed an error in the
+  editor ("normalizeDay is not defined", also on `main`); fixed.
 
 Known limits:
 - A removed row that is still a pending tracked change is read by
