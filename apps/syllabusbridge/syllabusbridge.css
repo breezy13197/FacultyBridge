@@ -84,3 +84,4 @@
 .sb-resolved{margin-top:8px;font-weight:800;color:var(--ft-success-strong)}
 .sb-fix-link{margin-top:4px;font-size:12px;font-weight:700;color:var(--ft-text-muted)}
 .sb-fix-target{outline:3px solid color-mix(in srgb,var(--ft-sb-accent) 70%,transparent);outline-offset:3px}
+.sb-export-counts{list-style:none;padding:0;margin:12px 0;display:grid;gap:8px}.sb-export-counts li{display:flex;gap:8px;align-items:flex-start}.sb-export-unplaced{margin-top:14px}.sb-export-unplaced h3{font-size:15px;margin:0 0 8px}.sb-export-unplaced td:last-child{min-width:200px}.sb-export-done{margin:10px 0 0;font-weight:700}.sb-export-done:empty{display:none}

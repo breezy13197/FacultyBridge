@@ -1,6 +1,7 @@
 # SyllabusBridge roadmap
 
 Status: planning document. Nothing here is built yet unless a section says so.
+v2.2, v2.3, and v2.5 are built and not yet released.
 Current release: SyllabusBridge **2.1.2** (see `suite.json`).
 
 ## The goal
@@ -154,9 +155,10 @@ Still to come:
 - ~~**Fix for a finding**~~: done in v2.3 (item 3). An edit made from a
   finding's "Fix this" is linked to it, and the report shows "Resolved by your
   edit" after revalidating.
-- **Paragraph locations** in the parser for body text (from the round-trip
-  findings). This comes with the v2.5 Word export work, because it changes
-  the protected parsing code.
+- ~~**Paragraph locations** in the parser for body text~~: not needed after
+  all. v2.5's export finds each line's paragraph by reading the original Word
+  file again the same way the parser does (see v2.5), so the protected parsing
+  code did not change.
 - A parser QA log export of reading corrections (to find where the parser
   most needs work).
 
@@ -387,9 +389,99 @@ Still to come:
 
 ---
 
-## v2.5 — Export an edited Word syllabus
+## v2.5 — Export an edited Word syllabus — done (unreleased)
 
-### 1. Export as Word tracked changes
+### What shipped
+
+- **Export edited Word syllabus** sits in the structured editor and on the
+  Validation report. It first shows a preview: how many syllabus edits will be
+  written, how many reading corrections are left out, and a **Make these by
+  hand in Word** list (each with before, after, and why it was not placed).
+  **Download edited Word syllabus** then saves
+  `Original-Name-SyllabusBridge-edits.docx`. The original file is not changed.
+- Every edit is a Word tracked change by "SyllabusBridge", so faculty accept
+  or reject each one in Word (Review tab).
+- **Reading corrections are never written.** A change is written whole or not
+  at all: if any part of it can't be placed safely, none of it is written and
+  it is listed. No edit is dropped silently.
+- How edits find their place: SyllabusBridge keeps the original Word file in
+  memory after upload (and after reopening a project, the file chosen then).
+  At export it reads that file again the same way its reader does, line by
+  line, so each line it read is tied to a paragraph (and, in a table cell, a
+  line within it). If the two readings disagree, nothing is placed there. The
+  parser itself did not change (see v2.2 item 3).
+- Only the words that changed are written; spacing (such as a tab after a
+  label), bold labels, red instruction text, bullets, and alignment around
+  them stay as they were.
+- Code: `apps/syllabusbridge/docx-export.js` (what goes where) and
+  `apps/syllabusbridge/docx-writeback.js` (the writer from the v2.2 round-trip
+  test, now loaded by the page and extended for rows and new paragraphs).
+
+What is placed, and what is listed for faculty to do by hand:
+
+| Change | Placed? |
+|---|---|
+| A required section the Word file does not have, written in the editor | Yes. It goes at the end of the nearest earlier section the file has (in template order; several sections added at one place keep template order), with its heading in capitals (unless you typed one) formatted like the next heading. Bullets pasted from Word as symbols are written as "•". |
+| Policies and narrative sections (course description, accessibility, and the rest): lines changed, added, or removed | Yes. A heading line with text after its colon ("ACCESSIBILITY: text") keeps its label. New lines copy the formatting of the line before; a new line typed with the bullet becomes a list item. |
+| Structured tables (grading scale, assignments, rubric, due dates, teams): cells, added rows, removed rows | Yes. A new row copies the formatting of the row it follows. |
+| Course schedule: changed date, time, topic, or faculty; added and removed entries | Yes, when the value is in its own cell and appears there once. A day printed in the date cell ("Friday 2/13/26"), a Day column, or both changes with the date in every one of those cells, in the same form ("Fri" stays short); if a cell names the old day more than once, the change is listed. A day printed nowhere needs no change. A removed entry that shares its table row with entries you kept is listed. A time SyllabusBridge filled in from the meeting pattern is listed. A new entry is listed whole if the table has no column for something you typed (for example no Time or Faculty column); a weekday worked out from the date may be left out. |
+| Course code, title, location | Yes, when the old text appears once in the line it was read from. |
+| Faculty name or email; CLO wording; grade item name or weight | Yes, when the old text appears exactly once where it was read. |
+| Year; adding or removing faculty, CLOs, or grade items; PSLO mapping; moving someone between coordinator and course faculty; grade type or date (worked out by SyllabusBridge) | Listed, with the reason. |
+| Paragraphs with links, fields, pictures, comments, content controls, or unaccepted tracked changes | Listed (the writer refuses them; see the round-trip findings). |
+
+Acceptance criteria (covered by `e2e/syllabusbridge-word-export.spec.js` and
+`tests/syllabusbridge-export.test.mjs`):
+- [x] Every syllabus edit appears once as a tracked change in the right place,
+  or in the "could not place" list with a reason; a change is never half
+  written.
+- [x] No reading correction appears in the exported file.
+- [x] Re-uploading the exported file (after accepting all changes) reads every
+  edit back, and a finding fixed with **Fix this** passes on revalidation.
+- [x] A reopened project exports against the Word file chosen when reopening.
+- [x] Only `word/document.xml` changes; with nothing to place, nothing can be
+  downloaded.
+- [x] The exported file opens in **LibreOffice** 24.2 with every edit shown as
+  a tracked change by SyllabusBridge; **Accept All** gives the edited syllabus
+  and **Reject All** gives back the original text and tables (checked by hand
+  on a development machine with the synthetic syllabus; not part of CI).
+- [x] **Open the exported file in Microsoft Word**, accept and reject changes.
+  Checked by the project owner on 2026-11-13 with several real syllabi
+  (outside the repository): exported copies opened in Word, accepting or
+  rejecting the changes behaved as expected, and uploading the result to
+  SyllabusBridge again gave the expected validation results.
+- [ ] Run the export on the full syllabus regression set and record it in the
+  release record (`docs/RELEASE-CHECKLIST.md`), as part of the release.
+
+Faculty feedback, fixed (2026-11-13; regressions with synthetic data in the same spec):
+- A required section missing from the Word file and written in the editor
+  stayed a warning ("heading was not detected") even with the heading typed in
+  the box. Now the Approved template check passes with "[Section] was added in
+  SyllabusBridge." and the next step "Choose “Export edited Word syllabus” to
+  add it to the Word file."; typing the heading as the first line of section
+  text read without one also counts. Export writes the section into the Word file.
+- Changing a date in a cell that also names the day ("Friday 2/13/26") was
+  listed as "could not place", because the day changed with it and has no
+  column of its own. The day word in that cell now changes with the date.
+
+Review findings, fixed (2026-11-13):
+- A weekday printed in both the Date cell and a Day column changed only in the
+  Day column. Every printed copy now changes; an unclear one lists the change.
+- Missing sections added together followed the order the changes were made in,
+  not the template order. They now follow the template order.
+- Changing a date in a schedule table with a Day column showed an error in the
+  editor ("normalizeDay is not defined", also on `main`); fixed.
+
+Known limits:
+- A removed row that is still a pending tracked change is read by
+  SyllabusBridge as an empty row until it is accepted in Word.
+- New paragraphs before a section's heading line, and edits spanning several
+  places at once (for example one change that moves text between sections),
+  are listed rather than placed.
+- Word comments naming the finding each change fixed (an optional idea below)
+  are not added yet.
+
+### 1. Export as Word tracked changes (as planned)
 
 - SyllabusBridge writes edits into a **new copy** of the original .docx, named
   like `Original-Name-SyllabusBridge-edits.docx`.
