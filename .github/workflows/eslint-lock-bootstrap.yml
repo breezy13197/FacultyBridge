@@ -1,0 +1,30 @@
+# Temporary PR-only job to generate a lockfile in an isolated GitHub runner.
+# Remove this workflow from the final PR after committing the lockfile.
+name: ESLint lock bootstrap (temporary)
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  prepare-lock:
+    if: github.head_ref == 'chore/eslint-static-analysis'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Regenerate npm lockfile without executing package scripts
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Emit lockfile segments for review and commit
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const contents = fs.readFileSync('package-lock.json', 'utf8');
+          for (let i = 0; i < contents.length; i += 2000) {
+            console.log('ESLINT_LOCK_CHUNK:' + i + ':' + JSON.stringify(contents.slice(i, i + 2000)));
+          }
+          console.log('ESLINT_LOCK_END:' + contents.length);
+          JS
