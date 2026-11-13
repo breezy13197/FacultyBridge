@@ -23,6 +23,8 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - name: Lint JavaScript for common bugs
+        run: npm run lint
       - name: Guard against committed course fixtures
         run: |
           if [ -n "$(git ls-files 'tests/test files' 'tests/test-files' 'tests/local-baselines')" ]; then
