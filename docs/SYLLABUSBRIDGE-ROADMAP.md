@@ -445,10 +445,13 @@ Acceptance criteria (covered by `e2e/syllabusbridge-word-export.spec.js` and
   a tracked change by SyllabusBridge; **Accept All** gives the edited syllabus
   and **Reject All** gives back the original text and tables (checked by hand
   on a development machine with the synthetic syllabus; not part of CI).
-- [ ] **Open the exported file in Microsoft Word** (desktop and web), accept
-  and reject changes. Required before release; this environment has no Word.
-- [ ] Run the export on the real template and the syllabus regression set
-  (`docs/RELEASE-CHECKLIST.md`), outside the repository.
+- [x] **Open the exported file in Microsoft Word**, accept and reject changes.
+  Checked by the project owner on 2026-11-13 with several real syllabi
+  (outside the repository): exported copies opened in Word, accepting or
+  rejecting the changes behaved as expected, and uploading the result to
+  SyllabusBridge again gave the expected validation results.
+- [ ] Run the export on the full syllabus regression set and record it in the
+  release record (`docs/RELEASE-CHECKLIST.md`), as part of the release.
 
 Faculty feedback, fixed (2026-11-13; regressions with synthetic data in the same spec):
 - A required section missing from the Word file and written in the editor
