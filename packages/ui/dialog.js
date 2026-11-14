@@ -265,7 +265,7 @@
   }
 
   /*
-   * Ask for typed input. Resolves with the text, or null when cancelled.
+   * Ask for typed input. Resolves with the text, or null when canceled.
    *   label: visible field label (defaults to the message)
    *   validate(value): return an error sentence to keep the pop-up open
    */
