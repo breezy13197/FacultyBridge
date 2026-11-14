@@ -161,3 +161,61 @@ test('QuestionBridge: a file named .xlsx that is not a real spreadsheet gets sav
   await expect(page.locator('#parseStatus')).not.toContainText('.docx or .txt');
   expect(await loggedErrors(page)).toEqual([expect.stringContaining('This .xlsx file could not be opened.')]);
 });
+
+// A missing or unusable answer key must never be invented from another column (the
+// template's "Time limit" sits just before "Correct answer(s)") and must be flagged
+// for faculty confirmation instead of imported as high confidence.
+test('QuestionBridge: Kahoot answer keys are never guessed from the time limit or from invalid numbers', async ({ page, openTool }) => {
+  const esc = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const col = i => String.fromCharCode(65 + i);
+  const row = (r, values) => `<row r="${r}">${values.map((v, i) => v === '' ? '' : typeof v === 'number'
+    ? `<c r="${col(i)}${r}"><v>${v}</v></c>`
+    : `<c r="${col(i)}${r}" t="inlineStr"><is><t>${esc(v)}</t></is></c>`).join('')}</row>`;
+  const rows = [
+    ['Question - max 120 characters', 'Answer 1 - max 75 characters', 'Answer 2 - max 75 characters',
+      'Answer 3 - max 75 characters', 'Answer 4 - max 75 characters', 'Time limit (sec)', 'Correct answer(s) - choose at least one'],
+    ['Synthetic blank key with a 20 second limit', 'Alpha', 'Bravo', 'Charlie', 'Delta', 20, ''],
+    ['Synthetic blank key with a 2 second limit', 'Alpha', 'Bravo', 'Charlie', 'Delta', 2, ''],
+    ['Synthetic repeated key', 'Alpha', 'Bravo', 'Charlie', 'Delta', 20, '1,1'],
+    ['Synthetic key beyond the answers', 'Alpha', 'Bravo', 'Charlie', 'Delta', 20, 5],
+    ['Synthetic key pointing at an empty answer', 'Alpha', 'Bravo', '', 'Delta', 20, 3],
+    ['Synthetic valid key', 'Alpha', 'Bravo', 'Charlie', 'Delta', 30, 2],
+  ];
+  const zip = new JSZip();
+  zip.file('xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>');
+  zip.file('xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>');
+  zip.file('xl/worksheets/sheet1.xml', '<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>' +
+    rows.map((values, i) => row(i + 1, values)).join('') + '</sheetData></worksheet>');
+
+  await openTool('questionbridge');
+  await page.locator('[data-screen="upload"]').click();
+  await page.locator('#fileInput').setInputFiles({
+    name: 'synthetic-kahoot-keys.xlsx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer: await zip.generateAsync({ type: 'nodebuffer' }),
+  });
+  const items = page.locator('#questionList .qb-question-item');
+  await expect(items).toHaveCount(6);
+
+  const expected = [
+    { type: 'mc', correct: [false, false, false, false], needsConfirm: true, reason: 'No answer in the Kahoot "Correct answer(s)" column' },
+    { type: 'mc', correct: [false, false, false, false], needsConfirm: true, reason: 'No answer in the Kahoot "Correct answer(s)" column' },
+    { type: 'mc', correct: [true, false, false, false], needsConfirm: false },
+    { type: 'mc', correct: [false, false, false, false], needsConfirm: true, reason: 'Kahoot "Correct answer(s)" column lists answer 5, which is blank or missing' },
+    { type: 'mc', correct: [false, false, false], needsConfirm: true, reason: 'Kahoot "Correct answer(s)" column lists answer 3, which is blank or missing' },
+    { type: 'mc', correct: [false, true, false, false], needsConfirm: false },
+  ];
+  for (const [i, want] of expected.entries()) {
+    await items.nth(i).click();
+    const { type, correct } = await editorContents(page);
+    const needsConfirm = await page.locator('#confirmParsedQuestion').count() > 0;
+    const { reason, ...rest } = want;
+    expect.soft({ question: i + 1, type, correct, needsConfirm }).toEqual({ question: i + 1, ...rest });
+    // The reason tells faculty why confirmation is needed, naming the column they will see.
+    if (reason) await expect.soft(page.locator('#questionState')).toContainText(reason);
+  }
+  // On the validation screen the reason sits inside the shared confirmation message.
+  await page.locator('[data-screen="validate"]').click();
+  await expect(page.locator('main')).toContainText('(No answer in the Kahoot "Correct answer(s)" column). Check the answer, then select Confirm.');
+  await expect(page.locator('main')).not.toContainText('.).');
+});
