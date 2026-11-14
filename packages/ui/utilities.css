@@ -9,9 +9,15 @@
 .ft-p-4 { padding: var(--ft-space-4); }
 .ft-p-6 { padding: var(--ft-space-6); }
 .ft-p-8 { padding: var(--ft-space-8); }
+.ft-mt-1 { margin-top: var(--ft-space-1); }
+.ft-mt-2 { margin-top: var(--ft-space-2); }
+.ft-mt-3 { margin-top: var(--ft-space-3); }
 .ft-mt-4 { margin-top: var(--ft-space-4); }
+.ft-mt-5 { margin-top: var(--ft-space-5); }
 .ft-mt-6 { margin-top: var(--ft-space-6); }
+.ft-mb-3 { margin-bottom: var(--ft-space-3); }
 .ft-mb-4 { margin-bottom: var(--ft-space-4); }
+.ft-mb-6 { margin-bottom: var(--ft-space-6); }
 .ft-w-full { width: 100%; }
 .ft-text-center { text-align: center; }
 @media (max-width: 800px) { .ft-grid-2, .ft-grid-3, .ft-grid-4 { grid-template-columns: 1fr; } }

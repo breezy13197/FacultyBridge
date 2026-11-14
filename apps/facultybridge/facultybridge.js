@@ -1,93 +1,74 @@
+// What each card says. Version, link, and color for the seven tools are filled in
+// from suite.json just below, so they are not repeated here.
 const FB_TOOLS = [
   {
     id: 'syllabusbridge',
     name: 'SyllabusBridge',
-    version: 'v2.1',
     category: 'Course preparation',
     description: 'Preflight a Word syllabus, review the structured extraction, and validate course information, outcomes, assessments, policies, and schedule data.',
     input: 'Course DOCX',
     output: 'Validated syllabus data',
-    url: './SyllabusBridge/index.html',
     status: 'Available',
-    accent: '#d6a51d',
     icon: 'syllabus'
   },
   {
     id: 'calendarbridge',
     name: 'CalendarBridge',
-    version: 'v7.5.3',
     category: 'Course preparation',
     description: 'Turn a syllabus or FacultyBridge Course JSON into reviewed faculty calendars and standard calendar files.',
     input: 'DOCX / Course JSON',
     output: 'Faculty calendars',
-    url: './CalendarBridge/index.html',
     status: 'Available',
-    accent: '#f07a24',
     icon: 'calendar'
   },
   {
     id: 'questionbridge',
     name: 'QuestionBridge',
-    version: 'v4.2',
     category: 'Assessment development',
     description: 'Convert, edit, validate, and export assessment questions across the platforms faculty already use.',
     input: 'Question banks',
     output: 'LMS & quiz platforms',
-    url: './QuestionBridge/index.html',
     status: 'Available',
-    accent: '#4a9a36',
     icon: 'questions'
   },
   {
     id: 'exambridge',
     name: 'ExamBridge',
-    version: 'v1.8.1',
     category: 'Pre-exam quality',
     description: 'Review an ExamSoft draft against faculty-approved exam-writing rules, question weights, tagging, and figure checks before administration.',
     input: 'ExamSoft exam export',
     output: 'Quality review report',
-    url: './ExamBridge/index.html',
     status: 'In development',
-    accent: '#8b5bb7',
     icon: 'exam'
   },
   {
     id: 'itembridge',
     name: 'ItemBridge',
-    version: 'v1.8.4',
     category: 'Post-exam analysis',
     description: 'Prioritize ExamSoft items for faculty review using psychometrics, tags, distractor performance, and repeated-item history.',
     input: 'Item Analysis CSV',
     output: 'Prioritized item review',
-    url: './ItemBridge/index.html',
     status: 'In development',
-    accent: '#169c9b',
     icon: 'items'
   },
   {
     id: 'gradebridge',
     name: 'GradeBridge',
-    version: 'v6.0.1',
     category: 'Grade management',
     description: 'Match student records and move raw grades from ExamSoft into a Brightspace-ready file with a faculty-controlled final audit.',
     input: 'ExamSoft + Brightspace',
     output: 'Brightspace grade CSV',
-    url: './GradeBridge/index.html',
     status: 'Available',
-    accent: '#2588d8',
     icon: 'grades'
   },
   {
     id: 'groupbridge',
     name: 'GroupBridge',
-    version: 'v1.2.1',
     category: 'Class management',
     description: 'Create random or grade-balanced student groups from a Brightspace roster, respect pair constraints, review the result, and export enrollments.',
     input: 'Brightspace roster',
     output: 'Groups & enrollment CSV',
-    url: './GroupBridge/index.html',
     status: 'Available',
-    accent: '#c94f38',
     icon: 'groups'
   },
   {
@@ -152,23 +133,12 @@ function renderTools() {
 }
 
 function setupTheme() {
+  // packages/ui/runtime.js has already applied the saved theme; this only wires the button.
   const root = document.documentElement;
-  try {
-    const saved = localStorage.getItem('ft-theme');
-    if (saved === 'dark') root.dataset.ftTheme = 'dark';
-  } catch (_) {}
   document.getElementById('themeToggle').addEventListener('click', () => {
     const dark = root.dataset.ftTheme === 'dark';
     root.dataset.ftTheme = dark ? 'light' : 'dark';
     try { localStorage.setItem('ft-theme', dark ? 'light' : 'dark'); } catch (_) {}
-  });
-}
-
-function setupToolLinks() {
-  document.addEventListener('click', event => {
-    const link = event.target.closest('[data-tool-link]');
-    if (!link) return;
-    try { localStorage.setItem('facultybridge-last-tool', link.dataset.toolLink); } catch (_) {}
   });
 }
 
@@ -180,5 +150,4 @@ function setupAboutDialog() {
 
 renderTools();
 setupTheme();
-setupToolLinks();
 setupAboutDialog();

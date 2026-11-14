@@ -85,6 +85,7 @@
       <div class="ft-card-soft ft-p-6"><strong>Standard card</strong><p class="ft-muted">Use for grouped secondary content.</p></div>
       <div class="ft-notice ft-notice-success"><strong>✓ Ready</strong><br><span class="ft-muted">Everything required is complete.</span></div>
       <div class="ft-notice ft-notice-warning"><strong>! Needs review</strong><br><span class="ft-muted">A user decision is required.</span></div>
+      <div class="ft-notice ft-notice-info"><strong><span aria-hidden="true">ⓘ</span> Good to know</strong><br><span class="ft-muted">Helpful background that needs no action.</span></div>
     </div>
   </section>
 
@@ -127,9 +128,11 @@
     <div class="ft-dialog-actions"><button class="ft-btn ft-btn-primary" type="button" data-ft-dialog-close>Close</button></div>
   </dialog>
 </div>
+<script src="../runtime.js"></script>
 <script src="../dialog.js"></script>
 <script>
-const root=document.documentElement;const saved=localStorage.getItem('ft-theme');if(saved==='dark')root.dataset.ftTheme='dark';document.getElementById('themeToggle').onclick=()=>{const dark=root.dataset.ftTheme==='dark';root.dataset.ftTheme=dark?'light':'dark';localStorage.setItem('ft-theme',dark?'light':'dark')};
+// runtime.js has already applied the saved theme and made storage safe to use when the browser blocks it.
+const root=document.documentElement;document.getElementById('themeToggle').onclick=()=>{const dark=root.dataset.ftTheme==='dark';root.dataset.ftTheme=dark?'light':'dark';localStorage.setItem('ft-theme',dark?'light':'dark')};
 const show=text=>{document.getElementById('demoResult').textContent=text};
 document.getElementById('demoConfirm').onclick=async()=>{const ok=await FTDialog.confirm('Delete Question 3? This cannot be undone.',{title:'Delete question?',confirmLabel:'Delete question',danger:true});show(ok?'Deleted (demo).':'Kept the question.')};
 document.getElementById('demoAlert').onclick=async()=>{await FTDialog.alert('Choose a Brightspace student first.',{title:'Student needed'});show('Notice acknowledged.')};
