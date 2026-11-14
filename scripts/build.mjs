@@ -16,7 +16,7 @@ function target(source) {
   const rel = path.relative(root, source).replaceAll(path.sep, '/');
   if (rel.startsWith('packages/ui/')) return path.join(site, 'assets/ui', rel.slice('packages/ui/'.length));
   if (rel.startsWith('vendor/')) return path.join(site, rel);
-  const [_, id, ...rest] = rel.split('/');
+  const [, id, ...rest] = rel.split('/');
   const tool = manifest.tools.find(t => t.id === id);
   if (!tool) throw new Error(`Unmapped local asset: ${rel}`);
   return path.join(site, tool.route, ...rest);
