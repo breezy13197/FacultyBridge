@@ -83,6 +83,14 @@ test('tools use the shared pop-up and unsaved-work warning, not browser boxes or
     }
   }
 });
+test('tool and shared UI sources use American spelling of canceled/canceling', () => {
+  // packages/ui/DESIGN-SYSTEM.md (Copy style) requires American English; "cancelled"/"cancelling" are British spellings.
+  for (const dir of ['apps','packages/ui']) for (const file of walk(path.join(root,dir))) {
+    if(!/\.(js|html|css|md)$/.test(file)) continue;
+    const hit=read(file).match(/cancell(?:ed|ing)/i);
+    assert.ok(!hit,`${path.relative(root,file)} uses "${hit?.[0]}"; use "canceled"/"canceling"`);
+  }
+});
 test('recorded baseline logic hashes remain intact', () => {
   const baseline=JSON.parse(read(path.join(root,'tests/import-baseline.json')));
   // Whitelisted migration edits affect theme storage and CSS classes, never processing functions.
