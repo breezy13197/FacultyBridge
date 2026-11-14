@@ -81,6 +81,7 @@ a { color: var(--ft-brand-700); }
 .ft-notice-warning { background: color-mix(in srgb, var(--ft-warning) 11%, var(--ft-surface)); border-color: color-mix(in srgb, var(--ft-warning) 35%, var(--ft-border)); }
 .ft-notice-danger { background: color-mix(in srgb, var(--ft-danger) 9%, var(--ft-surface)); border-color: color-mix(in srgb, var(--ft-danger) 35%, var(--ft-border)); }
 .ft-notice-success { background: var(--ft-success-bg); border-color: color-mix(in srgb, var(--ft-success) 28%, var(--ft-border)); }
+.ft-notice-info { background: var(--ft-info-bg); border-color: color-mix(in srgb, var(--ft-info) 28%, var(--ft-border)); }
 
 .ft-upload-zone {
   padding: 44px; border: 2px dashed color-mix(in srgb, var(--ft-brand-700) 45%, var(--ft-border));

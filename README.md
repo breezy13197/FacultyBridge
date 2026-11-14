@@ -11,6 +11,8 @@ npm run check
 npm run preview
 ```
 
+`npm run lint` (after `npm ci`) checks the JavaScript for common mistakes.
+
 Open http://127.0.0.1:4173. For browser verification:
 
 ```sh
@@ -39,6 +41,8 @@ capture, privacy, coverage, and review requirements.
 | suite.json | Suite/UI/tool versions, routes, imported source versions and SHA-256 provenance |
 | scripts/ | Dependency-free build and preview server |
 | tests/ | Build checks, imported processing-code parity, offline browser smoke checks |
+| e2e/ | Playwright workflow tests and the synthetic (made-up) files they upload |
+| docs/ | Development, release, and review guides |
 | docs/baselines/ | Original tool documentation and regression expectations |
 | dist/site/ | Generated website, ready for static hosting |
 | dist/standalone/ | Generated individual HTML files and matching offline landing page |
@@ -63,12 +67,10 @@ Suite 1.4.0 (shared UI 1.1.0) gives every tool one shared pop-up and one shared 
 
 Suite 1.5.0 (shared UI 1.2.0) adds a support note to the bottom of every tool page. It shows who to email (set once as `support.email` in `suite.json`), the exact tool version and build to mention, and a reminder not to send student names, IDs, grades, or exam questions. The email link fills in a subject line with the tool and build. No tool's processing changed and tool versions are unchanged.
 
-Use one branch/pull request per change. In the GitHub web UI, review and merge the migration pull request into main. Future releases use the tag facultybridge-v<the suiteVersion>, e.g. facultybridge-v1.3.0. The tag-triggered workflow validates the matching version, runs checks, and creates a GitHub Release with website ZIP, standalone ZIP, and checksums. Per-tool source versions remain independently tracked in suite.json. No website is deployed by this migration.
-
-For current development, start each coherent change from updated main, define acceptance criteria in an issue, use the PR template, and follow [the development guide](docs/DEVELOPMENT.md).
+Per-tool versions are tracked independently in suite.json. Use one branch/pull request per change: start each coherent change from updated main, define acceptance criteria in an issue, use the PR template, and follow [the development guide](docs/DEVELOPMENT.md).
 
 Releases use the tag `facultybridge-v<the suiteVersion>`, e.g. `facultybridge-v1.3.0`, on a commit already merged into main. The tag workflow runs the same full validation as PRs and prepares a **draft** GitHub Release with website ZIP, standalone ZIP, and checksums from the validated build. Review the downloaded artifacts, complete private/manual regression and the release record, then explicitly publish the draft. See [the release guide](docs/RELEASING.md); no website is automatically deployed.
 
 One **Suite checks** workflow runs on PRs into main/master and pushes to those branches, with required jobs `verify` and `test`. It is also reused by tagged releases. Feature-branch pushes with an open PR run once through the PR event. Build artifacts and synthetic E2E reports are retained for 14 days. Automated checks do not replace actual course-file regressions or receiving-system/managed-machine checks from [the release checklist](docs/RELEASE-CHECKLIST.md).
 
-See docs/MIGRATION.md and docs/QA-MIGRATION.md for scope and remaining checks.
+See docs/MIGRATION.md and docs/QA-MIGRATION.md for the scope and checks of the original 1.3.0 migration.

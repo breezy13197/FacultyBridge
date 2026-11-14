@@ -72,7 +72,7 @@ processing/export changes even when the author used an AI coding assistant.
 
 The single **Suite checks** workflow contains:
 
-1. `verify`: fixture guard, build checks, browser smoke, and the build artifact.
+1. `verify`: lint, fixture guard, build checks, browser smoke, and the build artifact.
 2. `test`: all six E2E projects, after `verify` succeeds.
 
 Both job names are required by the active main-branch ruleset. Keep these names

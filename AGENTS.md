@@ -1,6 +1,6 @@
 # FacultyBridge development
 
-Read packages/ui/DESIGN-SYSTEM.md, packages/ui/PRODUCT-PRINCIPLES.md, and packages/ui/DESIGN-CRITIQUE-CHECKS.md- before UI changes. Use the shared tokens, components, utilities, and component gallery. Follow packages/ui/AGENTS.md.
+Read packages/ui/DESIGN-SYSTEM.md, packages/ui/PRODUCT-PRINCIPLES.md, and packages/ui/DESIGN-CRITIQUE-CHECKS.md before UI changes. Use the shared tokens, components, utilities, and component gallery. Follow packages/ui/AGENTS.md.
 
 Canonical editable sources are apps/<tool>/; generated dist/ output must never be edited or committed. Use npm run validate:quick while developing and npm run validate before merging source/build changes. Documentation-only changes can use a reduced check scope if the PR explains it. Keep CI job names verify and test; the main branch ruleset requires both. See docs/DEVELOPMENT.md for issue/PR workflow and docs/RELEASING.md for the current draft-release process. Use docs/RELEASE-CHECKLIST.md for real-course regression and release sign-off. Never put real student records, grades, exams, or credentials in the repository. Test with synthetic or deidentified fixtures.
 
