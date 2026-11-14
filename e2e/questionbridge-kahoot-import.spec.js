@@ -13,6 +13,17 @@ const questions = [
   '2. Which of these are noble gases? (Select all that apply)\n*A. Neon\nB. Nitrogen\n*C. Argon\nD. Oxygen',
 ].join('\n\n');
 
+// QuestionBridge logs a rejected upload with console.error(err). Chromium prints the
+// message, but Firefox prints only "Error", so the shared guard cannot match it by text.
+// Capture the logged errors in the page instead and require exactly the expected one.
+async function captureConsoleErrors(page) {
+  await page.evaluate(() => {
+    window.__loggedErrors = [];
+    console.error = (...args) => window.__loggedErrors.push(args.map(a => a?.message ?? String(a)).join(' '));
+  });
+}
+const loggedErrors = page => page.evaluate(() => window.__loggedErrors);
+
 async function editorContents(page) {
   return {
     stem: await page.locator('#stem').inputValue(),
@@ -73,13 +84,14 @@ test('QuestionBridge: a Kahoot spreadsheet export can be uploaded again with its
   });
 });
 
-test('QuestionBridge: a spreadsheet that is not a Kahoot quiz gets a plain explanation', async ({ page, openTool, guard }) => {
+test('QuestionBridge: a spreadsheet that is not a Kahoot quiz gets a plain explanation', async ({ page, openTool }) => {
   const zip = new JSZip();
   zip.file('xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Roster" sheetId="1" r:id="rId1"/></sheets></workbook>');
   zip.file('xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>');
   zip.file('xl/worksheets/sheet1.xml', '<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Name</t></is></c><c r="B1" t="inlineStr"><is><t>Score</t></is></c></row></sheetData></worksheet>');
   await openTool('questionbridge');
   await page.locator('[data-screen="upload"]').click();
+  await captureConsoleErrors(page);
   await page.locator('#fileInput').setInputFiles({
     name: 'synthetic-roster.xlsx',
     mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -87,7 +99,7 @@ test('QuestionBridge: a spreadsheet that is not a Kahoot quiz gets a plain expla
   });
   await expect(page.locator('#parseStatus')).toContainText('This spreadsheet does not look like a Kahoot quiz.');
   await expect(page.locator('#parseStatus')).not.toContainText('.docx or .txt');
-  guard.allowConsoleError('This spreadsheet does not look like a Kahoot quiz.');
+  expect(await loggedErrors(page)).toEqual([expect.stringContaining('This spreadsheet does not look like a Kahoot quiz.')]);
 });
 
 // Excel (and Kahoot's own import template) store text in a shared-strings list, put
@@ -135,9 +147,10 @@ test('QuestionBridge: an Excel-saved Kahoot template with shared text is read co
   });
 });
 
-test('QuestionBridge: a file named .xlsx that is not a real spreadsheet gets save-as steps', async ({ page, openTool, guard }) => {
+test('QuestionBridge: a file named .xlsx that is not a real spreadsheet gets save-as steps', async ({ page, openTool }) => {
   await openTool('questionbridge');
   await page.locator('[data-screen="upload"]').click();
+  await captureConsoleErrors(page);
   await page.locator('#fileInput').setInputFiles({
     name: 'synthetic-not-a-spreadsheet.xlsx',
     mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -146,5 +159,5 @@ test('QuestionBridge: a file named .xlsx that is not a real spreadsheet gets sav
   await expect(page.locator('#parseStatus')).toContainText('This .xlsx file could not be opened.');
   await expect(page.locator('#parseStatus')).toContainText('File → Save As → Excel Workbook (.xlsx)');
   await expect(page.locator('#parseStatus')).not.toContainText('.docx or .txt');
-  guard.allowConsoleError('This .xlsx file could not be opened.');
+  expect(await loggedErrors(page)).toEqual([expect.stringContaining('This .xlsx file could not be opened.')]);
 });
