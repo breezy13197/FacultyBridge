@@ -169,7 +169,7 @@ Complex multi-column workspaces should collapse into stacked sections. A stepper
 
 ## Copy style
 
-Use concise, plain-language instructions. Faculty Tools should explain what the software is doing without exposing technical file-format details unless the user asks.
+Use American English spelling (canceled, color, organize). Use concise, plain-language instructions. Faculty Tools should explain what the software is doing without exposing technical file-format details unless the user asks.
 
 Prefer:
 

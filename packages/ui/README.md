@@ -52,7 +52,7 @@ if (!await FTDialog.confirm('The question and its answers will be removed.', {
 // Something that must be acknowledged.
 await FTDialog.alert('Choose a Brightspace student first.', { title: 'Choose a student' });
 
-// Typed input. Resolves with the text, or null if cancelled.
+// Typed input. Resolves with the text, or null if canceled.
 const points = await FTDialog.prompt('Every question will get this point value.', {
   title: 'Set points', label: 'Points per question', defaultValue: '1',
   validate: v => Number(v) >= 0 ? '' : 'Enter a point value of 0 or greater.'

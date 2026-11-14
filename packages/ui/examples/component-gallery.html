@@ -136,7 +136,7 @@ const root=document.documentElement;document.getElementById('themeToggle').oncli
 const show=text=>{document.getElementById('demoResult').textContent=text};
 document.getElementById('demoConfirm').onclick=async()=>{const ok=await FTDialog.confirm('Delete Question 3? This cannot be undone.',{title:'Delete question?',confirmLabel:'Delete question',danger:true});show(ok?'Deleted (demo).':'Kept the question.')};
 document.getElementById('demoAlert').onclick=async()=>{await FTDialog.alert('Choose a Brightspace student first.',{title:'Student needed'});show('Notice acknowledged.')};
-document.getElementById('demoPrompt').onclick=async()=>{const v=await FTDialog.prompt('Every question will be given this point value.',{title:'Set point value',label:'Points per question',defaultValue:'1',inputMode:'decimal',validate:x=>x.trim()===''||Number.isNaN(Number(x))||Number(x)<0?'Enter a point value of 0 or greater.':''});show(v===null?'Cancelled.':`Point value set to ${v} (demo).`)};
+document.getElementById('demoPrompt').onclick=async()=>{const v=await FTDialog.prompt('Every question will be given this point value.',{title:'Set point value',label:'Points per question',defaultValue:'1',inputMode:'decimal',validate:x=>x.trim()===''||Number.isNaN(Number(x))||Number(x)<0?'Enter a point value of 0 or greater.':''});show(v===null?'Canceled.':`Point value set to ${v} (demo).`)};
 const managed=FTDialog.manage(document.getElementById('demoDialog'));document.getElementById('demoManaged').onclick=()=>managed.open();
 let demoDirty=false;FTUnsavedWork.watch(()=>demoDirty);document.getElementById('demoUnsaved').onchange=e=>{demoDirty=e.target.checked};
 </script>

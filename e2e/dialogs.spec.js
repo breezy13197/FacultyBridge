@@ -290,3 +290,24 @@ test('CalendarBridge: deleting every event still counts as an unsaved change', a
   await downloadFrom(page, () => page.evaluate(() => saveProject()));
   expect(await warnsBeforeLeaving(page)).toBe(false);
 });
+
+// Canceling the "Add or replace questions" pop-up keeps the current set and says so
+// in American English ("canceled", per the design system's copy style).
+test('QuestionBridge: canceling a second import keeps the current questions', async ({ page, openTool }) => {
+  await openTool('questionbridge');
+  const paste = async text => {
+    await page.locator('[data-screen="upload"]').click();
+    await page.locator('#pasteText').fill(text);
+    await page.locator('#parsePaste').click();
+  };
+  await paste('1. Which molecule transports oxygen?\n*A. Hemoglobin\nB. Glycogen');
+  await expect(page.locator('#stem')).toHaveValue(/transports oxygen/);
+  await paste('1. Which organelle makes ATP?\n*A. Mitochondrion\nB. Ribosome');
+  const choice = sharedDialog(page, 'Add or replace questions');
+  await expect(choice).toBeVisible();
+  await page.locator('#importCancelBtn').click();
+  await expect(choice).toBeHidden();
+  await expect(page.locator('#toast')).toHaveText('Import canceled');
+  await page.locator('[data-screen="review"]').click();
+  await expect(page.locator('#stem')).toHaveValue(/transports oxygen/);
+});
