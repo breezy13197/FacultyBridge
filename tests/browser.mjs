@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
-import vm from 'node:vm';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createServer } from '../scripts/serve.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

@@ -55,6 +55,20 @@ test('every referenced design token is defined and shared foundation is not copi
     assert.ok(!/--ft-(?:bg|surface|text|font-sans|radius-\w+|space-\w+)\s*:/.test(css),`Duplicate foundation in ${t.id}`);
   }
 });
+test('every shared ft- class a tool uses has a style rule', () => {
+  // A class with no matching rule silently does nothing: the intended spacing or color never appears.
+  const ui=path.join(root,'packages/ui');
+  const css=[...walk(ui),...walk(path.join(root,'apps'))].filter(f=>f.endsWith('.css')).map(read).join('\n');
+  const defined=new Set([...css.matchAll(/\.(ft-[\w-]+)/g)].map(m=>m[1]));
+  // 'ft-theme' is the saved-setting name for light/dark mode, not a class.
+  const notClasses=new Set(['ft-theme']);
+  for(const file of [...walk(path.join(root,'apps')),...walk(path.join(ui,'examples')),...walk(path.join(ui,'templates'))].filter(f=>/\.(html|js)$/.test(f))) {
+    for(const m of read(file).matchAll(/(?<![\w-])ft-[a-z][\w-]*(?![\w-])/g)) {
+      if(notClasses.has(m[0])||m[0].endsWith('-')) continue;
+      assert.ok(defined.has(m[0]),`${path.relative(root,file)} uses .${m[0]}, which no stylesheet defines`);
+    }
+  }
+});
 test('tools use the shared pop-up and unsaved-work warning, not browser boxes or home-made pop-ups', () => {
   const browserBox=/(^|[^.\w$])(?:window\.)?(alert|confirm|prompt)\(/m;
   for(const t of manifest.tools) {

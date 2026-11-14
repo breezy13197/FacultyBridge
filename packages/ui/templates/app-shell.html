@@ -1,5 +1,6 @@
 <!doctype html>
-<html lang="en">
+<!-- Set data-ft-tool to the new tool's id (as listed in suite.json) so it gets its identity color from themes.css. -->
+<html lang="en" data-ft-tool="yourtool">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -39,10 +40,13 @@
     </main>
   </div>
 
+  <!-- runtime.js applies the saved theme and keeps the tool working when the browser blocks storage.
+       dialog.js provides the shared pop-ups (FTDialog) and the unsaved-work warning (FTUnsavedWork).
+       Load both before the tool's own script; the build check requires dialog.js on every tool page. -->
+  <script src="../runtime.js"></script>
+  <script src="../dialog.js"></script>
   <script>
     const root = document.documentElement;
-    const saved = localStorage.getItem('ft-theme');
-    if (saved === 'dark') root.dataset.ftTheme = 'dark';
     document.getElementById('themeToggle').addEventListener('click', () => {
       const dark = root.dataset.ftTheme === 'dark';
       root.dataset.ftTheme = dark ? 'light' : 'dark';
