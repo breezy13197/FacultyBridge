@@ -109,6 +109,25 @@ test('visible version numbers come from suite.json, not hand-typed text', () => 
     }
   }
 });
+test('summary counts use the shared ft-metric card instead of per-tool copies', () => {
+  // packages/ui/DESIGN-SYSTEM.md "Metric cards": one shared big-number card across tools.
+  const css=read(path.join(root,'packages/ui/components.css'));
+  for (const cls of ['ft-metric','ft-metric-value','ft-metric-label','ft-metric-detail','ft-metric-ready','ft-metric-warning','ft-metric-error','ft-metric-brand'])
+    assert.match(css,new RegExp(`\\.${cls}\\s*\\{`),`components.css defines .${cls}`);
+  assert.ok(read(path.join(root,'packages/ui/examples/component-gallery.html')).includes('class="ft-metric'),'component gallery shows metric cards');
+  // Where each tool writes its summary cards: page markup or, for generated cards, the tool script.
+  const sources={calendarbridge:'index.html',exambridge:'exambridge.js',itembridge:'itembridge.js',questionbridge:'index.html',syllabusbridge:'index.html'};
+  // Per-tool rules that used to size or pad the card or its number with one-off values.
+  const retired={calendarbridge:[/\.cb-metric\s*\{/],exambridge:[/\.eb-metric-value\s*\{/,/\.eb-metric-label\s*\{/,/\.eb-metric-detail\s*\{/,/\.eb-metric\s*\{[^}]*padding/],
+    itembridge:[/\.ib-metric\s*\{[^}]*padding/,/\.ib-metric\.is-(?:danger|warning|teal|good)/],questionbridge:[/\.qb-metric\b(?!s)/],syllabusbridge:[/\.summary-stat\b/,/(^|[^-\w])\.metric\s*\{/]};
+  for (const [id,file] of Object.entries(sources)) {
+    const markup=read(path.join(root,'apps',id,file));
+    assert.ok(/class="[^"]*\bft-metric\b/.test(markup),`${id} summary cards use .ft-metric (${file})`);
+    assert.ok(/\bft-metric-value\b/.test(markup)||id==='itembridge',`${id} marks its numbers with .ft-metric-value`);
+    const toolCss=read(path.join(root,'apps',id,`${id}.css`));
+    for (const rule of retired[id]) assert.ok(!rule.test(toolCss),`${id}.css still has a per-tool metric rule matching ${rule}`);
+  }
+});
 test('recorded baseline logic hashes remain intact', () => {
   const baseline=JSON.parse(read(path.join(root,'tests/import-baseline.json')));
   // Whitelisted migration edits affect theme storage and CSS classes, never processing functions.
