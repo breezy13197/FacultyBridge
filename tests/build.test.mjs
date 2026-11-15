@@ -55,6 +55,20 @@ test('every referenced design token is defined and shared foundation is not copi
     assert.ok(!/--ft-(?:bg|surface|text|font-sans|radius-\w+|space-\w+)\s*:/.test(css),`Duplicate foundation in ${t.id}`);
   }
 });
+test('every shared ft- class a tool uses has a style rule', () => {
+  // A class with no matching rule silently does nothing: the intended spacing or color never appears.
+  const ui=path.join(root,'packages/ui');
+  const css=[...walk(ui),...walk(path.join(root,'apps'))].filter(f=>f.endsWith('.css')).map(read).join('\n');
+  const defined=new Set([...css.matchAll(/\.(ft-[\w-]+)/g)].map(m=>m[1]));
+  // 'ft-theme' is the saved-setting name for light/dark mode, not a class.
+  const notClasses=new Set(['ft-theme']);
+  for(const file of [...walk(path.join(root,'apps')),...walk(path.join(ui,'examples')),...walk(path.join(ui,'templates'))].filter(f=>/\.(html|js)$/.test(f))) {
+    for(const m of read(file).matchAll(/(?<![\w-])ft-[a-z][\w-]*(?![\w-])/g)) {
+      if(notClasses.has(m[0])||m[0].endsWith('-')) continue;
+      assert.ok(defined.has(m[0]),`${path.relative(root,file)} uses .${m[0]}, which no stylesheet defines`);
+    }
+  }
+});
 test('tools use the shared pop-up and unsaved-work warning, not browser boxes or home-made pop-ups', () => {
   const browserBox=/(^|[^.\w$])(?:window\.)?(alert|confirm|prompt)\(/m;
   for(const t of manifest.tools) {
@@ -67,6 +81,51 @@ test('tools use the shared pop-up and unsaved-work warning, not browser boxes or
       assert.ok(!box,`${t.id}/${file} calls the browser's ${box?.[2]}(); use FTDialog.${box?.[2]}()`);
       assert.ok(!/beforeunload/.test(js),`${t.id}/${file} has its own leave warning; use FTUnsavedWork`);
     }
+  }
+});
+test('tool and shared UI sources use American spelling of canceled/canceling', () => {
+  // packages/ui/DESIGN-SYSTEM.md (Copy style) requires American English; "cancelled"/"cancelling" are British spellings.
+  for (const dir of ['apps','packages/ui']) for (const file of walk(path.join(root,dir))) {
+    if(!/\.(js|html|css|md)$/.test(file)) continue;
+    const hit=read(file).match(/cancell(?:ed|ing)/i);
+    assert.ok(!hit,`${path.relative(root,file)} uses "${hit?.[0]}"; use "canceled"/"canceling"`);
+  }
+});
+test('visible version numbers come from suite.json, not hand-typed text', () => {
+  // suite.json is the one place versions live (AGENTS.md). Pages use {{version}},
+  // which scripts/build.mjs fills in, so a release never leaves an old number on screen.
+  const typed = /(?:Bridge v|>v)\d+\.\d/;
+  for (const t of manifest.tools) {
+    const source = read(path.join(root, 'apps', t.id, 'index.html'));
+    assert.ok(!typed.test(source), `apps/${t.id}/index.html has a hand-typed version; use v{{version}}`);
+    assert.ok(source.includes('v{{version}}'), `apps/${t.id}/index.html should show its version with v{{version}}`);
+    // Protected tool code may still name its version in text faculty see; it must match suite.json.
+    for (const m of read(path.join(root, 'apps', t.id, `${t.id}.js`)).matchAll(new RegExp(`${t.name} v(\\d+(?:\\.\\d+)*)`, 'g')))
+      assert.equal(m[1], t.version, `apps/${t.id}/${t.id}.js shows "${m[0]}" but suite.json says ${t.version}`);
+    for (const dir of ['dist/site', 'dist/standalone']) {
+      const built = dir === 'dist/site' ? read(path.join(root, dir, t.route, 'index.html')) : read(path.join(root, dir, `${t.name}-v${t.version}-build${manifest.suiteVersion}.html`));
+      assert.ok(!built.includes('{{version}}'), `${dir} ${t.name} still contains {{version}}`);
+      assert.match(built, new RegExp(`<title>[^<]*v${t.version.replaceAll('.', '\\.')}\\b`), `${dir} ${t.name} title should show v${t.version}`);
+    }
+  }
+});
+test('summary counts use the shared ft-metric card instead of per-tool copies', () => {
+  // packages/ui/DESIGN-SYSTEM.md "Metric cards": one shared big-number card across tools.
+  const css=read(path.join(root,'packages/ui/components.css'));
+  for (const cls of ['ft-metric','ft-metric-value','ft-metric-label','ft-metric-detail','ft-metric-ready','ft-metric-warning','ft-metric-error','ft-metric-brand'])
+    assert.match(css,new RegExp(`\\.${cls}\\s*\\{`),`components.css defines .${cls}`);
+  assert.ok(read(path.join(root,'packages/ui/examples/component-gallery.html')).includes('class="ft-metric'),'component gallery shows metric cards');
+  // Where each tool writes its summary cards: page markup or, for generated cards, the tool script.
+  const sources={calendarbridge:'index.html',exambridge:'exambridge.js',itembridge:'itembridge.js',questionbridge:'index.html',syllabusbridge:'index.html'};
+  // Per-tool rules that used to size or pad the card or its number with one-off values.
+  const retired={calendarbridge:[/\.cb-metric\s*\{/],exambridge:[/\.eb-metric-value\s*\{/,/\.eb-metric-label\s*\{/,/\.eb-metric-detail\s*\{/,/\.eb-metric\s*\{[^}]*padding/],
+    itembridge:[/\.ib-metric\s*\{[^}]*padding/,/\.ib-metric\.is-(?:danger|warning|teal|good)/],questionbridge:[/\.qb-metric\b(?!s)/],syllabusbridge:[/\.summary-stat\b/,/(^|[^-\w])\.metric\s*\{/]};
+  for (const [id,file] of Object.entries(sources)) {
+    const markup=read(path.join(root,'apps',id,file));
+    assert.ok(/class="[^"]*\bft-metric\b/.test(markup),`${id} summary cards use .ft-metric (${file})`);
+    assert.ok(/\bft-metric-value\b/.test(markup)||id==='itembridge',`${id} marks its numbers with .ft-metric-value`);
+    const toolCss=read(path.join(root,'apps',id,`${id}.css`));
+    for (const rule of retired[id]) assert.ok(!rule.test(toolCss),`${id}.css still has a per-tool metric rule matching ${rule}`);
   }
 });
 test('recorded baseline logic hashes remain intact', () => {

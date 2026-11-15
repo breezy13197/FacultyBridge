@@ -1,6 +1,6 @@
 {
-  "suiteVersion": "1.5.0",
-  "uiVersion": "1.2.0",
+  "suiteVersion": "1.6.0",
+  "uiVersion": "1.3.0",
   "support": {
     "email": "cbrackett@southuniversity.edu"
   },
@@ -76,7 +76,7 @@
     {
       "id": "syllabusbridge",
       "name": "SyllabusBridge",
-      "version": "2.1.2",
+      "version": "2.5.0",
       "sourceVersion": "2.1.2",
       "sourceFile": "SyllabusBridge-v2.1.2(1).html",
       "sourceSha256": "c2ed7a020210b58c244521d9755f504c822fed81bfa1d7f6559961025c30226f",

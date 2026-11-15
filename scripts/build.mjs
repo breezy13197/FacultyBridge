@@ -16,7 +16,7 @@ function target(source) {
   const rel = path.relative(root, source).replaceAll(path.sep, '/');
   if (rel.startsWith('packages/ui/')) return path.join(site, 'assets/ui', rel.slice('packages/ui/'.length));
   if (rel.startsWith('vendor/')) return path.join(site, rel);
-  const [_, id, ...rest] = rel.split('/');
+  const [, id, ...rest] = rel.split('/');
   const tool = manifest.tools.find(t => t.id === id);
   if (!tool) throw new Error(`Unmapped local asset: ${rel}`);
   return path.join(site, tool.route, ...rest);
@@ -55,6 +55,8 @@ fs.rmSync(output, { recursive: true, force: true });
 for (const tool of manifest.tools) {
   const destination = path.join(site, tool.route, 'index.html');
   let html = renderSource(path.join(root, 'apps', tool.id, 'index.html'), destination);
+  // Visible version text comes from suite.json, so a release only edits one file.
+  html = html.replaceAll('{{version}}', tool.version);
   const info = { suiteVersion: manifest.suiteVersion, uiVersion: manifest.uiVersion, support: manifest.support, tools: manifest.tools, toolId: tool.id, output: 'site' };
   const metadataPath = path.join(site, tool.route, 'build-info.js');
   write(metadataPath, `window.FacultyBridgeBuild = ${JSON.stringify(info)};\n`);

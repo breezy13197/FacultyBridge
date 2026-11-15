@@ -12,19 +12,20 @@ A lightweight shared design system for Faculty Tools applications such as GradeB
 - `utilities.css` — small layout helpers
 - `DESIGN-SYSTEM.md` — visual and interaction rules
 - `PRODUCT-PRINCIPLES.md` — product-level UX principles
+- `DESIGN-CRITIQUE-CHECKS.md` — the checklist used to review a screen
 - `examples/component-gallery.html` — interactive visual reference
 - `templates/app-shell.html` — starter shell for new applications
 - `AGENTS.md` — instructions for coding agents working with the framework
 
 ## Quick start
 
-Copy or reference the three CSS files in your application:
+Reference the four CSS files, in this order, in your application:
 
 ```html
-<link rel="stylesheet" href="path/to/faculty-tools-ui/tokens.css">
-<link rel="stylesheet" href="path/to/faculty-tools-ui/themes.css">
-<link rel="stylesheet" href="path/to/faculty-tools-ui/components.css">
-<link rel="stylesheet" href="path/to/faculty-tools-ui/utilities.css">
+<link rel="stylesheet" href="../../packages/ui/tokens.css">
+<link rel="stylesheet" href="../../packages/ui/themes.css">
+<link rel="stylesheet" href="../../packages/ui/components.css">
+<link rel="stylesheet" href="../../packages/ui/utilities.css">
 ```
 
 Then use shared classes:
@@ -51,7 +52,7 @@ if (!await FTDialog.confirm('The question and its answers will be removed.', {
 // Something that must be acknowledged.
 await FTDialog.alert('Choose a Brightspace student first.', { title: 'Choose a student' });
 
-// Typed input. Resolves with the text, or null if cancelled.
+// Typed input. Resolves with the text, or null if canceled.
 const points = await FTDialog.prompt('Every question will get this point value.', {
   title: 'Set points', label: 'Points per question', defaultValue: '1',
   validate: v => Number(v) >= 0 ? '' : 'Enter a point value of 0 or greater.'

@@ -85,6 +85,41 @@ test('QuestionBridge: delete and bulk edits use the shared pop-up', async ({ pag
   expect(await page.evaluate(() => state.questions.length)).toBe(0);
 });
 
+test('QuestionBridge: canceling a second upload says it was canceled, not parsed', async ({ page, openTool }) => {
+  const txtFile = (name, text) => ({ name, mimeType: 'text/plain', buffer: Buffer.from(text) });
+  await openTool('questionbridge');
+  await page.locator('[data-screen="upload"]').click();
+  await page.locator('#fileInput').setInputFiles(txtFile('first-bank.txt', '1. Which molecule transports oxygen?\n*A. Hemoglobin\nB. Glycogen\nC. DNA\nD. ATP'));
+  await expect(page.locator('#parseStatus')).toContainText('Parsed 1 question');
+  expect(await page.evaluate(() => state.questions.length)).toBe(1);
+
+  // Each way of canceling the "Add or replace" pop-up keeps the current set and says so.
+  const cancelWays = [
+    ['Cancel button', d => d.getByRole('button', { name: 'Cancel' }).click()],
+    ['Escape', () => page.keyboard.press('Escape')],
+  ];
+  for (const [how, cancel] of cancelWays) {
+    await page.locator('[data-screen="upload"]').click();
+    await page.locator('#fileInput').setInputFiles(txtFile(`second-bank-${how}.txt`, '1. Which organ produces insulin?\n*A. Pancreas\nB. Liver\nC. Kidney\nD. Spleen'));
+    const choice = sharedDialog(page, 'Add or replace questions');
+    await expect(choice).toBeVisible();
+    await cancel(choice);
+    await expect(choice).toBeHidden();
+    await expect(page.locator('#parseStatus'), how).toContainText('Import canceled');
+    await expect(page.locator('#parseStatus'), how).not.toContainText('Parsed');
+    expect(await page.evaluate(() => state.questions.map(q => q.stem)), how).toEqual([expect.stringContaining('transports oxygen')]);
+  }
+
+  // Picking the same file again after a cancel opens the choice again, and "Add" still reports a successful parse.
+  await page.locator('[data-screen="upload"]').click();
+  expect(await page.locator('#fileInput').evaluate(el => el.value)).toBe('');
+  await page.locator('#fileInput').setInputFiles(txtFile('third-bank.txt', '1. Which vitamin helps blood clot?\n*A. Vitamin K\nB. Vitamin C\nC. Vitamin D\nD. Vitamin B12'));
+  await sharedDialog(page, 'Add or replace questions').getByRole('button', { name: 'Add to current set' }).click();
+  await page.locator('[data-screen="upload"]').click();
+  await expect(page.locator('#parseStatus')).toContainText('Parsed 1 question');
+  expect(await page.evaluate(() => state.questions.length)).toBe(2);
+});
+
 test('GradeBridge: manual decisions warn before leaving until the CSV is downloaded', async ({ page, openTool }) => {
   await openTool('gradebridge');
   await page.locator('#helpBtn').click();
@@ -289,4 +324,25 @@ test('CalendarBridge: deleting every event still counts as an unsaved change', a
   // Saving the now-empty project is what clears it.
   await downloadFrom(page, () => page.evaluate(() => saveProject()));
   expect(await warnsBeforeLeaving(page)).toBe(false);
+});
+
+// Canceling the "Add or replace questions" pop-up keeps the current set and says so
+// in American English ("canceled", per the design system's copy style).
+test('QuestionBridge: canceling a second import keeps the current questions', async ({ page, openTool }) => {
+  await openTool('questionbridge');
+  const paste = async text => {
+    await page.locator('[data-screen="upload"]').click();
+    await page.locator('#pasteText').fill(text);
+    await page.locator('#parsePaste').click();
+  };
+  await paste('1. Which molecule transports oxygen?\n*A. Hemoglobin\nB. Glycogen');
+  await expect(page.locator('#stem')).toHaveValue(/transports oxygen/);
+  await paste('1. Which organelle makes ATP?\n*A. Mitochondrion\nB. Ribosome');
+  const choice = sharedDialog(page, 'Add or replace questions');
+  await expect(choice).toBeVisible();
+  await page.locator('#importCancelBtn').click();
+  await expect(choice).toBeHidden();
+  await expect(page.locator('#toast')).toHaveText('Import canceled');
+  await page.locator('[data-screen="review"]').click();
+  await expect(page.locator('#stem')).toHaveValue(/transports oxygen/);
 });

@@ -46,6 +46,7 @@ CI uses Node 22; local Node must satisfy the package's supported engine range.
 
 | Command | Use |
 |---|---|
+| `npm run lint` | Conservative ESLint bug checks across editable browser scripts and Node modules; no formatting enforcement. |
 | `npm run check` | Fast build, structural, syntax, token, baseline, and reproducibility checks. |
 | `npm run validate:quick` | Build checks plus Chromium browser smoke for site and standalone. |
 | `npm run test:e2e -- --project=chromium --grep QuestionBridge` | Example focused development run for one tool/browser. |
@@ -71,7 +72,7 @@ processing/export changes even when the author used an AI coding assistant.
 
 The single **Suite checks** workflow contains:
 
-1. `verify`: fixture guard, build checks, browser smoke, and the build artifact.
+1. `verify`: lint, fixture guard, build checks, browser smoke, and the build artifact.
 2. `test`: all six E2E projects, after `verify` succeeds.
 
 Both job names are required by the active main-branch ruleset. Keep these names

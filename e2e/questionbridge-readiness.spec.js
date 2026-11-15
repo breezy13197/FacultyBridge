@@ -157,3 +157,38 @@ test('m5: answer controls are large enough to click and say whether they are cor
   const box = await page.locator('.qb-answer-marker').first().boundingBox();
   expect(box.width).toBeGreaterThanOrEqual(40);
 });
+
+// Every text inside a blocked-question box must stay readable (WCAG AA, 4.5:1) in both themes.
+// Before this check, the box kept a light pink background in dark mode, hiding its headings.
+const blockedQuestions = `${markedQuestion}\n\n2. Which organelle makes most ATP?\nA. Mitochondrion`;
+test('blocked-question box text meets AA contrast in light and dark themes', async ({ page, openTool }) => {
+  await openTool('questionbridge');
+  await paste(page, blockedQuestions);
+  await step(page, 'validate').click();
+  const box = page.locator('.qb-issue.is-blocked').first();
+  await expect(box).toBeVisible();
+  // Switch off color fades so a theme change applies at once and every color is measured settled.
+  await page.addStyleTag({ content: '*,*::before,*::after{transition:none!important}' });
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate(t => { document.documentElement.dataset.ftTheme = t; }, theme);
+    const failures = await box.evaluate(root => {
+      const parse = c => {
+        const n = (c.match(/[\d.]+/g) || []).map(Number);
+        const scale = c.startsWith('color(') ? 255 : 1; // color(srgb r g b / a) uses 0-1 channels
+        return { rgb: n.slice(0, 3).map(v => v * scale), a: n.length > 3 ? n[3] : 1 };
+      };
+      const lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+      const background = el => { for (let e = el; e; e = e.parentElement) { const bg = parse(getComputedStyle(e).backgroundColor); if (bg.a > 0.5) return bg.rgb; } return parse(getComputedStyle(document.body).backgroundColor).rgb; }; // assumes solid backgrounds
+      const out = [];
+      for (const el of [root, ...root.querySelectorAll('*')]) {
+        const own = [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim());
+        if (!own || !el.getClientRects().length) continue;
+        const [a, b] = [lum(parse(getComputedStyle(el).color).rgb), lum(background(el))];
+        const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+        if (ratio < 4.5) out.push(`"${el.textContent.trim().slice(0, 40)}" ${ratio.toFixed(2)}:1`);
+      }
+      return out;
+    });
+    expect(failures, `${theme} theme text below 4.5:1`).toEqual([]);
+  }
+});

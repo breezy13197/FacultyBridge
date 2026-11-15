@@ -85,6 +85,23 @@
       <div class="ft-card-soft ft-p-6"><strong>Standard card</strong><p class="ft-muted">Use for grouped secondary content.</p></div>
       <div class="ft-notice ft-notice-success"><strong>✓ Ready</strong><br><span class="ft-muted">Everything required is complete.</span></div>
       <div class="ft-notice ft-notice-warning"><strong>! Needs review</strong><br><span class="ft-muted">A user decision is required.</span></div>
+      <div class="ft-notice ft-notice-info"><strong><span aria-hidden="true">ⓘ</span> Good to know</strong><br><span class="ft-muted">Helpful background that needs no action.</span></div>
+    </div>
+  </section>
+
+  <section class="ft-card gallery-section">
+    <div class="ft-eyebrow">Summaries</div><h2>Metric cards</h2>
+    <p class="ft-muted">A big number, a short label, and an optional detail line. Color the number only when it carries a status, and let the label say what that status is.</p>
+    <div class="ft-grid-4 ft-mt-4">
+      <div class="ft-metric"><div class="ft-metric-value">42</div><div class="ft-metric-label">Questions</div></div>
+      <div class="ft-metric ft-metric-ready"><div class="ft-metric-value">38</div><div class="ft-metric-label">Ready to export</div></div>
+      <div class="ft-metric ft-metric-warning"><div class="ft-metric-value">3</div><div class="ft-metric-label">Need review</div><div class="ft-metric-detail">2 warnings · 1 guessed answer</div></div>
+      <div class="ft-metric ft-metric-error"><div class="ft-metric-value">1</div><div class="ft-metric-label">Cannot export</div><div class="ft-metric-detail">Missing a correct answer</div></div>
+    </div>
+    <div class="ft-grid-3 ft-mt-4">
+      <div class="ft-metric ft-metric-brand"><div class="ft-metric-value">12</div><div class="ft-metric-label">Priority items</div><div class="ft-metric-detail">Tool identity color, for a headline count</div></div>
+      <div class="ft-metric"><div class="ft-metric-label">Multiple response</div><div class="ft-metric-value">12.5%</div><div><span class="ft-badge ft-status-ready">✓ Ready</span></div><div class="ft-metric-detail">5 of 40 · max 20%</div></div>
+      <div class="ft-metric"><div class="ft-metric-value">0</div><div class="ft-metric-label">Times from course schedule</div></div>
     </div>
   </section>
 
@@ -127,13 +144,15 @@
     <div class="ft-dialog-actions"><button class="ft-btn ft-btn-primary" type="button" data-ft-dialog-close>Close</button></div>
   </dialog>
 </div>
+<script src="../runtime.js"></script>
 <script src="../dialog.js"></script>
 <script>
-const root=document.documentElement;const saved=localStorage.getItem('ft-theme');if(saved==='dark')root.dataset.ftTheme='dark';document.getElementById('themeToggle').onclick=()=>{const dark=root.dataset.ftTheme==='dark';root.dataset.ftTheme=dark?'light':'dark';localStorage.setItem('ft-theme',dark?'light':'dark')};
+// runtime.js has already applied the saved theme and made storage safe to use when the browser blocks it.
+const root=document.documentElement;document.getElementById('themeToggle').onclick=()=>{const dark=root.dataset.ftTheme==='dark';root.dataset.ftTheme=dark?'light':'dark';localStorage.setItem('ft-theme',dark?'light':'dark')};
 const show=text=>{document.getElementById('demoResult').textContent=text};
 document.getElementById('demoConfirm').onclick=async()=>{const ok=await FTDialog.confirm('Delete Question 3? This cannot be undone.',{title:'Delete question?',confirmLabel:'Delete question',danger:true});show(ok?'Deleted (demo).':'Kept the question.')};
 document.getElementById('demoAlert').onclick=async()=>{await FTDialog.alert('Choose a Brightspace student first.',{title:'Student needed'});show('Notice acknowledged.')};
-document.getElementById('demoPrompt').onclick=async()=>{const v=await FTDialog.prompt('Every question will be given this point value.',{title:'Set point value',label:'Points per question',defaultValue:'1',inputMode:'decimal',validate:x=>x.trim()===''||Number.isNaN(Number(x))||Number(x)<0?'Enter a point value of 0 or greater.':''});show(v===null?'Cancelled.':`Point value set to ${v} (demo).`)};
+document.getElementById('demoPrompt').onclick=async()=>{const v=await FTDialog.prompt('Every question will be given this point value.',{title:'Set point value',label:'Points per question',defaultValue:'1',inputMode:'decimal',validate:x=>x.trim()===''||Number.isNaN(Number(x))||Number(x)<0?'Enter a point value of 0 or greater.':''});show(v===null?'Canceled.':`Point value set to ${v} (demo).`)};
 const managed=FTDialog.manage(document.getElementById('demoDialog'));document.getElementById('demoManaged').onclick=()=>managed.open();
 let demoDirty=false;FTUnsavedWork.watch(()=>demoDirty);document.getElementById('demoUnsaved').onchange=e=>{demoDirty=e.target.checked};
 </script>
