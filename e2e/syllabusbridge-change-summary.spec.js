@@ -11,7 +11,9 @@ async function open(page, openTool, table) {
 async function setField(locator, value) { await locator.fill(value); await locator.press('Tab'); }
 // The summary as data: [section, action, item, before, after] rows.
 async function summaryRows(root) {
-  const rows = await root.locator('.sb-change-group').evaluateAll(groups => groups.flatMap(g => {
+  // Query inside root.evaluate, not root.locator(...).evaluateAll: Playwright 1.65.0's Firefox
+  // crashes the page on evaluateAll under getByRole({ name }) when the name comes from aria-labelledby.
+  const rows = await root.evaluate(r => [...r.querySelectorAll('.sb-change-group')].flatMap(g => {
     const section = g.querySelector('h3').firstChild.textContent.trim();
     // Change, item, before, after (the Kind column is checked in syllabusbridge-change-kinds.spec.js).
     return [...g.querySelectorAll('tbody tr')].map(tr => [section, ...[...tr.cells].slice(0, 4).map(td => td.innerText.trim())]);

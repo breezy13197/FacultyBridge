@@ -8,8 +8,10 @@ const syllabusFile = async () => ({ name: 'syllabus.docx', mimeType: DOCX_MIME, 
 async function setField(locator, value) { await locator.fill(value); await locator.press('Tab'); }
 const dialog = page => page.getByRole('dialog', { name: 'Change summary' });
 // [item, kind] for each summary row; kind is the checkbox state in the pop-up, or the words in the report.
+// Query inside root.evaluate, not root.locator(...).evaluateAll: Playwright 1.65.0's Firefox
+// crashes the page on evaluateAll under getByRole({ name }) when the name comes from aria-labelledby.
 async function kinds(root) {
-  return root.locator('.sb-change-table tbody tr').evaluateAll(rows => rows.map(tr => {
+  return root.evaluate(r => [...r.querySelectorAll('.sb-change-table tbody tr')].map(tr => {
     const box = tr.querySelector('.sb-kind-reading');
     return [tr.cells[1].innerText.trim(), box ? (box.checked ? 'Reading correction' : 'Syllabus edit') : tr.cells[4].innerText.trim()];
   }));
