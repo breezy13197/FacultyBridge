@@ -466,36 +466,8 @@
   }
 
 
-  const WRITING_BASE_WORDS = new Set(`
-a an the and or but if then than this that these those is are was were be been being have has had do does did
-which what who whom whose where when why how of in on at by for from with without to into over under between
-patient patients medication medications drug drugs insulin glucose blood serum plasma renal kidney liver heart
-increase increases increased decreasing decrease decreases reduced reduce reducing improves improve treatment therapy
-correct incorrect true false following most least appropriate primary secondary mechanism action effect effects
-type diabetes mellitus history current include includes including daily weekly twice once before after during
-year years old male female presents presented reports report laboratory result normal range recommend recommended
-question answer answers select all two three four only
-`.trim().split(/\s+/));
-  const WRITING_TERMS = new Set(`
-metformin glargine chylomicrons heterocycle vldl empagliflozin lispro glimepiride pioglitazone epidermidis glipizide
-isoelectric clindamycin terbinafine peptidoglycan enantiomers diastereomers lisinopril phospholipase
-ldl hdl idl bmi egfr mbc wnl pka cyp dpp glp sglt atp adme moa sar ascvd hba1c fbg tdd
-lantus afrezza apidra novolin humalog levemir tresiba toujeo jardiance mounjaro januvia glucophage amaryl invokana
-trulicity qsymia contrave xenical saxenda tradjenta onglyza nesina bydureon farxiga
-semaglutide tirzepatide dulaglutide liraglutide canagliflozin dapagliflozin sitagliptin saxagliptin alogliptin
-rosiglitazone repaglinide acarbose exenatide pramlintide topiramate phentermine naltrexone bupropion orlistat
-glipizide glyburide telmisartan rosuvastatin celexa hydrocodone lisinopril
-`.trim().split(/\s+/));
-  const DRUG_SUFFIX = /(?:afil|tinib|prazole|statin|glitazone|gliptin|gliflozin|sartan|mab|parin)$/i;
   function writingWords(s=''){
     return [...String(s).matchAll(/\b[A-Za-z][A-Za-z’'-]*\b/g)].map(m=>({raw:m[0],word:m[0].toLowerCase().replace(/[’']/g,"'")}));
-  }
-  function recognizedWritingWord(w){
-    const clean=w.toLowerCase().replace(/^-|-$/g,'');
-    if(clean.length<=2 || WRITING_BASE_WORDS.has(clean) || WRITING_TERMS.has(clean) || DRUG_SUFFIX.test(clean)) return true;
-    if(/^[a-z]+-[a-z]+$/i.test(clean)) return clean.split('-').every(recognizedWritingWord);
-    if(/^[A-Z]{2,}$/i.test(w) || /\d/.test(w)) return true;
-    return false;
   }
   function likelySpellingIssues(text=''){
     const typoMap={phospholiase:'phospholipase',symtpoms:'symptoms',tirzapatide:'tirzepatide',medulary:'medullary',hypoglycmeia:'hypoglycemia',hyperglyemia:'hyperglycemia',slimepiride:'glimepiride'};
@@ -661,7 +633,6 @@ with would you your following answer answers choice choices correct best appropr
     weights.forEach(w=>weightCounts.set(w,(weightCounts.get(w)||0)+1));
     const predominantWeight=[...weightCounts.entries()].sort((a,b)=>b[1]-a[1] || a[0]-b[0])[0]?.[0] ?? 1;
     const differentWeightQs=qs.filter(q=>q.weight!==predominantWeight);
-    const differentWeightPct=n?differentWeightQs.length/n:0;
     const variableWeights=weightCounts.size>1;
     const multiple=qs.filter(q=>q.type===ITEM_TYPES.MULTIPLE);
     const choiceBased=qs.filter(q=>q.options.length>0 && [ITEM_TYPES.MCQ,ITEM_TYPES.MULTIPLE,ITEM_TYPES.KTYPE].includes(q.type));
@@ -1056,7 +1027,6 @@ with would you your following answer answers choice choices correct best appropr
     const scopeLabel=scope==='all'?'All faculty':scope==='__missing__'?'Unassigned / missing faculty tag':scope;
     const notes=$('#reportNotes').value.trim();
     const applicable=reportCategoryInfos(scope);
-    const applicableKeys=new Set(applicable.map(x=>x.key));
     const selectedApplicable=applicable.filter(x=>selectedKeys.has(x.key));
     const selectedLabels=selectedApplicable.map(x=>x.label);
 

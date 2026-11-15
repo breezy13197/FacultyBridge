@@ -2,8 +2,8 @@
 
 const $=id=>document.getElementById(id);
 let examRows=[],brightRows=[],examHeaders=[],brightHeaders=[],matches=[],brightOnlyIndices=[],outputRows=[];
-let examCols={},brightCols={},gradeItems=[],activeSavedCourse='',autoUnlocked=false,fileWarnings=[],auditWarnings=[];
-let examFilename='',brightFilename='';
+let examCols={},brightCols={},gradeItems=[],activeSavedCourse='',autoUnlocked=false,auditWarnings=[];
+let brightFilename='';
 
 function safe(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
 function normHeader(s){return String(s??'').replace(/^\uFEFF/,'').trim().toLowerCase().replace(/[^a-z0-9%]+/g,'')}
@@ -151,7 +151,7 @@ async function readSource(file,type){
     }
     const obj=matrixToObjects(matrix,hi);
     if(type==='exam'){
-      examRows=obj.rows;examHeaders=obj.headers;examFilename=file.name;mapCols();
+      examRows=obj.rows;examHeaders=obj.headers;mapCols();
       if(!examCols.id||!examCols.first||!examCols.last)throw new Error('The ExamSoft file must include StudentID, First Name, and Last Name.');
       if(!examCols.pts){
         if(examCols.pct)throw new Error('This ExamSoft export contains percentages but no raw points. GradeBridge intentionally does not calculate grades from percentages. Re-export the assessment from ExamSoft with the Pts/raw-points column included.');
@@ -186,7 +186,7 @@ function wireDrop(dropId,fileId,type){
 }
 function showPreflight(){
   try{
-    mapCols();fileWarnings=[];
+    mapCols();
     const inferred=inferMax();
     if(inferred!==null){$('maxPoints').value=inferred;$('maxHelp').textContent=`ExamSoft percentages were detected. GradeBridge inferred a ${inferred}-point maximum and will use percentages only as an informational consistency check.`}
     else{$('maxPoints').value='';$('maxHelp').textContent='No usable percentage data was found. Enter the assessment maximum points manually; GradeBridge will still import the raw ExamSoft points.'}

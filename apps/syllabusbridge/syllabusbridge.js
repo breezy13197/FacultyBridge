@@ -36,7 +36,6 @@ function norm(s){return clean(s).toLowerCase().replace(/[–—−]/g,'-')}
 function tableNearSection(rows,key){
  const section=state.sections.find(x=>x.key===key);
  if(!section)return false;
- const next=state.sections.filter(x=>x.index>section.index&&x.key!==key).sort((a,b)=>a.index-b.index)[0];
  const sectionTextValue=sectionText(key);
  const tableText=rows.flat().map(c=>clean(c.text)).filter(Boolean).join(' ');
  if(!tableText||!sectionTextValue)return false;
@@ -197,7 +196,6 @@ function scheduleTableProfile(rows,tableIndex=-1){
  });
  return{tableIndex,dateCol,headerIndex,entries,failures,count:entries.length};
 }
-function countScheduleCandidates(rows,tableIndex=-1){return scheduleTableProfile(rows,tableIndex).count}
 function parseScheduleTable(rows,tableIndex=-1){
  const events=[];let headerIndex=-1,cols={};
  const facultyHeader=t=>/^(?:course\s+)?(?:faculty|instructor|lead\s+instructor|presenter|lecturer|facilitator)s?$/.test(t);
@@ -508,7 +506,7 @@ function policyResults(){
  if(!profile)return[result('policy-profile',POLICY_CATEGORY,'not-evaluated','Syllabus policy profile','No syllabus policy profile was loaded, so policy wording was not checked.','The policy profile file is missing from this copy of SyllabusBridge.','Reload SyllabusBridge, or download a fresh copy. If this keeps happening, contact the FacultyBridge project owner.',false)];
  return[gradingScaleResult(profile),...(profile.contentChecks||[]).map(c=>policyContentResult(c,profile))]
 }
-function validate(){const r=[],hasSection=k=>state.sections.some(x=>x.key===k),allText=state.lines.join('\n');
+function validate(){const r=[],hasSection=k=>state.sections.some(x=>x.key===k);
  const required=[
  ['description','Course description'],['clos','Course learning outcomes'],['coordinator','Course coordinator'],
  ['faculty','Course faculty'],['timeLocation','Time and location'],['credits','Quarter credit hours'],
