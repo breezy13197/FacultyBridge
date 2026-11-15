@@ -13,10 +13,13 @@ for (const tool of suite.tools) {
     await expect(page.locator('header, .ft-topbar').first()).toContainText(`v${tool.version}`);
     const before = await theme(page);
     await page.locator(THEME_BUTTON).first().click();
+    // Poll instead of reading once: the theme attribute can land a moment after the
+    // click, and after reload the standalone (file://) builds may not have applied the
+    // saved theme yet. The checks stay strict; they just wait up to the expect timeout.
+    await expect.poll(() => theme(page)).not.toBe(before);
     const after = await theme(page);
-    expect(after).not.toBe(before);
     await page.reload();
-    expect(await theme(page)).toBe(after);
+    await expect.poll(() => theme(page)).toBe(after);
     if (!tool.route) await expect(page.locator('[data-tool-link]')).toHaveCount(suite.tools.length - 1);
   });
 }
