@@ -19,14 +19,12 @@
 .ib-kicker { text-transform:uppercase; letter-spacing:.1em; font-size:.72rem; font-weight:700; color:var(--ib-700); }
 .ib-review-headline { font-size:clamp(1.8rem,4vw,3.25rem); letter-spacing:-.045em; line-height:1; margin:9px 0 10px; }
 
-.ib-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:18px; }
-.ib-metric { padding:16px; border:1px solid var(--ft-border); border-radius:16px; background:var(--ft-surface); }
-.ib-metric strong { display:block; font-size:1.75rem; letter-spacing:-.04em; }
-.ib-metric span { color:var(--ft-text-muted); font-size:.8rem; font-weight:700; }
-.ib-metric.is-danger strong { color:var(--ft-danger); }
-.ib-metric.is-warning strong { color:var(--ft-warning); }
-.ib-metric.is-teal strong { color:var(--ib-700); }
-.ib-metric.is-good strong { color:var(--ft-green-700); }
+.ib-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:var(--ft-space-3); margin-top:var(--ft-space-5); }
+/* Summary cards use the shared .ft-metric card (classes added in itembridge.js).
+   Their inner <strong>/<span>/<small> carry no class, so they borrow the shared value/label/detail styles here. */
+.ib-metric > strong { display:block; color:var(--ft-metric-accent,var(--ft-text)); font-size:var(--ft-font-size-2xl); font-weight:850; line-height:1.1; letter-spacing:-.03em; font-variant-numeric:tabular-nums; }
+.ib-metric > span { color:var(--ft-text-muted); font-size:var(--ft-font-size-sm); font-weight:650; line-height:1.3; }
+.ib-metric > small { display:block; color:var(--ft-text-muted); font-size:var(--ft-font-size-xs); font-weight:500; line-height:1.35; }
 .ib-section { margin-top:18px; padding:22px; }
 .ib-section-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:15px; }
 .ib-section-head h2 { margin:0; font-size:1.15rem; }
@@ -181,7 +179,7 @@
 .ib-privacy{margin:0 0 15px;font-size:.78rem;color:var(--ft-text-muted)}
 .ib-status.not-analyzed{background:var(--ft-surface-soft);color:#4f5c54;border:1px dashed var(--ft-border)}
 .ib-metric.is-selected{outline:3px solid var(--ib-700)!important;outline-offset:2px;box-shadow:0 0 0 2px var(--ft-surface)}
-.ib-metric.is-selected span::after{content:" · selected";font-weight:700;color:var(--ft-text)}
+
 .ib-exam-file{font-size:.68rem;color:var(--ft-text-muted);display:block;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 .ib-snapshot-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.82rem}
@@ -201,6 +199,8 @@ body,button,input,select,textarea{font-family:var(--ft-font-sans,system-ui,-appl
 :where(.ft-btn,.ft-step,.ft-icon-btn,.ft-theme-toggle,.ib-metric,.ib-exam-btn,.ib-remove-exam,.ib-sort-btn,summary,button,input,select,textarea):focus-visible{outline:3px solid var(--ib-400);outline-offset:2px}
 .ib-metric.is-selected{outline:3px solid color-mix(in srgb,var(--ib-600) 55%,transparent)!important;outline-offset:2px}
 .ib-metric.is-selected::after{content:"Selected";display:block;margin-top:var(--ft-space-1,.25rem);font-size:var(--ft-font-size-xs,.75rem);font-weight:700;color:var(--ib-text-accent)}
+/* Keyboard focus on a summary card: strong identity-color ring (3:1+ in both themes), drawn on top of the selected ring, without squaring the corners. */
+.ib-metric:focus-visible,.ib-metric.is-selected:focus-visible{outline:3px solid var(--ft-brand-700)!important;outline-offset:3px;border-radius:var(--ft-radius-lg)!important;box-shadow:0 0 0 7px color-mix(in srgb,var(--ft-brand-700) 22%,transparent)}
 @media(max-width:620px){.ib-option{display:grid!important;grid-template-columns:24px minmax(0,1fr)!important;gap:var(--ft-space-2,.5rem)!important;align-items:start}.ib-option>*{display:block!important}.ib-option>*:nth-child(n+3){grid-column:2;font-size:var(--ft-font-size-xs,.75rem);color:var(--ft-text-muted)}}
 @media(prefers-reduced-motion:reduce){.ib-metric,.ib-exam-btn,.ib-sort-btn{transition:none!important;animation:none!important;transform:none!important}}
 
@@ -323,7 +323,6 @@ body,button,input,select,textarea{font-family:var(--ft-font-sans,system-ui,-appl
 .ib-history-order-unclear{display:inline-flex;align-items:center;min-height:28px;padding:4px 9px;border:1px solid var(--ft-border);border-radius:999px;background:var(--ft-surface);color:var(--ft-text-muted);font-size:var(--ft-font-size-xs,.75rem);font-weight:700;white-space:nowrap}
 .ib-history-table{min-width:900px}
 
-/* v1.9 priority-total relationship */
-.ib-metric small{display:block;margin-top:var(--ft-space-1,.25rem);color:var(--ft-text-muted);font-size:var(--ft-font-size-xs,.75rem);font-weight:600;line-height:1.25}
+
 
 .ib-items-table-wrap { --ib-detail-width: 100%; }

@@ -844,7 +844,7 @@ with would you your following answer answers choice choices correct best appropr
     if(e.manualQuestions.length) cards.push(['Manual check',e.manualQuestions.length,'items whose option-dependent composition rules could not be fully evaluated','manual']);
     const aiCount=e.questions.filter(q=>q.tags.ai.length).length;
     if(aiCount) cards.push(['AI authorship tag',aiCount,`${aiCount} of ${e.questions.length} questions · informational only`,'pass']);
-    $('#summaryGrid').innerHTML=cards.map(c=>`<div class="ft-card-soft eb-metric"><div class="eb-metric-label">${esc(c[0])}</div><div class="eb-metric-value">${esc(c[1])}</div><div>${statusBadge(c[3],c[3]==='pass'?'Ready':c[3]==='action'?'Action Needed':c[3]==='manual'?'Manual Check':'Needs Review')}</div><div class="eb-metric-detail">${esc(c[2])}</div></div>`).join('');
+    $('#summaryGrid').innerHTML=cards.map(c=>`<div class="ft-card-soft eb-metric ft-metric"><div class="eb-metric-label ft-metric-label">${esc(c[0])}</div><div class="eb-metric-value ft-metric-value">${esc(c[1])}</div><div>${statusBadge(c[3],c[3]==='pass'?'Ready':c[3]==='action'?'Action Needed':c[3]==='manual'?'Manual Check':'Needs Review')}</div><div class="eb-metric-detail ft-metric-detail">${esc(c[2])}</div></div>`).join('');
   }
 
   function sortedRuleKeys(keys){

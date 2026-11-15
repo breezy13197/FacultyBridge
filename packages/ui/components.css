@@ -105,6 +105,27 @@ a { color: var(--ft-brand-700); }
 .ft-table th { font-size: var(--ft-font-size-xs); text-transform: uppercase; letter-spacing: .06em; color: var(--ft-text-muted); background: var(--ft-surface-soft); }
 .ft-table tr:last-child td { border-bottom: 0; }
 
+/* Metric card: one big number with a short label and an optional detail line.
+   Add .ft-metric-ready / -warning / -error to color the number by status (the label
+   must still say what the status is), or .ft-metric-brand for the tool's identity color. */
+.ft-metric {
+  display: flex; flex-direction: column; gap: var(--ft-space-1); min-width: 0;
+  padding: var(--ft-space-4); color: var(--ft-text); text-align: left;
+  background: var(--ft-surface-soft); border: 1px solid var(--ft-border); border-radius: var(--ft-radius-lg);
+}
+.ft-metric-value {
+  display: block; margin: 0; color: var(--ft-metric-accent, var(--ft-text));
+  font-size: var(--ft-font-size-2xl); font-weight: 850; line-height: 1.1; letter-spacing: -.03em;
+  font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+}
+.ft-metric-label { display: block; color: var(--ft-text-muted); font-size: var(--ft-font-size-sm); font-weight: 650; line-height: 1.3; }
+.ft-metric-detail { display: block; color: var(--ft-text-muted); font-size: var(--ft-font-size-xs); font-weight: 500; line-height: 1.35; }
+.ft-metric-detail:empty { display: none; }
+.ft-metric-ready { --ft-metric-accent: var(--ft-success); }
+.ft-metric-warning { --ft-metric-accent: var(--ft-warning); }
+.ft-metric-error { --ft-metric-accent: var(--ft-danger); }
+.ft-metric-brand { --ft-metric-accent: var(--ft-brand-700); }
+
 .ft-empty-state { text-align: center; padding: 42px 24px; }
 .ft-empty-icon { width: 54px; height: 54px; margin: 0 auto 14px; border-radius: 16px; display: grid; place-items: center; background: var(--ft-brand-200); font-size: 24px; }
 
