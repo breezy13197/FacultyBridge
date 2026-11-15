@@ -23,13 +23,22 @@ async function openValidate(page, openTool, text) {
 }
 const card = page => page.locator('#metricAttention');
 const detail = page => page.locator('#metricAttentionDetail');
+// Checks the color actually shown, not just class names: the number must match the
+// given status token (--ft-danger, --ft-warning) or the plain text color (--ft-text).
+async function expectShownColor(page, token) {
+  const [shown, wanted] = await card(page).evaluate((el, name) => {
+    const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+    const rgb = c => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = c; ctx.fillRect(0, 0, 1, 1); return [...ctx.getImageData(0, 0, 1, 1).data].slice(0, 3).join(','); };
+    return [rgb(getComputedStyle(el).color), rgb(getComputedStyle(document.documentElement).getPropertyValue(name).trim())];
+  }, token);
+  expect(shown).toBe(wanted);
+}
 
 test('With issues card is red when any question is blocked', async ({ page, openTool }) => {
   await openValidate(page, openTool, blockedQuestion);
   await expect(card(page)).toHaveText('1');
   await expect(detail(page)).toContainText('1 blocked');
-  await expect(card(page)).toHaveClass(/\bft-status-error\b/);
-  await expect(card(page)).not.toHaveClass(/\bft-status-warning\b/);
+  await expectShownColor(page, '--ft-danger');
 });
 
 test('With issues card is amber when there are only warnings', async ({ page, openTool }) => {
@@ -37,12 +46,11 @@ test('With issues card is amber when there are only warnings', async ({ page, op
   await expect(card(page)).toHaveText('1');
   await expect(detail(page)).toContainText('0 blocked');
   await expect(detail(page)).toContainText('1 warning');
-  await expect(card(page)).toHaveClass(/\bft-status-warning\b/);
-  await expect(card(page)).not.toHaveClass(/\bft-status-error\b/);
+  await expectShownColor(page, '--ft-warning');
 });
 
 test('With issues card has no warning or error color when there are no issues', async ({ page, openTool }) => {
   await openValidate(page, openTool, cleanQuestion);
   await expect(card(page)).toHaveText('0');
-  await expect(card(page)).not.toHaveClass(/\bft-status-(warning|error)\b/);
+  await expectShownColor(page, '--ft-text');
 });

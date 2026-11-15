@@ -14,7 +14,7 @@ test('QuestionBridge: the "With issues" detail is on its own line below the labe
   await page.locator('#parsePaste').click();
   await page.locator('[data-screen="validate"]').click();
 
-  const card = page.locator('.qb-metric:has(#metricAttention)');
+  const card = page.locator('.ft-metric:has(#metricAttention)');
   const label = card.locator('span', { hasText: 'With issues' });
   const detail = page.locator('#metricAttentionDetail');
   await expect(detail).toHaveText('0 warnings · 1 blocked');

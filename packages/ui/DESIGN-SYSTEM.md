@@ -75,9 +75,29 @@ Destructive actions should use text/border danger styling and require confirmati
 
 ## Cards
 
-Cards are the core organizational primitive. Use them for upload areas, platform choices, question editors, metrics, validation panels, dashboards, and settings. Cards should not be nested more than necessary.
+Cards are the core organizational primitive. Use them for upload areas, platform choices, question editors, metrics (see "Metric cards" below), validation panels, dashboards, and settings. Cards should not be nested more than necessary.
 
 Interactive cards can lift subtly on hover; informational cards should remain static.
+
+## Metric cards
+
+Use `.ft-metric` for a summary count: one big number, a short label, and an optional detail line. Every tool uses the same card, so summary counts look and read the same across the suite.
+
+```html
+<div class="ft-metric ft-metric-warning">
+  <div class="ft-metric-value">3</div>
+  <div class="ft-metric-label">Need review</div>
+  <div class="ft-metric-detail">2 warnings · 1 guessed answer</div>
+</div>
+```
+
+- **Value** (`.ft-metric-value`): the number itself. Keep it short, such as `42`, `12.5%`, or `3 of 8`.
+- **Label** (`.ft-metric-label`): what is being counted, in plain words ("Need review", not "flaggedCount").
+- **Detail** (`.ft-metric-detail`, optional): one line of breakdown or context. It hides itself when it holds nothing at all (not even a space), so a tool can fill it in only when there is something to say.
+- **Color**: leave the number in the normal text color unless it carries a status. Add `.ft-metric-ready`, `.ft-metric-warning`, or `.ft-metric-error` for status, and make sure the label also says what that status is. Use `.ft-metric-brand` for a headline count in the tool's identity color. Never use a status color for decoration.
+- **Order**: put the value first for plain counts. When a card names a rule and carries a status badge (as ExamBridge's summary does), the label may come first, in the normal text color and a heavier weight, so it reads as a heading.
+- **Layout**: place cards in a grid (for example `.ft-grid-3` or the tool's own grid). Each tool chooses how many columns fit its screen; the cards stack on small screens.
+- **Interactive cards**: a card may be a `<button>` when clicking it filters a list (as in ItemBridge). It must then show a visible focus ring and a "selected" state that does not rely on color alone.
 
 ## Forms
 
