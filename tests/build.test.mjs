@@ -91,6 +91,24 @@ test('tool and shared UI sources use American spelling of canceled/canceling', (
     assert.ok(!hit,`${path.relative(root,file)} uses "${hit?.[0]}"; use "canceled"/"canceling"`);
   }
 });
+test('visible version numbers come from suite.json, not hand-typed text', () => {
+  // suite.json is the one place versions live (AGENTS.md). Pages use {{version}},
+  // which scripts/build.mjs fills in, so a release never leaves an old number on screen.
+  const typed = /(?:Bridge v|>v)\d+\.\d/;
+  for (const t of manifest.tools) {
+    const source = read(path.join(root, 'apps', t.id, 'index.html'));
+    assert.ok(!typed.test(source), `apps/${t.id}/index.html has a hand-typed version; use v{{version}}`);
+    assert.ok(source.includes('v{{version}}'), `apps/${t.id}/index.html should show its version with v{{version}}`);
+    // Protected tool code may still name its version in text faculty see; it must match suite.json.
+    for (const m of read(path.join(root, 'apps', t.id, `${t.id}.js`)).matchAll(new RegExp(`${t.name} v(\\d+(?:\\.\\d+)*)`, 'g')))
+      assert.equal(m[1], t.version, `apps/${t.id}/${t.id}.js shows "${m[0]}" but suite.json says ${t.version}`);
+    for (const dir of ['dist/site', 'dist/standalone']) {
+      const built = dir === 'dist/site' ? read(path.join(root, dir, t.route, 'index.html')) : read(path.join(root, dir, `${t.name}-v${t.version}-build${manifest.suiteVersion}.html`));
+      assert.ok(!built.includes('{{version}}'), `${dir} ${t.name} still contains {{version}}`);
+      assert.match(built, new RegExp(`<title>[^<]*v${t.version.replaceAll('.', '\\.')}\\b`), `${dir} ${t.name} title should show v${t.version}`);
+    }
+  }
+});
 test('recorded baseline logic hashes remain intact', () => {
   const baseline=JSON.parse(read(path.join(root,'tests/import-baseline.json')));
   // Whitelisted migration edits affect theme storage and CSS classes, never processing functions.

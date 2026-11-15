@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>GroupBridge v1.2.1 — Faculty Tools</title>
+<title>GroupBridge v{{version}} — Faculty Tools</title>
 
 <link rel="stylesheet" href="../../packages/ui/tokens.css">
 <link rel="stylesheet" href="../../packages/ui/themes.css">
@@ -14,7 +14,7 @@
 <body>
 <div class="app ft-app">
 <header class="topbar ft-topbar">
-  <div class="brand ft-brand"><div class="mark">G</div><div><div class="suite ft-brand-suite">Faculty Tools</div><div class="name">GroupBridge <span class="version">v1.2.1</span></div></div></div>
+  <div class="brand ft-brand"><div class="mark">G</div><div><div class="suite ft-brand-suite">Faculty Tools</div><div class="name">GroupBridge <span class="version">v{{version}}</span></div></div></div>
   <nav class="steps ft-steps" aria-label="Workflow">
     <button class="step active ft-step" data-step="1">1 Upload</button><button class="step ft-step" data-step="2">2 Configure</button><button class="step ft-step" data-step="3">3 Groups</button><button class="step ft-step" data-step="4">4 Export</button>
   </nav>
@@ -66,7 +66,7 @@
 <div class="small" style="margin-top:14px">Brightspace fields are written in this order: ACTION, Username, Org Defined ID, GroupName, GroupCode. GroupBridge does not add a header row because Brightspace reads each line as an action.</div>
 </section>
 </main>
-<footer class="footer">GroupBridge v1.2.1 · Faculty Tools · Local-only processing</footer>
+<footer class="footer">GroupBridge v{{version}} · Faculty Tools · Local-only processing</footer>
 </div><div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="../../packages/ui/runtime.js"></script>
