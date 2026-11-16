@@ -156,3 +156,75 @@ test('QuestionBridge: Title and Type lines attach to Word automatically numbered
   expect(second.correct).toEqual([true, false, true]);
   for (const q of [first, second]) expect(q.stem).not.toMatch(/Title:|Type:|~/);
 });
+
+// Review follow-ups (all synthetic):
+// 5. A title with a number ("Chapter 2. Enzymes") followed by another header line
+//    (Category:/Type:) and then the question was split into a phantom question
+//    titled "Chapter", because the title check looked only at the very next line.
+// 6. A bold paragraph with leading spaces lost the wrong characters from its
+//    formatted (HTML) stem when the Title: header was removed.
+const headerEdgeParagraphs = [
+  'Title: Chapter 2. Enzymes',
+  'Category: Biochemistry',
+  '1. Which enzyme breaks a bond using water?',
+  'a. Ligase',
+  '*b. Hydrolase',
+  '',
+  'Title: Chapter 3. Lipids',
+  'Type: MA',
+  { auto: 'Which of these are lipids?' },
+  '*a. Cholesterol',
+  'b. Glucose',
+  '*c. Triglyceride',
+  '',
+  [['   Title: Gases 3. Which gases are noble?', true]],
+  '*a. Neon',
+  'b. Nitrogen',
+];
+
+test('QuestionBridge: a numbered title before other header lines does not create a phantom question (Word)', async ({ page, openTool }) => {
+  await openTool('questionbridge');
+  await page.locator('[data-screen="upload"]').click();
+  await page.locator('#fileInput').setInputFiles({ name: 'synthetic-examsoft-headers.docx', mimeType: DOCX_MIME, buffer: await docx(headerEdgeParagraphs) });
+  await expect(page.locator('#questionList .qb-question-item')).toHaveCount(3);
+
+  const first = await openQuestion(page, 0);
+  expect(first.title).toBe('Chapter 2. Enzymes');
+  expect(first.topic).toBe('Biochemistry');
+  expect(first.stem).toBe('Which enzyme breaks a bond using water?');
+  expect(first.correct).toEqual([false, true]);
+
+  const second = await openQuestion(page, 1);
+  expect(second.title).toBe('Chapter 3. Lipids');
+  expect(second.type).toBe('mr');
+  expect(second.stem).toBe('Which of these are lipids?');
+
+  const third = await openQuestion(page, 2);
+  expect(third.title).toBe('Gases');
+  expect(third.stem).toBe('Which gases are noble?');
+  // The formatted stem says the same thing as the plain stem, still in bold.
+  const html = await page.evaluate(() => state.questions[2].stemHtml);
+  expect(html).toMatch(/<strong>/);
+  expect(html.replace(/<[^>]+>/g, '').trim()).toBe('Which gases are noble?');
+});
+
+test('QuestionBridge: a numbered title before other header lines does not create a phantom question (pasted text)', async ({ page, openTool }) => {
+  await openTool('questionbridge');
+  await page.locator('[data-screen="upload"]').click();
+  await page.locator('#pasteText').fill([
+    'Title: Chapter 2. Enzymes', 'Category: Biochemistry', '1. Which enzyme breaks a bond using water?', 'a. Ligase', '*b. Hydrolase', '',
+    'Title: Chapter 3. Lipids', 'Type: MA', 'Category: Biochemistry', '2. Which of these are lipids?', '*a. Cholesterol', 'b. Glucose', '*c. Triglyceride',
+  ].join('\n'));
+  await page.locator('#parsePaste').click();
+  await expect(page.locator('#questionList .qb-question-item')).toHaveCount(2);
+
+  const first = await openQuestion(page, 0);
+  expect(first.title).toBe('Chapter 2. Enzymes');
+  expect(first.topic).toBe('Biochemistry');
+  expect(first.stem).toBe('Which enzyme breaks a bond using water?');
+
+  const second = await openQuestion(page, 1);
+  expect(second.title).toBe('Chapter 3. Lipids');
+  expect(second.type).toBe('mr');
+  expect(second.stem).toBe('Which of these are lipids?');
+});
