@@ -38,7 +38,7 @@ const FB_TOOLS = [
     description: 'Review an ExamSoft draft against faculty-approved exam-writing rules, question weights, tagging, and figure checks before administration.',
     input: 'ExamSoft exam export',
     output: 'Quality review report',
-    status: 'In development',
+    status: 'Available',
     icon: 'exam'
   },
   {
@@ -48,7 +48,7 @@ const FB_TOOLS = [
     description: 'Prioritize ExamSoft items for faculty review using psychometrics, tags, distractor performance, and repeated-item history.',
     input: 'Item Analysis CSV',
     output: 'Prioritized item review',
-    status: 'In development',
+    status: 'Available',
     icon: 'items'
   },
   {
