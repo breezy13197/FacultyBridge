@@ -78,11 +78,18 @@
   border-radius:var(--ft-radius-md);
   background:var(--ft-surface-soft);
 }
+/* Floating the legend keeps "Findings to include" inside the box as a heading,
+   instead of the browser default of drawing it across the top border. */
 .eb-report-findings-picker legend{
-  padding:0 6px;
+  float:left;
+  width:100%;
+  padding:0;
+  margin:0 0 var(--ft-space-2);
+  font-size:var(--ft-font-size-lg);
   font-weight:850;
 }
 .eb-report-picker-head{
+  clear:both;
   display:flex;
   justify-content:space-between;
   align-items:center;
