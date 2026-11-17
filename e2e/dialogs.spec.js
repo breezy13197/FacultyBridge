@@ -202,6 +202,74 @@ test('ExamBridge: report options and "choose another exam" use the shared pop-up
   await expect(page.locator('#uploadView')).toBeVisible();
 });
 
+// ExamBridge keeps exception approvals and report notes in browser storage. When
+// storage is blocked they live only in the open tab, so the tool must warn before
+// leaving, show a notice, and never claim the work is saved.
+const loadSyntheticExam = page => page.locator('#fileInput').setInputFiles({ name: 'synthetic.doc', mimeType: 'application/msword', buffer: Buffer.from(syntheticExamRtf) });
+
+test('ExamBridge: blocked storage warns before leaving and never claims notes are saved', async ({ page, openTool }) => {
+  await page.addInitScript(() => {
+    for (const name of ['localStorage', 'sessionStorage']) Object.defineProperty(window, name, {
+      configurable: true, get() { throw new DOMException('The operation is insecure.', 'SecurityError'); },
+    });
+  });
+  await openTool('exambridge');
+  await loadSyntheticExam(page);
+  await expect(page.locator('#resultsView')).toBeVisible();
+  expect(await page.evaluate(() => FTStorage.persistent)).toBe(false);
+  expect(await warnsBeforeLeaving(page)).toBe(false); // nothing entered yet
+  await expect(page.locator('#unsavedWorkNotice')).toBeHidden();
+
+  await page.locator('#reportNotes').fill('Revise question 2 before the retake.');
+  expect(await warnsBeforeLeaving(page)).toBe(true);
+  await expect(page.locator('#unsavedWorkNotice')).toBeVisible();
+  await expect(page.locator('#unsavedWorkNotice')).toContainText('only in this tab');
+
+  await page.locator('#changeFileBtn').click();
+  const another = sharedDialog(page, 'Choose another exam?');
+  await expect(another).toBeVisible();
+  await expect(another).not.toContainText(/saved/i);
+  await expect(another).toContainText(/will be lost when this tab is closed or reloaded/);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#reportNotes')).toHaveValue(/Revise question 2/);
+
+  // Clearing the notes leaves nothing to lose again.
+  await page.locator('#reportNotes').fill('');
+  expect(await warnsBeforeLeaving(page)).toBe(false);
+  await expect(page.locator('#unsavedWorkNotice')).toBeHidden();
+
+  // An approved exception is also work: one "select all that apply" question out
+  // of two exceeds the 20% multiple-response maximum, so an exception can be recorded.
+  await page.locator('#changeFileBtn').click();
+  await sharedDialog(page, 'Choose another exam?').getByRole('button', { name: 'Choose another exam' }).click();
+  await page.locator('#fileInput').setInputFiles({ name: 'synthetic-mr.doc', mimeType: 'application/msword',
+    buffer: Buffer.from(syntheticExamRtf.replace('Which molecule transports oxygen?', 'Which molecules carry oxygen? Select all that apply.')) });
+  await page.locator('[data-ex-approved="multiple"]').check();
+  expect(await warnsBeforeLeaving(page)).toBe(true);
+  await expect(page.locator('#unsavedWorkNotice')).toBeVisible();
+  await page.locator('#changeFileBtn').click();
+  await expect(sharedDialog(page, 'Choose another exam?')).not.toContainText(/saved/i);
+});
+
+test('ExamBridge: working storage keeps notes after reload without a leave warning', async ({ page, openTool }) => {
+  await openTool('exambridge');
+  await loadSyntheticExam(page);
+  await expect(page.locator('#resultsView')).toBeVisible();
+  expect(await warnsBeforeLeaving(page)).toBe(false);
+  await page.locator('#reportNotes').fill('Revise question 2 before the retake.');
+  expect(await warnsBeforeLeaving(page)).toBe(false);
+  await expect(page.locator('#unsavedWorkNotice')).toBeHidden();
+
+  await page.locator('#changeFileBtn').click();
+  const another = sharedDialog(page, 'Choose another exam?');
+  await expect(another).toContainText('Your exceptions and report notes are saved for this exam.');
+  await page.keyboard.press('Escape');
+
+  await page.reload();
+  await loadSyntheticExam(page);
+  await expect(page.locator('#reportNotes')).toHaveValue('Revise question 2 before the retake.');
+});
+
 test('CalendarBridge: schedule edits warn before leaving until the project is saved', async ({ page, openTool }) => {
   await openTool('calendarbridge');
   await page.locator('#fileInput').setInputFiles({ name: 'syllabus.docx', mimeType: DOCX_MIME, buffer: await syntheticDocx(syntheticSyllabus) });
