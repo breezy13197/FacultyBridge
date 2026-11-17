@@ -223,12 +223,13 @@ test('ExamBridge: blocked storage warns before leaving and never claims notes ar
   await page.locator('#reportNotes').fill('Revise question 2 before the retake.');
   expect(await warnsBeforeLeaving(page)).toBe(true);
   await expect(page.locator('#unsavedWorkNotice')).toBeVisible();
+  await expect(page.locator('#unsavedWorkNotice')).toContainText('only in this tab');
 
   await page.locator('#changeFileBtn').click();
   const another = sharedDialog(page, 'Choose another exam?');
   await expect(another).toBeVisible();
   await expect(another).not.toContainText(/saved/i);
-  await expect(another).toContainText(/will be cleared/);
+  await expect(another).toContainText(/will be lost when this tab is closed or reloaded/);
   await page.keyboard.press('Escape');
   await expect(page.locator('#reportNotes')).toHaveValue(/Revise question 2/);
 

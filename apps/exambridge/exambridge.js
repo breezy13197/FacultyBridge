@@ -118,14 +118,21 @@
       if(!show) return;
       unsavedNotice=document.createElement('div');
       unsavedNotice.id='unsavedWorkNotice';
-      unsavedNotice.className='ft-notice ft-notice-warning ft-mt-3';
+      unsavedNotice.className='ft-notice ft-notice-warning ft-mt-3 eb-hidden';
       unsavedNotice.setAttribute('role','status');
-      const strong=document.createElement('strong');
-      strong.textContent='Your exceptions and report notes are only in this tab.';
-      unsavedNotice.append(strong,' This browser is not keeping a copy, so they will be lost if you close or reload the tab. Print or save the PDF report to keep a record.');
       $('#resultsView .eb-file-meta').after(unsavedNotice);
     }
+    const shown=!unsavedNotice.classList.contains('eb-hidden');
+    if(show===shown) return;
     unsavedNotice.classList.toggle('eb-hidden',!show);
+    // Fill the live region only after it is visible so screen readers announce it.
+    unsavedNotice.textContent='';
+    if(show) setTimeout(()=>{
+      if(unsavedNotice.classList.contains('eb-hidden') || unsavedNotice.textContent) return;
+      const strong=document.createElement('strong');
+      strong.textContent='Your exceptions and report notes are only in this tab.';
+      unsavedNotice.append(strong,' This browser is not keeping a copy, so they will be lost if you close or reload this tab. Use “Print / Save PDF report” to keep a record.');
+    },50);
   }
   function restoreSession(){
     const key=sessionKey(); if(!key) return;
@@ -141,11 +148,10 @@
     if(state.exam){
       saveSession();
       if(storageIsTemporary() && hasEnteredWork()){
-        const msg='This browser is not keeping a copy of your exceptions and report notes. They will be cleared and cannot be recovered. Print or save the PDF report first if you need them.';
+        const msg='Your exceptions and report notes will be lost when this tab is closed or reloaded, because this browser is not keeping a copy. Use “Print / Save PDF report” first if you need a record.';
         if(!await FTDialog.confirm(msg,{title:'Choose another exam?',confirmLabel:'Clear and choose another exam',danger:true})) return;
       } else {
-        const hasWork=Object.keys(state.exceptions).length>0 || !!($('#reportNotes')?.value||'').trim();
-        const msg=hasWork
+        const msg=hasEnteredWork()
           ? 'Your exceptions and report notes are saved for this exam.'
           : 'The results for the current exam will be cleared from the screen.';
         if(!await FTDialog.confirm(msg,{title:'Choose another exam?',confirmLabel:'Choose another exam'})) return;
