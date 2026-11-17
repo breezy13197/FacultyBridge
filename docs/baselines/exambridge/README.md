@@ -28,7 +28,7 @@ The exam is parsed entirely in the browser. ExamBridge does not send the file to
 
 - Multiple response is detected primarily by more than one keyed correct answer, with common stem-language fallbacks.
 - K-type detection is validated against known K-type Questions 46 and 47 from the supplied PHA3102 exam. It requires a Roman-numeral statement set including I/II/III plus combination-style Roman-numeral answer choices.
-- A `PHA#### - Course Name` category is recognized as the course tag even when ExamSoft stores it inside the CLO taxonomy. The course inferred from the Exam Folder is displayed separately and is not treated as satisfying the required tag by itself.
+- A `PHA#### - Course Name` category is recognized as the course tag even when ExamSoft stores it inside the CLO taxonomy. Only a category whose own name carries the course code counts: a CLO whose path merely runs through the course folder does not satisfy the Course Name tag. The course inferred from the Exam Folder is displayed separately and is not treated as satisfying the required tag by itself.
 - Figure integrity flags a likely figure/image reference when no attachment is detected. Attachments do not need an explicit “see figure” phrase.
 
 ## Files
@@ -189,3 +189,14 @@ ExamBridge identifies the guideline's targeted wording elements:
 - None of the Above
 
 Findings name the location (stem or option). `Select all that apply` is not treated as an absolute-term finding because it is an item-format instruction. K-type combination-choice `only` wording is also suppressed because it is structural to that format.
+
+
+## Tagging accuracy fixes (unreleased)
+
+Found with a faculty test quiz that had one deliberate tagging fault per question.
+
+- **Course Name tag:** a question tagged only with CLOs is no longer treated as course-tagged just because each CLO's path passes through the course folder. It now gets "Course Name tag not detected" (Action Needed).
+- **Wrong course:** a Course Name tag from a different course than the exam (for example, PHA3114 on a PHA3134 exam) is now flagged under Tag quality (Review), the same way cross-course CLO tags already were.
+- **Bloom's level:** a question tagged with more than one abbreviated Bloom's level is now Action Needed ("tag exactly one").
+- The `Category Name / Category Path` column header that ExamSoft repeats in each item's category list is no longer counted as a category.
+- Regression check: `e2e/exambridge-tagging.spec.js` (synthetic data).
