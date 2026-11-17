@@ -383,7 +383,7 @@
     for(let i=0;i<lines.length;){
       if(lines[i].includes('\t')){
         const parts=lines[i].split('\t').map(normalizeSpace).filter(Boolean);
-        if(parts.length>=2) cats.push({name:parts[0],path:parts.slice(1).join('\\')});
+        if(parts.length>=2 && !isCategoryHeader(parts[0],parts[1])) cats.push({name:parts[0],path:parts.slice(1).join('\\')});
         i++;
       } else {
         const name=normalizeSpace(lines[i]||''), path=normalizeSpace(lines[i+1]||'');
@@ -394,36 +394,29 @@
     return cats;
   }
 
+  // ExamSoft repeats a "Category Name<tab>Category Path" column header inside each category list.
+  function isCategoryHeader(name,path){ return /^Category Name$/i.test(name) && /^Category Path$/i.test(path); }
+
   function classifyTags(cats, examCourse){
     const faculty=cats.filter(c=>/(^|\\)2\. Faculty(\\|$)/i.test(c.path) && !/\\AI(?:\\|$)/i.test(c.path));
     const ai=cats.filter(c=>/(^|\\)2\. Faculty(\\|$)/i.test(c.path) && /(?:^|\\)AI(?:\\|$)/i.test(c.path));
     const pslo=cats.filter(c=>/PSLO/i.test(c.path));
     const bloom=cats.filter(c=>/Blooms Taxonomy Abbreviated/i.test(c.path));
 
-    // Course and outcome are independent dimensions in the local ExamSoft taxonomy:
-    // a CLO category can have the course as an intermediate path segment. Preserve the
-    // CLO while also deriving a synthetic course tag from the matching path segment.
-    const course=[];
-    const seenCourse=new Set();
-    cats.forEach(c=>{
-      const segments=String(c.path||'').split(/\\|\//).map(normalizeSpace).filter(Boolean);
-      const candidates=[...segments, c.name].filter(Boolean);
-      for(const seg of candidates){
-        const code=detectCourseCode(seg);
-        if(code){
-          const key=code+'|'+seg;
-          if(!seenCourse.has(key)){ course.push({name:seg,path:c.path,derived:true}); seenCourse.add(key); }
-          break;
-        }
-      }
-    });
+    // In the local ExamSoft taxonomy the course category ("PHA#### - Course Name")
+    // sits inside the CLO tree, so every CLO path also passes through the course
+    // folder. Only a category whose own name carries the course code is a course
+    // tag; a CLO path that merely runs through the course folder is not.
+    const course=cats.filter(c=>detectCourseCode(c.name) && !/^(?:CLO|CO)\s*\d+/i.test(c.name));
     const clo=cats.filter(c=>/^(?:CLO|CO)\s*\d+/i.test(c.name) || /\\(?:CLO|CO)\s*\d+/i.test(c.path));
     const legacy=cats.filter(c=>/OLD Curriculum/i.test(c.path));
-    const wrongCourse=clo.filter(c=>{
+    const otherCourse=c=>{
       const codes=[...String(c.path||'').matchAll(/\bPHA\s*[- ]?\s*(\d{3,4})\b/gi)].map(m=>`PHA${m[1]}`);
-      return examCourse && codes.some(code=>code!==examCourse);
-    });
-    return {faculty,ai,pslo,clo,bloom,course,legacy,wrongCourse};
+      return !!examCourse && codes.some(code=>code!==examCourse);
+    };
+    const wrongCourse=clo.filter(otherCourse);
+    const wrongCourseTag=course.filter(otherCourse);
+    return {faculty,ai,pslo,clo,bloom,course,legacy,wrongCourse,wrongCourseTag};
   }
 
   function isKType(stem,options){
@@ -673,9 +666,11 @@ with would you your following answer answers choice choices correct best appropr
       if(q.tags.pslo.length===0) f.push(finding('action','tag','PSLO tag missing.'));
       if(q.tags.clo.length===0) f.push(finding('action','tag','CLO tag missing.'));
       if(q.tags.bloom.length===0) f.push(finding('action','tag',"Abbreviated Bloom's level missing."));
+      if(q.tags.bloom.length>1) f.push(finding('action','tag',`Abbreviated Bloom's: ${q.tags.bloom.length} levels tagged (${q.tags.bloom.map(c=>c.name).join('; ')}); tag exactly one.`));
       if(q.tags.pslo.length>2) f.push(finding('review','tag',`${q.tags.pslo.length} PSLOs tagged; 1–2 is typical.`));
       if(q.tags.clo.length>2) f.push(finding('review','tag',`${q.tags.clo.length} CLOs tagged; 1–2 is typical.`));
       if(q.tags.legacy.length) f.push(finding('review','tag','Legacy / pre-2022 curriculum tag detected.'));
+      q.tags.wrongCourseTag.forEach(c=>f.push(finding('action','tag',`Course Name tag belongs to ${detectCourseCode(c.path)}, not this exam's course ${exam.metadata.detectedCourseCode}: ${c.name}.`)));
       if(q.tags.wrongCourse.length) f.push(finding('review','tag',`CLO tag appears to belong to ${detectCourseCode(q.tags.wrongCourse[0].path)}, not ${exam.metadata.detectedCourseCode}.`));
       q.findings=f;
       q.status=f.some(x=>x.level==='action')?'action':f.some(x=>x.level==='review')?'review':f.some(x=>x.level==='manual')?'manual':'pass';
@@ -717,11 +712,11 @@ with would you your following answer answers choice choices correct best appropr
       writing:{level:qs.some(q=>q.findings.some(f=>f.kind.startsWith('writing-')))?'review':'pass',affectsOverall:false,title:'Writing review',detail:(()=>{const hit=qs.filter(q=>q.findings.some(f=>f.kind.startsWith('writing-')));const partial=qs.filter(q=>q.options.length===0);return `${n-partial.length} of ${n} questions fully evaluated; ${partial.length} evaluated in part (answer choices could not be read); ${hit.length} question(s) to review. Student-visible stems and answer choices only.`;})(),questions:qs.filter(q=>q.findings.some(f=>f.kind.startsWith('writing-'))),evaluated:qs.filter(q=>q.options.length>0).length,total:n},
       choiceLength:{level:qs.some(q=>q.findings.some(f=>f.kind==='choice-length'))?'review':'pass',affectsOverall:false,title:'Correct-answer length cueing',detail:qs.some(q=>q.findings.some(f=>f.kind==='choice-length'))?`${qs.filter(q=>q.findings.some(f=>f.kind==='choice-length')).length} eligible question(s) have a keyed answer that is conspicuously longer than the distractors.`:'No keyed-answer length cue was detected among the conventional single-key MCQs examined.',questions:qs.filter(q=>q.findings.some(f=>f.kind==='choice-length')),evaluated:choiceLengthEligible.length,total:n},
       ai:{level:'pass',title:'AI authorship tag',detail:`${qs.filter(q=>q.tags.ai.length).length} of ${n} questions carry an AI authorship tag. Informational only.`,questions:qs.filter(q=>q.tags.ai.length)},
-      course:{level:qs.some(q=>q.tags.course.length===0)?'action':'pass',title:'Course Name',detail:completeness(qs,q=>q.tags.course.length>0),questions:qs.filter(q=>q.tags.course.length===0)},
+      course:{level:qs.some(q=>q.tags.course.length===0||q.tags.wrongCourseTag.length)?'action':'pass',title:'Course Name',detail:courseDetail(qs),questions:qs.filter(q=>q.tags.course.length===0||q.tags.wrongCourseTag.length)},
       faculty:{level:qs.some(q=>q.tags.faculty.length===0)?'action':'pass',title:'Faculty Name',detail:completeness(qs,q=>q.tags.faculty.length>0),questions:qs.filter(q=>q.tags.faculty.length===0)},
       pslo:{level:qs.some(q=>q.tags.pslo.length===0)?'action':'pass',title:'PSLO',detail:tagDetail(qs,'pslo'),questions:qs.filter(q=>q.tags.pslo.length===0)},
       clo:{level:qs.some(q=>q.tags.clo.length===0)?'action':'pass',title:'CLO',detail:tagDetail(qs,'clo'),questions:qs.filter(q=>q.tags.clo.length===0)},
-      bloom:{level:qs.some(q=>q.tags.bloom.length===0)?'action':'pass',title:"Abbreviated Bloom's",detail:bloomDetail(qs),questions:qs.filter(q=>q.tags.bloom.length===0)},
+      bloom:{level:qs.some(q=>q.tags.bloom.length!==1)?'action':'pass',title:"Abbreviated Bloom's",detail:bloomDetail(qs),questions:qs.filter(q=>q.tags.bloom.length!==1)},
       tagQuality:{level:qs.some(q=>q.tags.wrongCourse.length||q.tags.legacy.length||q.tags.pslo.length>2||q.tags.clo.length>2)?'review':'pass',title:'Tag quality',detail:qualityDetail(qs),questions:qs.filter(q=>q.tags.wrongCourse.length||q.tags.legacy.length||q.tags.pslo.length>2||q.tags.clo.length>2)}
     };
     // Every rule reports its evaluation denominator so a rule cannot silently
@@ -775,11 +770,16 @@ with would you your following answer answers choice choices correct best appropr
     const c=qs.filter(q=>q.tags[key].length>0).length, over=qs.filter(q=>q.tags[key].length>2).length;
     return `${c} of ${qs.length} questions tagged (${pct(c,qs.length)}).${over?` ${over} question(s) have more than 2.`:''}`;
   }
+  function courseDetail(qs){
+    const wrong=qs.filter(q=>q.tags.wrongCourseTag.length).length;
+    return `${completeness(qs,q=>q.tags.course.length>0)}${wrong?` ${wrong} question(s) are tagged to a different course than this exam.`:''}`;
+  }
   function bloomDetail(qs){
     const tagged=qs.filter(q=>q.tags.bloom.length).length;
     const levels={1:0,2:0,3:0};
     qs.forEach(q=>q.tags.bloom.forEach(c=>{ const m=c.name.match(/^\s*([123])\./); if(m) levels[m[1]]++; }));
-    return `${tagged} of ${qs.length} tagged. Level 1: ${levels[1]}, Level 2: ${levels[2]}, Level 3: ${levels[3]}.`;
+    const multi=qs.filter(q=>q.tags.bloom.length>1).length;
+    return `${tagged} of ${qs.length} tagged. Level 1: ${levels[1]}, Level 2: ${levels[2]}, Level 3: ${levels[3]}.${multi?` ${multi} question(s) have more than one level; tag exactly one.`:''}`;
   }
   function qualityDetail(qs){
     const wrongQs=qs.filter(q=>q.tags.wrongCourse.length), legacyQs=qs.filter(q=>q.tags.legacy.length);
