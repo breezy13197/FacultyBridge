@@ -410,11 +410,13 @@
     const course=cats.filter(c=>detectCourseCode(c.name) && !/^(?:CLO|CO)\s*\d+/i.test(c.name));
     const clo=cats.filter(c=>/^(?:CLO|CO)\s*\d+/i.test(c.name) || /\\(?:CLO|CO)\s*\d+/i.test(c.path));
     const legacy=cats.filter(c=>/OLD Curriculum/i.test(c.path));
-    const wrongCourse=[...course,...clo].filter(c=>{
+    const otherCourse=c=>{
       const codes=[...String(c.path||'').matchAll(/\bPHA\s*[- ]?\s*(\d{3,4})\b/gi)].map(m=>`PHA${m[1]}`);
-      return examCourse && codes.some(code=>code!==examCourse);
-    });
-    return {faculty,ai,pslo,clo,bloom,course,legacy,wrongCourse};
+      return !!examCourse && codes.some(code=>code!==examCourse);
+    };
+    const wrongCourse=clo.filter(otherCourse);
+    const wrongCourseTag=course.filter(otherCourse);
+    return {faculty,ai,pslo,clo,bloom,course,legacy,wrongCourse,wrongCourseTag};
   }
 
   function isKType(stem,options){
@@ -668,10 +670,8 @@ with would you your following answer answers choice choices correct best appropr
       if(q.tags.pslo.length>2) f.push(finding('review','tag',`${q.tags.pslo.length} PSLOs tagged; 1–2 is typical.`));
       if(q.tags.clo.length>2) f.push(finding('review','tag',`${q.tags.clo.length} CLOs tagged; 1–2 is typical.`));
       if(q.tags.legacy.length) f.push(finding('review','tag','Legacy / pre-2022 curriculum tag detected.'));
-      q.tags.wrongCourse.forEach(c=>{
-        const kind=q.tags.course.includes(c)?'Course Name':'CLO';
-        f.push(finding('review','tag',`${kind} tag appears to belong to ${detectCourseCode(c.path)}, not ${exam.metadata.detectedCourseCode}: ${c.name}.`));
-      });
+      q.tags.wrongCourseTag.forEach(c=>f.push(finding('action','tag',`Course Name tag belongs to ${detectCourseCode(c.path)}, not this exam's course ${exam.metadata.detectedCourseCode}: ${c.name}.`)));
+      if(q.tags.wrongCourse.length) f.push(finding('review','tag',`CLO tag appears to belong to ${detectCourseCode(q.tags.wrongCourse[0].path)}, not ${exam.metadata.detectedCourseCode}.`));
       q.findings=f;
       q.status=f.some(x=>x.level==='action')?'action':f.some(x=>x.level==='review')?'review':f.some(x=>x.level==='manual')?'manual':'pass';
     });
@@ -712,7 +712,7 @@ with would you your following answer answers choice choices correct best appropr
       writing:{level:qs.some(q=>q.findings.some(f=>f.kind.startsWith('writing-')))?'review':'pass',affectsOverall:false,title:'Writing review',detail:(()=>{const hit=qs.filter(q=>q.findings.some(f=>f.kind.startsWith('writing-')));const partial=qs.filter(q=>q.options.length===0);return `${n-partial.length} of ${n} questions fully evaluated; ${partial.length} evaluated in part (answer choices could not be read); ${hit.length} question(s) to review. Student-visible stems and answer choices only.`;})(),questions:qs.filter(q=>q.findings.some(f=>f.kind.startsWith('writing-'))),evaluated:qs.filter(q=>q.options.length>0).length,total:n},
       choiceLength:{level:qs.some(q=>q.findings.some(f=>f.kind==='choice-length'))?'review':'pass',affectsOverall:false,title:'Correct-answer length cueing',detail:qs.some(q=>q.findings.some(f=>f.kind==='choice-length'))?`${qs.filter(q=>q.findings.some(f=>f.kind==='choice-length')).length} eligible question(s) have a keyed answer that is conspicuously longer than the distractors.`:'No keyed-answer length cue was detected among the conventional single-key MCQs examined.',questions:qs.filter(q=>q.findings.some(f=>f.kind==='choice-length')),evaluated:choiceLengthEligible.length,total:n},
       ai:{level:'pass',title:'AI authorship tag',detail:`${qs.filter(q=>q.tags.ai.length).length} of ${n} questions carry an AI authorship tag. Informational only.`,questions:qs.filter(q=>q.tags.ai.length)},
-      course:{level:qs.some(q=>q.tags.course.length===0)?'action':'pass',title:'Course Name',detail:completeness(qs,q=>q.tags.course.length>0),questions:qs.filter(q=>q.tags.course.length===0)},
+      course:{level:qs.some(q=>q.tags.course.length===0||q.tags.wrongCourseTag.length)?'action':'pass',title:'Course Name',detail:courseDetail(qs),questions:qs.filter(q=>q.tags.course.length===0||q.tags.wrongCourseTag.length)},
       faculty:{level:qs.some(q=>q.tags.faculty.length===0)?'action':'pass',title:'Faculty Name',detail:completeness(qs,q=>q.tags.faculty.length>0),questions:qs.filter(q=>q.tags.faculty.length===0)},
       pslo:{level:qs.some(q=>q.tags.pslo.length===0)?'action':'pass',title:'PSLO',detail:tagDetail(qs,'pslo'),questions:qs.filter(q=>q.tags.pslo.length===0)},
       clo:{level:qs.some(q=>q.tags.clo.length===0)?'action':'pass',title:'CLO',detail:tagDetail(qs,'clo'),questions:qs.filter(q=>q.tags.clo.length===0)},
@@ -770,6 +770,10 @@ with would you your following answer answers choice choices correct best appropr
     const c=qs.filter(q=>q.tags[key].length>0).length, over=qs.filter(q=>q.tags[key].length>2).length;
     return `${c} of ${qs.length} questions tagged (${pct(c,qs.length)}).${over?` ${over} question(s) have more than 2.`:''}`;
   }
+  function courseDetail(qs){
+    const wrong=qs.filter(q=>q.tags.wrongCourseTag.length).length;
+    return `${completeness(qs,q=>q.tags.course.length>0)}${wrong?` ${wrong} question(s) are tagged to a different course than this exam.`:''}`;
+  }
   function bloomDetail(qs){
     const tagged=qs.filter(q=>q.tags.bloom.length).length;
     const levels={1:0,2:0,3:0};
@@ -783,7 +787,7 @@ with would you your following answer answers choice choices correct best appropr
     const broad=qs.filter(q=>q.tags.pslo.length>2||q.tags.clo.length>2).length;
     if(!wrongQs.length&&!legacyQs.length&&!broad) return 'No obvious wrong-course, legacy, or unusually broad tags detected.';
     const overlapText=overlap?` ${overlap} question(s) contain tags that are both cross-course and legacy; those findings overlap and should not be added together.`:'';
-    return `${wrongQs.length} question(s) have Course Name or CLO tags from another course; ${legacyQs.length} question(s) have legacy tags; ${broad} have unusually broad tagging.${overlapText}`;
+    return `${wrongQs.length} question(s) have cross-course CLO tags; ${legacyQs.length} question(s) have legacy tags; ${broad} have unusually broad tagging.${overlapText}`;
   }
   function fmtWeight(w){ return `${Number(w)%1?Number(w):Number(w).toFixed(0)} ${Number(w)===1?'point':'points'}`; }
 
@@ -887,7 +891,7 @@ with would you your following answer answers choice choices correct best appropr
     if(f.kind==='choice-length') return 'choiceLength';
     if(String(f.kind||'').startsWith('writing-')) return 'writing';
     if(f.kind==='tag'){
-      if(/^Course Name tag not detected/i.test(f.text)) return 'course';
+      if(/^Course Name tag/i.test(f.text)) return 'course';
       if(/^Faculty Name tag/i.test(f.text)) return 'faculty';
       if(/^PSLO tag missing/i.test(f.text)) return 'pslo';
       if(/^CLO tag missing/i.test(f.text)) return 'clo';

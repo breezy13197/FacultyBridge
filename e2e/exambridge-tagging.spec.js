@@ -51,10 +51,10 @@ test('ExamBridge flags missing course, wrong course, and multiple Bloom\'s tags'
   expect(q[4].tagFindings).toContain('action: Course Name tag not detected.');
 
   // Q9: the course tag belongs to a different course than the exam.
-  expect(q[9].tagFindings.some(f => /PHA9998/.test(f) && /PHA9999/.test(f))).toBe(true);
+  expect(q[9].tagFindings.some(f => /^action: Course Name tag belongs to PHA9998, not this exam's course PHA9999/.test(f))).toBe(true);
 
   // Q10: two Bloom's levels on one question.
   expect(q[10].tagFindings.some(f => /^action: Abbreviated Bloom's: 2 levels tagged/.test(f))).toBe(true);
 
-  expect(result.rules).toEqual({ course: 'action', bloom: 'action', tagQuality: 'review' });
+  expect(result.rules).toEqual({ course: 'action', bloom: 'action', tagQuality: 'pass' });
 });

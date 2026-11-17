@@ -196,7 +196,7 @@ Findings name the location (stem or option). `Select all that apply` is not trea
 Found with a faculty test quiz that had one deliberate tagging fault per question.
 
 - **Course Name tag:** a question tagged only with CLOs is no longer treated as course-tagged just because each CLO's path passes through the course folder. It now gets "Course Name tag not detected" (Action Needed).
-- **Wrong course:** a Course Name tag from a different course than the exam (for example, PHA3114 on a PHA3134 exam) is now flagged under Tag quality (Review), the same way cross-course CLO tags already were.
+- **Wrong course:** a Course Name tag from a different course than the exam (for example, PHA3114 on a PHA3134 exam) is now Action Needed under the Course Name check. Cross-course CLO tags remain Review under Tag quality.
 - **Bloom's level:** a question tagged with more than one abbreviated Bloom's level is now Action Needed ("tag exactly one").
 - The `Category Name / Category Path` column header that ExamSoft repeats in each item's category list is no longer counted as a category.
 - Regression check: `e2e/exambridge-tagging.spec.js` (synthetic data).
