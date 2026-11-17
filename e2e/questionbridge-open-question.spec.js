@@ -134,6 +134,9 @@ test('QuestionBridge: opening project B after editing project A keeps every fiel
   expect(saved.brightspaceImageFolder).toBe(projectB.brightspaceImageFolder);
   expect(saved.questions.map(fieldsOf)).toEqual(projectB.questions.map(q => fieldsOf(Object.assign({ title: '', topic: '', bloom: '', objective: '', difficulty: '', tags: [], rationale: '', kahootStem: '', pollStem: '' }, q))));
   expect(JSON.stringify(saved)).not.toContain('project A');
+  // B's questions have no source label of their own, so they take B's name, never A's.
+  expect(saved.questions.map(q => q.source)).toEqual([projectB.sourceName, projectB.sourceName]);
+  await expect(page.locator('#sourcePill')).toHaveText(projectB.sourceName);
 
   // Moving around project B afterward still does not mix anything in.
   await items(page).nth(1).click();
@@ -155,6 +158,12 @@ test('QuestionBridge: a damaged project file leaves the open project and its aut
     ['a missing question', damagedProject([projectB.questions[0], null]), '1 of 2 questions in this project file could not be read'],
     ['answers that are not a list', damagedProject([{ ...projectB.questions[0], answers: 'Mineral one' }]), '1 of 1 question in this project file could not be read'],
     ['a file that is not a project', 'not a project at all', 'This file is not a QuestionBridge project'],
+    // Values the editor reads directly: each once slipped past the check and replaced project A.
+    ['an empty (null) stem', damagedProject([{ ...projectB.questions[0], stem: null }]), '1 of 1 question in this project file could not be read'],
+    ['a numeric stem', damagedProject([{ ...projectB.questions[0], stem: 42 }]), '1 of 1 question in this project file could not be read'],
+    ['a missing image entry', damagedProject([{ ...projectB.questions[0], images: [null] }]), '1 of 1 question in this project file could not be read'],
+    ['blank answers that are not a list', damagedProject([{ id: 'synthetic-fitb', type: 'fitb', stem: 'Synthetic fact: __1__', blanks: [{ token: '__1__', accepted: 'one' }] }]), '1 of 1 question in this project file could not be read'],
+    ['an unknown question type', damagedProject([{ ...projectB.questions[0], type: 'hotspot' }]), '1 of 1 question in this project file could not be read'],
   ];
   for (const [label, body, message] of cases) {
     await page.locator('#projectInput').setInputFiles({ name: 'damaged.questionbridge', mimeType: 'application/json', buffer: Buffer.from(body) });
@@ -173,5 +182,38 @@ test('QuestionBridge: a damaged project file leaves the open project and its aut
   const after = await readAutosave(page);
   expect(after.sourceName).toBe(before.sourceName);
   expect(after.brightspaceImageFolder).toBe(before.brightspaceImageFolder);
+  expect(after.questions.map(fieldsOf)).toEqual(before.questions.map(fieldsOf));
+});
+
+test('QuestionBridge: if showing a new project fails, the open project is put back and nothing is autosaved', async ({ page, openTool }) => {
+  await openTool('questionbridge');
+  await page.locator('[data-screen="upload"]').click();
+  await page.locator('#pasteText').fill(pasted);
+  await page.locator('#parsePaste').click();
+  await expect(items(page)).toHaveCount(3);
+  await items(page).first().click();
+  const before = await readAutosave(page);
+
+  // Simulate an unexpected display failure for project B only (a problem no file check caught).
+  await page.evaluate(() => {
+    const original = window.renderAnswers;
+    window.renderAnswers = q => { if (q.id === 'synthetic-b-q1') throw new Error('simulated display failure'); return original(q); };
+  });
+  await page.locator('#projectInput').setInputFiles({
+    name: 'synthetic-b.questionbridge', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(projectB)),
+  });
+  const dialog = page.locator('.ft-dialog, [role="dialog"]').filter({ hasText: 'Project could not be opened' });
+  await expect(dialog).toContainText('Your current work has not changed.');
+  await page.keyboard.press('Escape');
+
+  // Project A is back on screen, and the autosaved copy was never replaced.
+  await expect(items(page)).toHaveCount(3);
+  await expect(page.locator('#stem')).toHaveValue(longStem);
+  const storedNow = await readAutosave(page);
+  expect(storedNow.sourceName).toBe(before.sourceName);
+  expect(storedNow.questions.map(fieldsOf)).toEqual(before.questions.map(fieldsOf));
+  await items(page).nth(1).click();
+  const after = await readAutosave(page);
+  expect(after.sourceName).toBe(before.sourceName);
   expect(after.questions.map(fieldsOf)).toEqual(before.questions.map(fieldsOf));
 });
