@@ -78,6 +78,7 @@
       state.exceptions = {};
       render();
       restoreSession();
+      updateUnsavedNotice();
       $('#uploadView').classList.add('eb-hidden');
       $('#resultsView').classList.remove('eb-hidden');
       updateSteps('review');
@@ -96,6 +97,35 @@
     const key=sessionKey(); if(!key) return;
     const notes=$('#reportNotes')?.value || '';
     try { localStorage.setItem(key, JSON.stringify({exceptions:state.exceptions,notes,updatedAt:new Date().toISOString()})); } catch {}
+    updateUnsavedNotice();
+  }
+  // Exception approvals and report notes are the only work faculty enter here.
+  // An exception counts once it is checked or has an authority or note recorded.
+  function hasEnteredWork(){
+    if(!state.exam) return false;
+    const exceptionEntered=Object.values(state.exceptions).some(ex=>ex && (ex.approved || ex.authority || (ex.note||'').trim()));
+    return exceptionEntered || !!($('#reportNotes')?.value||'').trim();
+  }
+  // When the browser blocks storage, the shared runtime keeps "saved" work in a
+  // temporary in-memory copy that is lost when the tab closes. Warn before leaving
+  // and say so on the page instead of implying it is kept.
+  const storageIsTemporary=()=>!(window.FTStorage?.persistent ?? true);
+  FTUnsavedWork.watch(()=>storageIsTemporary() && hasEnteredWork());
+  let unsavedNotice=null;
+  function updateUnsavedNotice(){
+    const show=storageIsTemporary() && hasEnteredWork();
+    if(!unsavedNotice){
+      if(!show) return;
+      unsavedNotice=document.createElement('div');
+      unsavedNotice.id='unsavedWorkNotice';
+      unsavedNotice.className='ft-notice ft-notice-warning ft-mt-3';
+      unsavedNotice.setAttribute('role','status');
+      const strong=document.createElement('strong');
+      strong.textContent='Your exceptions and report notes are only in this tab.';
+      unsavedNotice.append(strong,' This browser is not keeping a copy, so they will be lost if you close or reload the tab. Print or save the PDF report to keep a record.');
+      $('#resultsView .eb-file-meta').after(unsavedNotice);
+    }
+    unsavedNotice.classList.toggle('eb-hidden',!show);
   }
   function restoreSession(){
     const key=sessionKey(); if(!key) return;
@@ -110,17 +140,23 @@
   async function requestReset(){
     if(state.exam){
       saveSession();
-      const hasWork=Object.keys(state.exceptions).length>0 || !!($('#reportNotes')?.value||'').trim();
-      const msg=hasWork
-        ? 'Your exceptions and report notes are saved for this exam.'
-        : 'The results for the current exam will be cleared from the screen.';
-      if(!await FTDialog.confirm(msg,{title:'Choose another exam?',confirmLabel:'Choose another exam'})) return;
+      if(storageIsTemporary() && hasEnteredWork()){
+        const msg='This browser is not keeping a copy of your exceptions and report notes. They will be cleared and cannot be recovered. Print or save the PDF report first if you need them.';
+        if(!await FTDialog.confirm(msg,{title:'Choose another exam?',confirmLabel:'Clear and choose another exam',danger:true})) return;
+      } else {
+        const hasWork=Object.keys(state.exceptions).length>0 || !!($('#reportNotes')?.value||'').trim();
+        const msg=hasWork
+          ? 'Your exceptions and report notes are saved for this exam.'
+          : 'The results for the current exam will be cleared from the screen.';
+        if(!await FTDialog.confirm(msg,{title:'Choose another exam?',confirmLabel:'Choose another exam'})) return;
+      }
     }
     resetApp();
   }
   function resetApp(){
     state.exam=null; state.filter='all'; state.facultyFilter='all'; state.exceptions={}; fileInput.value='';
     if($('#reportNotes')) $('#reportNotes').value='';
+    updateUnsavedNotice();
     $('#resultsView').classList.add('eb-hidden'); $('#uploadView').classList.remove('eb-hidden');
     updateSteps('upload'); window.scrollTo({top:0,behavior:'smooth'});
   }
