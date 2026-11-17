@@ -125,4 +125,65 @@ test.describe('GradeBridge export approval is bound to what was reviewed', () =>
     await expect(page.locator('#savedSelect')).toHaveValue('Course B – 2026');
     await expect(page.getByText('Matching and the final audit were cleared')).toBeVisible();
   });
+
+  test('"Use" on the unchanged active course keeps the approval', async ({ page }) => {
+    await approveExport(page, 'Course A – 2026');
+    await page.locator('#savedBtn').click();
+    await page.locator('#savedList .course-row', { hasText: 'Course A' }).getByRole('button', { name: 'Use' }).click();
+    await expect(page.locator('#auditCard')).toBeVisible();
+    await expect(page.locator('#maxConfirm')).toBeChecked();
+    await expect(page.locator('#downloadBtn')).toBeEnabled();
+    const { text } = await downloadFrom(page, () => page.locator('#downloadBtn').click());
+    expect(exportedIds(text)).toEqual(['00001', '00002', '00003']);
+  });
+
+  test('"Use" on the active course clears approval when its saved roster changed', async ({ page }) => {
+    await approveExport(page, 'Course A – 2026');
+    // Another tab re-saved Course A with a different roster.
+    await page.evaluate(() => {
+      const store = JSON.parse(localStorage.getItem('gradebridge_profiles_v6'));
+      store['Course A – 2026'].roster[0].OrgDefinedId = '00009';
+      localStorage.setItem('gradebridge_profiles_v6', JSON.stringify(store));
+    });
+    await page.locator('#savedBtn').click();
+    await page.locator('#savedList .course-row', { hasText: 'Course A' }).getByRole('button', { name: 'Use' }).click();
+    await expectApprovalCleared(page);
+    await expect(page.locator('#reviewCard')).toBeHidden();
+    await approveExport(page, 'Course A – 2026');
+    const { text } = await downloadFrom(page, () => page.locator('#downloadBtn').click());
+    expect(exportedIds(text)).toEqual(['00009', '00002', '00003']);
+  });
+
+  test('Clear selection says matching and approval were cleared', async ({ page }) => {
+    await approveExport(page, 'Course A – 2026');
+    await page.locator('#clearSavedSelection').click();
+    await expectApprovalCleared(page);
+    await expect(page.locator('#examStatus')).toContainText('Matching and the final audit were cleared');
+    await expect(page.locator('#examStatus')).toContainText('ExamSoft file is still loaded');
+    // The note goes away once a roster is chosen again.
+    await page.locator('#savedSelect').selectOption('Course B – 2026');
+    await expect(page.locator('#examStatus')).not.toContainText('Matching and the final audit were cleared');
+  });
+
+  test('Clear selection with undownloaded decisions: Escape keeps approval, confirming clears it', async ({ page }) => {
+    await approveExport(page, 'Course A – 2026');
+    await page.locator('#autoDetails > summary').click();
+    await page.locator('#unlockBtn').click();
+    await page.locator('#autoTable').getByRole('button', { name: 'Save change' }).first().click();
+    await page.locator('#prepareBtn').click();
+    await page.locator('#maxConfirm').check();
+
+    await page.locator('#clearSavedSelection').click();
+    const dialog = page.getByRole('dialog', { name: 'Clear course selection?' });
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(page.locator('#savedSelect')).toHaveValue('Course A – 2026');
+    await expect(page.locator('#downloadBtn')).toBeEnabled();
+
+    await page.locator('#clearSavedSelection').click();
+    await dialog.getByRole('button', { name: 'Clear selection', exact: true }).click();
+    await expectApprovalCleared(page);
+    await expect(page.locator('#examStatus')).toContainText('Matching and the final audit were cleared');
+  });
 });

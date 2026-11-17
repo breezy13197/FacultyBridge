@@ -26,7 +26,7 @@ function workflowNotice(html,{target,focus=false}={}){
   const note=$(target).querySelector('.gb-audit-notice');note.scrollIntoView({behavior:'smooth',block:'center'});if(focus)note.focus({preventScroll:true});
 }
 const CLEARED_AUDIT='<strong>⚠ The final audit was cleared.</strong>';
-function resetDownstream(){invalidateAudit();matches=[];brightOnlyIndices=[];$('preflightCard').classList.add('hidden');$('reviewCard').classList.add('hidden');$('auditCard').classList.add('hidden');setSteps(1)}
+function resetDownstream(){invalidateAudit();document.querySelectorAll('.gb-roster-cleared').forEach(n=>n.remove());matches=[];brightOnlyIndices=[];$('preflightCard').classList.add('hidden');$('reviewCard').classList.add('hidden');$('auditCard').classList.add('hidden');setSteps(1)}
 function visibleError(msg,target='reviewStatus'){const el=$(target);if(el)el.innerHTML=`<div class="status bad"><strong>GradeBridge could not continue.</strong><br>${safe(msg)}</div>`}
 
 window.addEventListener('error',e=>{console.error(e.error||e.message);const target=$('reviewCard').classList.contains('hidden')?'preflightAlerts':'reviewStatus';visibleError('An unexpected error occurred. Your source files were not changed. Try reloading GradeBridge and uploading the original CSV files again.',target)});
@@ -141,9 +141,12 @@ function loadSavedProfile(name){
   if(examRows.length)showPreflight();
   if(hadReview)workflowNotice('<div class="status warn"><strong>⚠ Matching and the final audit were cleared</strong> because a different roster was selected. Choose the grade item, then <strong>Continue to Student Matching</strong> to match students against this roster.</div>');
 }
-function clearSavedSelection(){
+function clearSavedSelection(reason='cleared'){
+  const hadReview=matches.length>0;
   activeSavedCourse='';brightRows=[];brightHeaders=[];brightCols={};gradeItems=[];$('savedSelect').value='';$('savedAgeText').textContent='';$('brightStatus').innerHTML='';resetDownstream();
-  if(examRows.length)$('examStatus').insertAdjacentHTML('beforeend','<div class="status info">ExamSoft file is still loaded. Upload a Brightspace file or select another saved course.</div>');
+  if(examRows.length)$('examStatus').insertAdjacentHTML('beforeend',hadReview
+    ?`<div class="status warn gb-roster-cleared"><strong>⚠ Matching and the final audit were cleared</strong> ${reason==='deleted'?'because the saved course was deleted.':'because no saved course is selected now. Your saved course is still available.'} The ExamSoft file is still loaded. Upload a Brightspace file or select another saved course.</div>`
+    :'<div class="status info gb-roster-cleared">ExamSoft file is still loaded. Upload a Brightspace file or select another saved course.</div>');
 }
 async function decodeFile(file){
   const buf=await file.arrayBuffer();
@@ -406,7 +409,7 @@ function renderSavedModal(){
   names.forEach(name=>{const p=store[name],days=ageDays(p.savedAt),row=document.createElement('div');row.className='course-row';
     const info=document.createElement('div');info.innerHTML=`<strong>${safe(name)}</strong><small>${p.roster?.length||0} students • saved ${days} day${days===1?'':'s'} ago${days>60?' • roster age warning':''}</small>`;
     const acts=document.createElement('div');acts.className='row-actions';const use=document.createElement('button');use.className='mini mini-primary';use.textContent='Use';use.onclick=()=>{savedDialog.close();switchSavedCourse(name)};
-    const del=document.createElement('button');del.className='mini mini-danger';del.textContent='Delete';del.onclick=async()=>{if(await FTDialog.confirm(`The saved roster and student mappings for "${name}" will be removed from this browser.`,{title:'Delete saved course?',confirmLabel:'Delete saved course',danger:true})){const s=courseStore();delete s[name];saveStore(s);if(activeSavedCourse===name)clearSavedSelection();populateSaved();renderSavedModal()}};
+    const del=document.createElement('button');del.className='mini mini-danger';del.textContent='Delete';del.onclick=async()=>{if(await FTDialog.confirm(`The saved roster and student mappings for "${name}" will be removed from this browser.`,{title:'Delete saved course?',confirmLabel:'Delete saved course',danger:true})){const s=courseStore();delete s[name];saveStore(s);if(activeSavedCourse===name)clearSavedSelection('deleted');populateSaved();renderSavedModal()}};
     acts.append(use,del);row.append(info,acts);box.appendChild(row)
   })
 }
@@ -414,8 +417,17 @@ function applyTheme(t){document.documentElement.dataset.ftTheme=t;document.body.
 
 wireDrop('examDrop','examFile','exam');wireDrop('brightDrop','brightFile','bright');
 // Switching rosters discards matching decisions, so ask first when some have not been downloaded.
+// True when the named saved course holds exactly the roster already in use, so reloading it would change nothing.
+// Saved grade-item names are not compared: the approval is bound to the chosen grade item, not the list of suggestions.
+function isActiveRoster(name){
+  const p=courseStore()[name];if(!p||name!==activeSavedCourse||!Array.isArray(p.roster))return false;
+  const current=JSON.stringify(brightRows.map(b=>[b[brightCols.org],b[brightCols.last],b[brightCols.first]].map(v=>String(v??''))));
+  return current===JSON.stringify(p.roster.map(r=>[r.OrgDefinedId,r['Last Name'],r['First Name']].map(v=>String(v??''))));
+}
 async function switchSavedCourse(name){
-  if(matches.length&&gradeWork.isDirty()&&!await FTDialog.confirm('Your matching decisions for the current roster have not been downloaded yet. Switching courses clears them, along with the final audit.',{title:'Switch saved course?',confirmLabel:'Switch course',danger:true})){$('savedSelect').value=activeSavedCourse;return}
+  if(name&&isActiveRoster(name)){$('savedSelect').value=name;return}
+  const clearing=!name;
+  if(matches.length&&gradeWork.isDirty()&&!await FTDialog.confirm(`Your matching decisions for the current roster have not been downloaded yet. ${clearing?'Clearing the selection':'Switching courses'} removes them, along with the final audit.${clearing?' Your saved course stays available.':''}`,{title:clearing?'Clear course selection?':'Switch saved course?',confirmLabel:clearing?'Clear selection':'Switch course',danger:true})){$('savedSelect').value=activeSavedCourse;return}
   if(name){$('savedSelect').value=name;loadSavedProfile(name)}else clearSavedSelection();
 }
 $('savedSelect').addEventListener('change',e=>switchSavedCourse(e.target.value));
@@ -437,7 +449,7 @@ $('themeToggle').onclick=()=>applyTheme(document.body.classList.contains('dark')
 const helpDialog=FTDialog.manage($('helpModal')),savedDialog=FTDialog.manage($('savedModal'));
 $('helpBtn').onclick=()=>helpDialog.open($('helpBtn'));
 $('savedBtn').onclick=()=>{renderSavedModal();savedDialog.open($('savedBtn'))};
-$('deleteAllBtn').onclick=async()=>{if(await FTDialog.confirm('Every saved GradeBridge course profile and student mapping will be removed from this browser.',{title:'Delete all saved data?',confirmLabel:'Delete all saved data',danger:true})){localStorage.removeItem('gradebridge_profiles_v6');activeSavedCourse='';brightRows=[];brightHeaders=[];brightCols={};populateSaved();renderSavedModal();clearSavedSelection()}};
+$('deleteAllBtn').onclick=async()=>{if(await FTDialog.confirm('Every saved GradeBridge course profile and student mapping will be removed from this browser.',{title:'Delete all saved data?',confirmLabel:'Delete all saved data',danger:true})){localStorage.removeItem('gradebridge_profiles_v6');activeSavedCourse='';brightRows=[];brightHeaders=[];brightCols={};populateSaved();renderSavedModal();clearSavedSelection('deleted')}};
 // Unsaved work: matching decisions made since the review was built or the CSV was last downloaded.
 const gradeWork=FTUnsavedWork.track(()=>matches.length?matches.map(m=>[m.bi,m.excluded,m.matchConfirmed,m.matchStatus,m.scoreValue,m.scoreStatus]):null);
 
