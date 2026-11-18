@@ -1,6 +1,6 @@
 // SyllabusBridge: choosing another file while a syllabus is open must never lose
 // edits unless faculty agree to replace it. Synthetic data only.
-import { test, expect, syntheticDocx, syntheticSyllabus, DOCX_MIME } from './fixtures.js';
+import { test, expect, syntheticDocx, syntheticDocxBody, syntheticSyllabus, DOCX_MIME } from './fixtures.js';
 
 const otherSyllabus = { ...syntheticSyllabus, paragraphs: ['PHA8888 - Second Synthetic Course', ...syntheticSyllabus.paragraphs.slice(1)] };
 const pdf = { name: 'syllabus.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 synthetic, not a Word file') };
@@ -113,4 +113,82 @@ test('when two files are chosen quickly, the last one chosen is opened', async (
   await expect(page.locator('#screen-review')).toBeVisible();
   await expect(page.locator('#courseTitle')).toHaveValue('Second Synthetic Course');
   expect(await page.evaluate(() => state.sourceName)).toBe('second.docx');
+});
+
+// Review of PR #66: gaps found in the first version of this fix.
+const replaceQuestion = page => page.getByRole('dialog', { name: 'Replace the syllabus you’re editing?' });
+const unsavedWork = page => page.evaluate(() => FTUnsavedWork.hasUnsavedWork());
+// Run handleFile in the page with files built from { name, b64 } (no b64 = a small non-Word file).
+const inPage = files => files.map(f => ({ name: f.name, b64: f.buffer ? f.buffer.toString('base64') : '' }));
+
+test('the leave-page warning keeps protecting the draft while the replace question is open', async ({ page, openTool }) => {
+  await openEdited(page, openTool);
+  await page.locator('#file').setInputFiles(await docx('second.docx', otherSyllabus));
+  await expect(replaceQuestion(page)).toBeVisible();
+  expect(await unsavedWork(page)).toBe(true);
+  await replaceQuestion(page).getByRole('button', { name: 'Cancel' }).click();
+  expect(await unsavedWork(page)).toBe(true);
+});
+
+test('edits to a blank Word file are protected like any other syllabus', async ({ page, openTool }) => {
+  await openTool('syllabusbridge');
+  await page.locator('#file').setInputFiles({ name: 'blank.docx', mimeType: DOCX_MIME, buffer: await syntheticDocxBody([]) });
+  await expect(page.locator('#screen-review')).toBeVisible();
+  await page.locator('#courseTitle').fill('Typed Into A Blank File');
+  await page.locator('#courseTitle').press('Tab');
+  expect(await page.evaluate(() => editorDiffCount())).toBeGreaterThan(0);
+
+  await page.locator('#file').setInputFiles(await docx('second.docx', otherSyllabus));
+  await replaceQuestion(page).getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.locator('#courseTitle')).toHaveValue('Typed Into A Blank File');
+
+  await page.locator('#file').setInputFiles(pdf);
+  await expect(page.locator('#uploadError')).toContainText('still open');
+  await expect(page.locator('.sb-step[data-step="review"]')).toHaveAttribute('aria-disabled', 'false');
+  expect(await page.evaluate(() => state.course.title)).toBe('Typed Into A Blank File');
+});
+
+test('a project saved for one Word file does not make another file look saved', async ({ page, openTool }) => {
+  await openEdited(page, openTool);
+  const download = page.waitForEvent('download');
+  await page.locator('#saveProject').click();
+  await download;
+  // A different Word file (same text, so the same edit gives the same editor contents).
+  await page.locator('#file').setInputFiles(await docx('other-copy.docx', syntheticSyllabus));
+  await expect(page.locator('#screen-review')).toBeVisible();
+  expect(await page.evaluate(() => state.sourceName)).toBe('other-copy.docx');
+  await page.locator('#courseTitle').fill('Edited Synthetic Course');
+  await page.locator('#courseTitle').press('Tab');
+  expect(await unsavedWork(page)).toBe(true);
+  await page.locator('#file').setInputFiles(await docx('third.docx', otherSyllabus));
+  await expect(replaceQuestion(page)).toBeVisible();
+});
+
+test('a non-Word file chosen during a slow read shows its error and stops the progress bar', async ({ page, openTool }) => {
+  await openTool('syllabusbridge');
+  await page.evaluate(([slow, later]) => {
+    const load = JSZip.loadAsync.bind(JSZip);
+    JSZip.loadAsync = (...args) => new Promise(r => setTimeout(r, 400)).then(() => load(...args));
+    const file = ({ name, b64 }) => new File([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], name);
+    handleFile(file(slow)); handleFile(file(later));
+  }, inPage([await docx('slow.docx', syntheticSyllabus), { name: 'later.pdf' }]));
+  await expect(page.locator('#uploadError')).toContainText('later.pdf');
+  await expect(page.locator('#loading')).not.toHaveClass(/\bshow\b/);
+  await page.waitForTimeout(600);
+  await expect(page.locator('#screen-upload')).toBeVisible();
+  await expect(page.locator('#uploadError')).toContainText('later.pdf');
+  await expect(page.locator('#loading')).not.toHaveClass(/\bshow\b/);
+});
+
+test('an error for a file chosen right after another opens is not hidden by the earlier one', async ({ page, openTool }) => {
+  await openTool('syllabusbridge');
+  await page.evaluate(([first, later]) => {
+    const file = ({ name, b64 }) => new File([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], name);
+    handleFile(file(first)).then(() => handleFile(file(later)));
+  }, inPage([await docx('first.docx', syntheticSyllabus), { name: 'later.pdf' }]));
+  await expect(page.locator('#uploadError')).toContainText('later.pdf');
+  await page.waitForTimeout(500);
+  await expect(page.locator('#screen-upload')).toBeVisible();
+  await expect(page.locator('#uploadError')).toContainText('later.pdf');
+  await expect(page.locator('#loading')).not.toHaveClass(/\bshow\b/);
 });
