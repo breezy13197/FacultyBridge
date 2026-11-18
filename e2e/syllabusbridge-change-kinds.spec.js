@@ -79,6 +79,7 @@ test('kinds are saved in the project (format 3) and restored; format 1 projects 
   const file = await syllabusFile();
   // Re-upload this exact copy so the project fingerprint matches on reopen.
   await page.locator('#file').setInputFiles(file);
+  await page.getByRole('dialog', { name: 'Replace the syllabus you’re editing?' }).getByRole('button', { name: 'Replace syllabus' }).click();
   await expect(page.locator('#screen-review')).toBeVisible();
   await setField(page.locator('#courseTitle'), 'Revised Synthetic Course');
   await setField(page.locator('#scheduleBody .s-topic').nth(1), 'Enzyme kinetics');

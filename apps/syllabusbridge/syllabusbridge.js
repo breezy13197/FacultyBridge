@@ -1446,7 +1446,53 @@ async function applyPendingProject(){
  state.projectNote=notes.join(' ');
  return true
 }
-async function handleFile(file){clearError();resetState();go('upload');if(!file?.name?.toLowerCase().endsWith('.docx')){showError('SyllabusBridge accepts .docx Word syllabi only.');return}showLoading(true,'Reading Word syllabus…',15);try{const fingerprint=await fileFingerprint(file),tracked=await trackedChangesIn(file);await parseDocx(file);promoteGradingScaleTables();state.sourceFingerprint=fingerprint;state.sourceBytes=await file.arrayBuffer();state.trackedChanges=tracked;showLoading(true,'Extracting syllabus structure…',72);captureEditorBaseline();if(pendingProject&&!await applyPendingProject()){showLoading(false);resetState();go('upload');return}renderReview();showTrackedChanges();if(state.openedProject){const st=$('historyStatus');if(st)st.textContent=state.projectNote||''}showLoading(true,'Extraction complete',100);setTimeout(()=>{showLoading(false);go('review')},180)}catch(e){console.error(e);showLoading(false);if(e instanceof SyllabusFileError)showError(e.message,'Word syllabus could not be read');else showError(`Something went wrong while reading this syllabus. SyllabusBridge v${toolVersion()}.\n\nTechnical detail: ${e?.message||'Unknown error'}\n\nPlease send a screenshot of this message and the syllabus filename to the FacultyBridge project owner.`,'SyllabusBridge encountered an internal error')}}
+// Opening a Word syllabus, including one chosen while another is already open.
+// The new file is read into a fresh copy of SyllabusBridge's state. The syllabus
+// already open is set aside untouched and comes back exactly as it was (edits,
+// undo history, edit count) if the new file can't be read, or if it has edits not
+// saved in a project file and faculty choose not to replace it. Reading changes
+// shared state, so one file is read at a time; if another file is chosen in the
+// meantime, the earlier read is abandoned and only the last file chosen opens.
+let uploadAttempt=0,uploadInProgress=null;
+async function handleFile(file){
+ const attempt=++uploadAttempt;
+ while(uploadInProgress)await uploadInProgress;
+ if(attempt!==uploadAttempt)return;
+ let finished;uploadInProgress=new Promise(r=>finished=r);
+ try{await readSyllabusFile(file,attempt)}finally{uploadInProgress=null;finished()}
+}
+async function readSyllabusFile(file,attempt){
+ clearError();go('upload');
+ const previous=state.lines.length?state:null,unsaved=!!previous&&projectWork.isDirty(),changes=previous?editorDiffCount():0,
+  openName=previous?.sourceName?`“${previous.sourceName}”`:'The syllabus you were working on';
+ let editorsRedrawn=false;
+ const stillOpen=previous?`\n\n${openName} is still open${changes?' with your edits':''}. To keep working on it, choose Review extraction (step 2) at the top of the page.`:'';
+ // Put the open syllabus back (or start empty if none was open).
+ const keepPrevious=(screen='upload')=>{if(!previous){resetState();return}state=previous;if(editorsRedrawn)renderReview();updateEditorStatus();updateHistoryControls('');go(screen)};
+ const stale=()=>attempt!==uploadAttempt;
+ if(!file?.name?.toLowerCase().endsWith('.docx')){showError(`“${file?.name||'This file'}” is not a Word (.docx) file. SyllabusBridge accepts .docx Word syllabi only: choose a .docx syllabus, or open this file in Word and save it as .docx first.`+stillOpen);return}
+ resetState();showLoading(true,'Reading Word syllabus…',15);
+ try{
+  const fingerprint=await fileFingerprint(file),tracked=await trackedChangesIn(file);
+  if(stale())return keepPrevious();
+  await parseDocx(file);promoteGradingScaleTables();state.sourceFingerprint=fingerprint;state.sourceBytes=await file.arrayBuffer();state.trackedChanges=tracked;
+  if(stale())return keepPrevious();
+  showLoading(true,'Extracting syllabus structure…',72);
+  if(unsaved){
+   showLoading(false);
+   const replace=await FTDialog.confirm(`${openName} has edits that aren’t saved in a SyllabusBridge project file (${changes} net change${changes===1?'':'s'} in all). If you open “${file.name}”, they will be lost.\n\nTo keep them, choose Cancel, then Save SyllabusBridge project.`,{title:'Replace the syllabus you’re editing?',confirmLabel:'Replace syllabus',danger:true});
+   if(!replace||stale())return keepPrevious(replace?'upload':'review');
+   showLoading(true,'Extracting syllabus structure…',72);
+  }
+  captureEditorBaseline();
+  if(pendingProject){editorsRedrawn=true;if(!await applyPendingProject()){showLoading(false);return keepPrevious()}}
+  renderReview();showTrackedChanges();if(state.openedProject){const st=$('historyStatus');if(st)st.textContent=state.projectNote||''}showLoading(true,'Extraction complete',100);setTimeout(()=>{showLoading(false);go('review')},180)
+ }catch(e){
+  console.error(e);showLoading(false);keepPrevious();
+  if(e instanceof SyllabusFileError)showError(e.message+stillOpen,'Word syllabus could not be read');
+  else showError(`Something went wrong while reading this syllabus. SyllabusBridge v${toolVersion()}.\n\nTechnical detail: ${e?.message||'Unknown error'}\n\nPlease send a screenshot of this message and the syllabus filename to the FacultyBridge project owner.${stillOpen}`,'SyllabusBridge encountered an internal error')
+ }
+}
 $('exportCourseJson').onclick=exportCourseJson;if($('exportCourseJsonReport'))$('exportCourseJsonReport').onclick=exportCourseJson;$('choose').onclick=()=>$('file').click();$('openProject').onclick=()=>$('projectFile').click();$('projectFile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)openProjectFile(f)};$('saveProject').onclick=saveProject;$('saveProjectReport').onclick=saveProject;$('file').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)handleFile(f)};['dragenter','dragover'].forEach(ev=>$('drop').addEventListener(ev,e=>{e.preventDefault();$('drop').classList.add('drag')}));['dragleave','drop'].forEach(ev=>$('drop').addEventListener(ev,e=>{e.preventDefault();$('drop').classList.remove('drag')}));$('drop').addEventListener('drop',e=>e.dataTransfer.files[0]&&handleFile(e.dataTransfer.files[0]));$('runValidation').onclick=()=>{state.reviewComplete=true;syncCourseFields();renderReport();updateEditorStatus();go('report')};document.querySelectorAll('.sb-step').forEach(b=>b.onclick=()=>{if(b.getAttribute('aria-disabled')==='true')return;if(b.dataset.step==='report'){renderReport()}go(b.dataset.step)});const root=document.documentElement;const savedTheme=localStorage.getItem('ft-theme')||'light';root.dataset.theme=savedTheme;root.dataset.ftTheme=savedTheme;$('theme').onclick=()=>{const dark=root.dataset.theme==='dark',next=dark?'light':'dark';root.dataset.theme=next;root.dataset.ftTheme=next;localStorage.setItem('ft-theme',next)};
 // Undo/redo buttons and keyboard shortcuts. Inside a text box, Ctrl+Z / Cmd+Z
 // keeps doing the browser's own typing undo.
