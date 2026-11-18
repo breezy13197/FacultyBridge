@@ -326,3 +326,8 @@ body,button,input,select,textarea{font-family:var(--ft-font-sans,system-ui,-appl
 
 
 .ib-items-table-wrap { --ib-detail-width: 100%; }
+
+/* Remove-exam ×: a 40px square beside the exam name that stays inside the card, rather than
+   stretching down beside the period fields and past the card's right edge. */
+.ib-exam-row { grid-template-columns:minmax(0,1fr) 44px; }
+.ib-remove-exam { align-self:start; width:40px; height:40px; margin:var(--ft-space-1,.25rem) var(--ft-space-1,.25rem) 0 0; justify-self:start; padding:0; }
