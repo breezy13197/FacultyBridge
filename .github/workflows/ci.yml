@@ -16,6 +16,8 @@ jobs:
   verify:
     timeout-minutes: 10
     runs-on: ubuntu-latest
+    outputs:
+      playwright-version: ${{ steps.playwright-version.outputs.version }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -23,6 +25,11 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      # The test job runs inside the Playwright image that matches this
+      # version, so upgrading Playwright updates the image automatically.
+      - name: Read installed Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")" >> "$GITHUB_OUTPUT"
       - name: Lint JavaScript for common bugs
         run: npm run lint
       - name: Guard against committed course fixtures
@@ -47,11 +54,16 @@ jobs:
           retention-days: 14
   test:
     needs: verify
-    # Tests take about 20-28 minutes. The browser install normally takes under
-    # a minute, but once took 26.5 minutes because Ubuntu's package server was
-    # slow. 60 minutes lets a run like that finish instead of being cancelled.
-    timeout-minutes: 60
+    # Tests take about 20-28 minutes; 45 leaves room for a slow day.
+    timeout-minutes: 45
     runs-on: ubuntu-latest
+    # Playwright's official image already contains the browsers and the Linux
+    # libraries they need, so nothing is downloaded from Ubuntu's package
+    # server (which twice took over 25 minutes). Its version always matches
+    # package-lock.json via the verify job.
+    container:
+      image: mcr.microsoft.com/playwright:v${{ needs.verify.outputs.playwright-version }}-resolute
+      options: --user 1001
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -59,13 +71,6 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      # Downloads the browsers (seconds) and installs the Linux libraries they
-      # need from Ubuntu's package server (usually under a minute). Its own
-      # limit means a truly stuck install fails here, under this step's name,
-      # instead of leaving the tests without enough time.
-      - name: Install Playwright browsers and system libraries
-        timeout-minutes: 30
-        run: npx playwright install --with-deps
       - run: npm run test:e2e
       # Retain synthetic reports even on success so retries/flakes stay visible.
       - uses: actions/upload-artifact@v4
