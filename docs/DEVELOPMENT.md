@@ -75,6 +75,13 @@ The single **Suite checks** workflow contains:
 1. `verify`: lint, fixture guard, build checks, browser smoke, and the build artifact.
 2. `test`: all six E2E projects, after `verify` succeeds.
 
+`test` runs inside Playwright's official Docker image
+(`mcr.microsoft.com/playwright:v<version>-resolute`), which already contains the
+browsers and their Linux libraries. `verify` reads the Playwright version from
+`package-lock.json`, so upgrading Playwright switches the image automatically.
+This avoids downloading libraries from Ubuntu's package server, which twice took
+more than 25 minutes and pushed the job past its time limit.
+
 Both job names are required by the active main-branch ruleset. Keep these names
 stable or update the ruleset deliberately when changing CI. Full validation runs
 on PRs into main/master and pushes to those branches, plus manual runs. Feature
