@@ -3,7 +3,7 @@
 const $=id=>document.getElementById(id);
 let examRows=[],brightRows=[],examHeaders=[],brightHeaders=[],matches=[],brightOnlyIndices=[],outputRows=[];
 let examCols={},brightCols={},gradeItems=[],activeSavedCourse='',autoUnlocked=false,auditWarnings=[];
-let brightFilename='';
+let brightFilename='',approvedExport=null;
 
 function safe(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
 function normHeader(s){return String(s??'').replace(/^\uFEFF/,'').trim().toLowerCase().replace(/[^a-z0-9%]+/g,'')}
@@ -14,7 +14,19 @@ function blank(v){return String(v??'').trim()===''}
 function num(v){if(blank(v))return NaN;const n=Number(String(v).replace(/[%,$]/g,'').trim());return Number.isFinite(n)?n:NaN}
 function esc(v){const s=String(v??'');return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
 function setSteps(n){[1,2,3].forEach(i=>{const el=$('step'+i);el.classList.remove('active','done');if(i<n)el.classList.add('done');else if(i===n)el.classList.add('active')})}
-function resetDownstream(){matches=[];brightOnlyIndices=[];outputRows=[];$('preflightCard').classList.add('hidden');$('reviewCard').classList.add('hidden');$('auditCard').classList.add('hidden');setSteps(1)}
+// An export approval belongs to the exact roster, matches, grade item, and maximum that were reviewed.
+function exportSignature(grade,max){return JSON.stringify({grade,max,roster:brightRows.map(b=>[b[brightCols.org],b[brightCols.last],b[brightCols.first]]),matches:matches.map(m=>[m.e[examCols.id],m.bi==null?null:brightRows[m.bi]?.[brightCols.org],m.excluded,m.matchConfirmed,m.scoreValue])})}
+function auditPrepared(){return approvedExport!==null}
+function invalidateAudit(){outputRows=[];approvedExport=null;$('maxConfirm').checked=false;$('downloadBtn').disabled=true;$('auditCard').classList.add('hidden')}
+// Explains why an approval was cleared, next to the step the faculty member is on, without replacing that step's summary.
+function workflowNotice(html,{target,focus=false}={}){
+  document.querySelectorAll('.gb-audit-notice').forEach(n=>n.remove());
+  target=target||(!$('reviewCard').classList.contains('hidden')?'reviewStatus':!$('preflightCard').classList.contains('hidden')?'preflightAlerts':'brightStatus');
+  $(target).insertAdjacentHTML('afterbegin',`<div class="gb-audit-notice" tabindex="-1">${html}</div>`);
+  const note=$(target).querySelector('.gb-audit-notice');note.scrollIntoView({behavior:'smooth',block:'center'});if(focus)note.focus({preventScroll:true});
+}
+const CLEARED_AUDIT='<strong>⚠ The final audit was cleared.</strong>';
+function resetDownstream(){invalidateAudit();document.querySelectorAll('.gb-roster-cleared').forEach(n=>n.remove());matches=[];brightOnlyIndices=[];$('preflightCard').classList.add('hidden');$('reviewCard').classList.add('hidden');$('auditCard').classList.add('hidden');setSteps(1)}
 function visibleError(msg,target='reviewStatus'){const el=$(target);if(el)el.innerHTML=`<div class="status bad"><strong>GradeBridge could not continue.</strong><br>${safe(msg)}</div>`}
 
 window.addEventListener('error',e=>{console.error(e.error||e.message);const target=$('reviewCard').classList.contains('hidden')?'preflightAlerts':'reviewStatus';visibleError('An unexpected error occurred. Your source files were not changed. Try reloading GradeBridge and uploading the original CSV files again.',target)});
@@ -115,6 +127,8 @@ function populateSaved(){
 }
 function loadSavedProfile(name){
   const p=courseStore()[name];if(!p)return;
+  const hadReview=matches.length>0;
+  resetDownstream();
   activeSavedCourse=name;
   brightRows=(p.roster||[]).map(r=>({...r}));
   brightHeaders=['OrgDefinedId','First Name','Last Name'];
@@ -125,10 +139,14 @@ function loadSavedProfile(name){
   $('savedAgeText').innerHTML=`Saved ${days} day${days===1?'':'s'} ago • ${p.roster?.length||0} students${days>60?' • <strong>Roster is more than 60 days old; consider uploading a fresh Brightspace export.</strong>':''}`;
   $('brightStatus').innerHTML=`<div class="status ${days>60?'warn':'good'}">${days>60?'⚠':'✓'} Using saved roster: <strong>${safe(name)}</strong>${days>60?` (${days} days old)`:''}</div>`;
   if(examRows.length)showPreflight();
+  if(hadReview)workflowNotice('<div class="status warn"><strong>⚠ Matching and the final audit were cleared</strong> because a different roster was selected. Choose the grade item, then <strong>Continue to Student Matching</strong> to match students against this roster.</div>');
 }
-function clearSavedSelection(){
+function clearSavedSelection(reason='cleared'){
+  const hadReview=matches.length>0;
   activeSavedCourse='';brightRows=[];brightHeaders=[];brightCols={};gradeItems=[];$('savedSelect').value='';$('savedAgeText').textContent='';$('brightStatus').innerHTML='';resetDownstream();
-  if(examRows.length)$('examStatus').insertAdjacentHTML('beforeend','<div class="status info">ExamSoft file is still loaded. Upload a Brightspace file or select another saved course.</div>');
+  if(examRows.length)$('examStatus').insertAdjacentHTML('beforeend',hadReview
+    ?`<div class="status warn gb-roster-cleared"><strong>⚠ Matching and the final audit were cleared</strong> ${reason==='deleted'?'because the saved course was deleted.':'because no saved course is selected now. Your saved course is still available.'} The ExamSoft file is still loaded. Upload a Brightspace file or select another saved course.</div>`
+    :'<div class="status info gb-roster-cleared">ExamSoft file is still loaded. Upload a Brightspace file or select another saved course.</div>');
 }
 async function decodeFile(file){
   const buf=await file.arrayBuffer();
@@ -240,9 +258,10 @@ function buildMatches(){
 function needsAttention(m){return !m.excluded && (m.matchStatus==='duplicate'||!m.matchConfirmed||m.scoreStatus==='missing')}
 function renderReview(){
   renderAttention();renderAuto();renderBrightOnly();refreshMetrics();
-  $('reviewCard').classList.remove('hidden');$('auditCard').classList.add('hidden');setSteps(2);
+  const auditWasPrepared=auditPrepared();invalidateAudit();$('reviewCard').classList.remove('hidden');setSteps(2);
   const n=matches.filter(needsAttention).length;
   $('reviewStatus').innerHTML=n?`<div class="status warn"><strong>${n} record${n===1?' needs':'s need'} faculty attention.</strong> Resolve each record before preparing the final audit.</div>`:'<div class="status good"><strong>✓ Every ExamSoft record has a safe disposition.</strong> You can review automatic matches or continue to the final audit.</div>';
+  if(auditWasPrepared)workflowNotice(`<div class="status warn">${CLEARED_AUDIT} A student match changed after the audit was prepared. Choose <strong>Prepare Final Audit</strong> again before downloading.</div>`,{target:'reviewStatus'});
 }
 function studentName(m){return `${m.e[examCols.last]}, ${m.e[examCols.first]}`}
 function brightLabel(i){const b=brightRows[i];return `${b[brightCols.last]}, ${b[brightCols.first]} (${b[brightCols.org]})`}
@@ -380,7 +399,7 @@ function renderAudit(grade,max,included){
   $('excludedBox').classList.toggle('hidden',excluded.length===0);$('excludedList').innerHTML=excluded.map(m=>`<li><strong>${safe(studentName(m))}</strong> — ${safe(m.excludeReason||'Excluded by faculty')}</li>`).join('');
   $('maxConfirmMessage').innerHTML=`GradeBridge will import <strong>raw points out of ${max}</strong> into <strong>${safe(grade)}</strong>. Before downloading, confirm that the Brightspace grade item is also configured for <strong>${max} points</strong>. If it is not, every student's displayed percentage will be wrong.`;
   $('maxConfirmLabel').innerHTML=`I confirm that <strong>${safe(grade)}</strong> in Brightspace is worth <strong>${max} points</strong>.`;
-  $('maxConfirm').checked=false;$('downloadBtn').disabled=true;
+  $('maxConfirm').checked=false;$('downloadBtn').disabled=true;approvedExport=exportSignature(grade,max);
   const t=$('previewTable');t.innerHTML='<thead><tr>'+outputRows[0].map(h=>`<th>${safe(h)}</th>`).join('')+'</tr></thead>';const tb=document.createElement('tbody');outputRows.slice(1,21).forEach(r=>{const tr=document.createElement('tr');tr.innerHTML=r.map(v=>`<td>${safe(v)}</td>`).join('');tb.appendChild(tr)});t.appendChild(tb);
   $('filePill').textContent=`Brightspace_${grade.replace(/[^\w.-]+/g,'_')}.csv`;$('auditCard').classList.remove('hidden');setSteps(3);$('auditCard').scrollIntoView({behavior:'smooth',block:'start'});
 }
@@ -389,30 +408,48 @@ function renderSavedModal(){
   if(!names.length){box.innerHTML='<div class="status info">No saved course data exists in this browser.</div>';return}
   names.forEach(name=>{const p=store[name],days=ageDays(p.savedAt),row=document.createElement('div');row.className='course-row';
     const info=document.createElement('div');info.innerHTML=`<strong>${safe(name)}</strong><small>${p.roster?.length||0} students • saved ${days} day${days===1?'':'s'} ago${days>60?' • roster age warning':''}</small>`;
-    const acts=document.createElement('div');acts.className='row-actions';const use=document.createElement('button');use.className='mini mini-primary';use.textContent='Use';use.onclick=()=>{savedDialog.close();$('savedSelect').value=name;loadSavedProfile(name)};
-    const del=document.createElement('button');del.className='mini mini-danger';del.textContent='Delete';del.onclick=async()=>{if(await FTDialog.confirm(`The saved roster and student mappings for "${name}" will be removed from this browser.`,{title:'Delete saved course?',confirmLabel:'Delete saved course',danger:true})){const s=courseStore();delete s[name];saveStore(s);if(activeSavedCourse===name)clearSavedSelection();populateSaved();renderSavedModal()}};
+    const acts=document.createElement('div');acts.className='row-actions';const use=document.createElement('button');use.className='mini mini-primary';use.textContent='Use';use.onclick=()=>{savedDialog.close();switchSavedCourse(name)};
+    const del=document.createElement('button');del.className='mini mini-danger';del.textContent='Delete';del.onclick=async()=>{if(await FTDialog.confirm(`The saved roster and student mappings for "${name}" will be removed from this browser.`,{title:'Delete saved course?',confirmLabel:'Delete saved course',danger:true})){const s=courseStore();delete s[name];saveStore(s);if(activeSavedCourse===name)clearSavedSelection('deleted');populateSaved();renderSavedModal()}};
     acts.append(use,del);row.append(info,acts);box.appendChild(row)
   })
 }
 function applyTheme(t){document.documentElement.dataset.ftTheme=t;document.body.classList.toggle('dark',t==='dark');$('themeToggle').textContent=t==='dark'?'☀️ Light':'🌙 Dark';localStorage.setItem('ft-theme',t)}
 
 wireDrop('examDrop','examFile','exam');wireDrop('brightDrop','brightFile','bright');
-$('savedSelect').addEventListener('change',e=>{if(e.target.value)loadSavedProfile(e.target.value);else clearSavedSelection()});
-$('clearSavedSelection').onclick=clearSavedSelection;
-$('gradeItemSelect').addEventListener('change',()=>{$('manualGradeWrap').classList.toggle('hidden',$('gradeItemSelect').value!=='__manual__')});
+// Switching rosters discards matching decisions, so ask first when some have not been downloaded.
+// True when the named saved course holds exactly the roster already in use, so reloading it would change nothing.
+// Saved grade-item names are not compared: the approval is bound to the chosen grade item, not the list of suggestions.
+function isActiveRoster(name){
+  const p=courseStore()[name];if(!p||name!==activeSavedCourse||!Array.isArray(p.roster))return false;
+  const current=JSON.stringify(brightRows.map(b=>[b[brightCols.org],b[brightCols.last],b[brightCols.first]].map(v=>String(v??''))));
+  return current===JSON.stringify(p.roster.map(r=>[r.OrgDefinedId,r['Last Name'],r['First Name']].map(v=>String(v??''))));
+}
+async function switchSavedCourse(name){
+  if(name&&isActiveRoster(name)){$('savedSelect').value=name;return}
+  const clearing=!name;
+  if(matches.length&&gradeWork.isDirty()&&!await FTDialog.confirm(`Your matching decisions for the current roster have not been downloaded yet. ${clearing?'Clearing the selection':'Switching courses'} removes them, along with the final audit.${clearing?' Your saved course stays available.':''}`,{title:clearing?'Clear course selection?':'Switch saved course?',confirmLabel:clearing?'Clear selection':'Switch course',danger:true})){$('savedSelect').value=activeSavedCourse;return}
+  if(name){$('savedSelect').value=name;loadSavedProfile(name)}else clearSavedSelection();
+}
+$('savedSelect').addEventListener('change',e=>switchSavedCourse(e.target.value));
+$('clearSavedSelection').onclick=()=>switchSavedCourse('');
+function auditSettingsChanged(){if(!auditPrepared())return;invalidateAudit();setSteps(2);workflowNotice(`<div class="status warn">${CLEARED_AUDIT} The grade item or maximum points changed after the audit was prepared. Choose <strong>Prepare Final Audit</strong> again before downloading.</div>`,{target:'preflightAlerts'})}
+$('gradeItemSelect').addEventListener('change',()=>{$('manualGradeWrap').classList.toggle('hidden',$('gradeItemSelect').value!=='__manual__');auditSettingsChanged()});
+$('maxPoints').addEventListener('input',auditSettingsChanged);$('manualGradeName').addEventListener('input',auditSettingsChanged);
 $('continueBtn').onclick=()=>{try{const max=num($('maxPoints').value);if(!Number.isFinite(max)||max<=0){$('preflightAlerts').innerHTML='<div class="status bad">Enter the assessment maximum points before continuing.</div>';return}if(!selectedGradeName()){$('preflightAlerts').innerHTML='<div class="status bad">Select an existing Brightspace grade item or enter another grade item name before continuing.</div>';return}buildMatches();$('reviewCard').scrollIntoView({behavior:'smooth',block:'start'})}catch(err){visibleError(err.message,'preflightAlerts')}};
 $('unlockBtn').onclick=()=>{autoUnlocked=!autoUnlocked;$('unlockBtn').textContent=autoUnlocked?'Lock matching':'Unlock matching';renderAuto()};
 $('saveProfile').addEventListener('change',()=>{$('profileWrap').classList.toggle('hidden',!$('saveProfile').checked);if($('saveProfile').checked&&!$('profileName').value)$('profileName').value=(activeSavedCourse||detectCourseName(brightFilename))+' – '+new Date().getFullYear()});
 $('prepareBtn').onclick=prepareAudit;
 $('maxConfirm').addEventListener('change',()=>{$('downloadBtn').disabled=!$('maxConfirm').checked});
-$('downloadBtn').onclick=()=>{if(!$('maxConfirm').checked)return;gradeWork.markSaved();const csv=outputRows.map(r=>r.map(esc).join(',')).join('\r\n')+'\r\n';const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=$('filePill').textContent;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url)};
+$('downloadBtn').onclick=()=>{if(!$('maxConfirm').checked)return;
+  if(!auditPrepared()||exportSignature(selectedGradeName(),num($('maxPoints').value))!==approvedExport){invalidateAudit();if(matches.length)setSteps(2);workflowNotice('<div class="status bad"><strong>× Cannot download.</strong> The roster, student matches, grade item, or maximum points changed since you reviewed the final audit. Review the current students, then choose <strong>Prepare Final Audit</strong> again.</div>',{focus:true});return}
+  gradeWork.markSaved();const csv=outputRows.map(r=>r.map(esc).join(',')).join('\r\n')+'\r\n';const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=$('filePill').textContent;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url)};
 $('resetBtn').onclick=async()=>{if(gradeWork.isDirty()&&!await FTDialog.confirm('Your matching decisions have not been downloaded yet and will be cleared.',{title:'Start over?',confirmLabel:'Start over',danger:true}))return;FTUnsavedWork.allowLeave();location.reload()};
 $('themeToggle').onclick=()=>applyTheme(document.body.classList.contains('dark')?'light':'dark');
 // Shared pop-ups: Escape, ×, and outside clicks close them; focus returns to the opening button.
 const helpDialog=FTDialog.manage($('helpModal')),savedDialog=FTDialog.manage($('savedModal'));
 $('helpBtn').onclick=()=>helpDialog.open($('helpBtn'));
 $('savedBtn').onclick=()=>{renderSavedModal();savedDialog.open($('savedBtn'))};
-$('deleteAllBtn').onclick=async()=>{if(await FTDialog.confirm('Every saved GradeBridge course profile and student mapping will be removed from this browser.',{title:'Delete all saved data?',confirmLabel:'Delete all saved data',danger:true})){localStorage.removeItem('gradebridge_profiles_v6');activeSavedCourse='';brightRows=[];brightHeaders=[];brightCols={};populateSaved();renderSavedModal();clearSavedSelection()}};
+$('deleteAllBtn').onclick=async()=>{if(await FTDialog.confirm('Every saved GradeBridge course profile and student mapping will be removed from this browser.',{title:'Delete all saved data?',confirmLabel:'Delete all saved data',danger:true})){localStorage.removeItem('gradebridge_profiles_v6');activeSavedCourse='';brightRows=[];brightHeaders=[];brightCols={};populateSaved();renderSavedModal();clearSavedSelection('deleted')}};
 // Unsaved work: matching decisions made since the review was built or the CSV was last downloaded.
 const gradeWork=FTUnsavedWork.track(()=>matches.length?matches.map(m=>[m.bi,m.excluded,m.matchConfirmed,m.matchStatus,m.scoreValue,m.scoreStatus]):null);
 
