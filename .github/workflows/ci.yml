@@ -47,9 +47,10 @@ jobs:
           retention-days: 14
   test:
     needs: verify
-    # The suite itself takes about 20-28 minutes. 45 leaves room for a slow
-    # runner without letting a truly stuck job run for hours.
-    timeout-minutes: 45
+    # Tests take about 20-28 minutes. The browser install normally takes under
+    # a minute, but once took 26.5 minutes because Ubuntu's package server was
+    # slow. 60 minutes lets a run like that finish instead of being cancelled.
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -58,30 +59,13 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      # Reuse the downloaded browsers (Chromium, Firefox, WebKit) between runs.
-      # The key follows the installed Playwright version, so upgrading
-      # Playwright automatically downloads and caches matching browsers.
-      - name: Read installed Playwright version
-        id: playwright-version
-        run: echo "version=$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")" >> "$GITHUB_OUTPUT"
-      - name: Restore cached Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-browsers-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
-      # Cache miss: download browsers and install their system libraries.
-      # A stuck download fails here, by name, instead of eating the job timeout.
+      # Downloads the browsers (seconds) and installs the Linux libraries they
+      # need from Ubuntu's package server (usually under a minute). Its own
+      # limit means a truly stuck install fails here, under this step's name,
+      # instead of leaving the tests without enough time.
       - name: Install Playwright browsers and system libraries
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        timeout-minutes: 10
+        timeout-minutes: 30
         run: npx playwright install --with-deps
-      # Cache hit: browsers are already present; only the system libraries
-      # (which are not cached) need installing on the fresh runner.
-      - name: Install Playwright system libraries
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        timeout-minutes: 10
-        run: npx playwright install-deps
       - run: npm run test:e2e
       # Retain synthetic reports even on success so retries/flakes stay visible.
       - uses: actions/upload-artifact@v4
