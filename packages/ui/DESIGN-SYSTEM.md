@@ -168,6 +168,10 @@ Every pop-up uses the shared `FTDialog` from `dialog.js` and the `.ft-dialog` st
 
 All pop-ups are announced to screen readers as dialogs, keep keyboard focus inside while open, close with Escape, the × button, or a click outside (all equal to Cancel), and return focus to the control that opened them.
 
+## Opening inline details
+
+When a table row opens a details row beneath it (an exam question, an item analysis), load `reveal-detail.js` and call `FTRevealDetail.reveal(row, detail)` once the details are on the page. It scrolls just enough to show the row and all of its details below the sticky top bar, puts the row at the top when the details are taller than the window, leaves the page still when everything already fits, and respects reduced motion. Keep the code that decides *when* to call it in a small tool file outside the protected processing script.
+
 ## Unsaved work
 
 Leaving or refreshing the page must never silently discard work a faculty member cannot easily recreate. Register a check with `FTUnsavedWork.watch(() => hasEdits)` or `FTUnsavedWork.track(() => snapshot)` (then call `markSaved()` after saving or exporting). The browser then asks before the page closes. Tools that autosave only need to warn when saving fails or when `FTStorage.persistent` is false. In that case the browser has blocked storage, and saves reach only a temporary in-memory copy that is lost when the tab closes. For an intentional "Start over" reload, confirm with `FTDialog.confirm` first, then call `FTUnsavedWork.allowLeave()`.
