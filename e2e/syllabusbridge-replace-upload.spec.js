@@ -18,6 +18,17 @@ const entryPoints = {
   }, { name: file.name, mimeType: file.mimeType, b64: file.buffer.toString('base64') }),
 };
 
+// SyllabusBridge logs an unreadable file with console.error(err). Chromium prints the
+// message, but Firefox prints only "Error", so the shared guard cannot match it by text.
+// Capture the logged errors in the page instead and require exactly the expected one.
+async function captureConsoleErrors(page) {
+  await page.evaluate(() => {
+    window.__loggedErrors = [];
+    console.error = (...args) => window.__loggedErrors.push(args.map(a => a?.message ?? String(a)).join(' '));
+  });
+}
+const loggedErrors = page => page.evaluate(() => window.__loggedErrors);
+
 async function openEdited(page, openTool) {
   await openTool('syllabusbridge');
   await page.locator('#file').setInputFiles(await docx('syllabus.docx', syntheticSyllabus));
@@ -52,11 +63,12 @@ for (const [via, give] of Object.entries(entryPoints)) {
     await expectDraftKept(page, edited);
   });
 
-  test(`a damaged Word file (${via}) keeps the edited syllabus`, async ({ page, openTool, guard }) => {
+  test(`a damaged Word file (${via}) keeps the edited syllabus`, async ({ page, openTool }) => {
     const edited = await openEdited(page, openTool);
+    await captureConsoleErrors(page);
     await give(page, brokenDocx);
     await expect(page.locator('#uploadError')).toContainText('could not be opened as a Word document');
-    guard.allowConsoleError('could not be opened as a Word document');
+    expect(await loggedErrors(page)).toEqual([expect.stringContaining('could not be opened as a Word document')]);
     await expectDraftKept(page, edited);
   });
 
