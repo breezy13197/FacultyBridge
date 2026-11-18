@@ -75,6 +75,12 @@ The single **Suite checks** workflow contains:
 1. `verify`: lint, fixture guard, build checks, browser smoke, and the build artifact.
 2. `test`: all six E2E projects, after `verify` succeeds.
 
+`test` caches the downloaded Playwright browsers, keyed to the Playwright
+version in `package-lock.json`, so most runs skip the large browser download.
+A Playwright upgrade changes the key and refreshes the cache automatically. The
+browser-install step has its own 10-minute limit and the job a 45-minute limit,
+so a stuck download fails under its own step name instead of cancelling tests.
+
 Both job names are required by the active main-branch ruleset. Keep these names
 stable or update the ruleset deliberately when changing CI. Full validation runs
 on PRs into main/master and pushes to those branches, plus manual runs. Feature
