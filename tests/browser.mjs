@@ -34,6 +34,14 @@ function skillsLabXml(){
   const xml=`<?xml version="1.0"?><w:document xmlns:w="${NS}"><w:body>${paragraphs.map(p).join('')}<w:tbl>${rows.map(r=>'<w:tr>'+r.map(tc).join('')+'</w:tr>').join('')}</w:tbl></w:body></w:document>`;
   return xml;
 }
+// Synthetic syllabus whose schedule names a faculty member inside a topic ("Antibiotics (Mentor)") and leaves the
+// Faculty box empty. Every name is made up.
+function facultyInTopicXml(){
+  const p=t=>`<w:p><w:r><w:t>${t}</w:t></w:r></w:p>`,tc=t=>'<w:tc>'+p(t)+'</w:tc>';
+  const paragraphs=['PHA9997 - Synthetic Pharmacotherapy','Fall 2026','COURSE COORDINATOR: Ada Faculty, PharmD','Email: afaculty@university.edu','COURSE FACULTY:','Ben Mentor, Ph.D.','Email: bmentor@university.edu','Course Schedule'];
+  const rows=[['Date','Topic','Faculty'],['9/21/26','Proteins','Faculty'],['9/22/26','Antibiotics (Mentor)',''],['9/23/26','Enzymes','']];
+  return `<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${paragraphs.map(p).join('')}<w:tbl>${rows.map(r=>'<w:tr>'+r.map(tc).join('')+'</w:tr>').join('')}</w:tbl></w:body></w:document>`;
+}
 try {
   for(const format of ['site','standalone']) for(const tool of manifest.tools) {
     const context=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
@@ -190,6 +198,18 @@ try {
       },tool.id);
       if(tool.id==='calendarbridge') assert.deepEqual(flags,{Proteins:[],Enzymes:['weekday'],Lipids:[],Hemoglobin:['weekday','year'],Membranes:[],Carbohydrates:['date-order']},'calendarbridge date typo flags');
       else assert.deepEqual(flags,['Thursday 9/23/26: that date is a Wednesday','Monday 9/28/25: that date is a Sunday','9/28/25: the year 2025 does not match the dates around it (2026)','9/16/26: earlier than the row above it'],'syllabusbridge date typo warnings');
+    }
+    if(['calendarbridge','syllabusbridge'].includes(tool.id)) {
+      // A faculty name inside a topic ("Antibiotics (Mentor)"): CalendarBridge names the event "Antibiotics" and lists
+      // Mentor as its faculty. SyllabusBridge keeps the topic as written in Word.
+      const rows=await page.evaluate(async({id,xml})=>{
+        const z=new JSZip();z.file('word/document.xml',xml);
+        const parsed=await parseDocx(new File([await z.generateAsync({type:'uint8array'})],'synthetic-faculty-in-topic.docx'));
+        if(id==='syllabusbridge') return state.schedule.map(e=>`${e.date}|${e.topic}|${e.faculty}`);
+        return parsed.events.map(e=>`${e.date}|${e.topic}|${e.facultyIds.map(f=>parsed.faculty.find(x=>x.id===f)?.short||f).join('+')}`);
+      },{id:tool.id,xml:facultyInTopicXml()});
+      if(tool.id==='calendarbridge') assert.deepEqual(rows,['9/21/2026|Proteins|Faculty','9/22/2026|Antibiotics|Mentor','9/23/2026|Enzymes|Faculty'],'calendarbridge removes a faculty name from the topic');
+      else assert.deepEqual(rows,['9/21/26|Proteins|Faculty','9/22/26|Antibiotics (Mentor)|Faculty','9/23/26|Enzymes|Faculty'],'syllabusbridge keeps a topic that names a faculty member');
     }
     if(tool.id==='calendarbridge') {
       // "Week N" heading rows inside a schedule table are section labels, not calendar events.
