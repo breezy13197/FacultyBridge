@@ -227,6 +227,18 @@ try {
         '10/6/2026|Tuesday|1:30pm – 4:30pm|Final Skills Assessment Arrive at your assigned time|lecture|true|Faculty',
         '10/7/2026|Wednesday|1:30pm – 4:30pm|Final Skills Assessment Arrive at your assigned time|lecture|true|Faculty'],'calendarbridge skills-lab schedule rows');
       assert.deepEqual(lab.fullDayIssues,[],'calendarbridge accepts a full-day time range');
+      // Several dates in one box with one topic are that many meetings of the topic, each led by the row's faculty.
+      const shared=await page.evaluate(async()=>{
+        const p=t=>`<w:p><w:r><w:t>${t}</w:t></w:r></w:p>`,tc=c=>'<w:tc>'+[].concat(c).map(p).join('')+'</w:tc>';
+        const rows=[['Date','Topic','Faculty'],['9/21/26','Introduction','Mentor'],[['9/28/26','9/29/26'],'Shared topic','Faculty'],['9/30/26','Wrap up','Mentor']];
+        const xml=`<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${p('PHA9999 - Synthetic Course')}${p('Fall 2026')}${p('COURSE COORDINATOR: Ada Faculty, PharmD')}${p('Email: afaculty@university.edu')}${p('COURSE FACULTY:')}${p('Ben Mentor, Ph.D.')}${p('Email: bmentor@university.edu')}${p('Course Schedule')}<w:tbl>${rows.map(r=>'<w:tr>'+r.map(tc).join('')+'</w:tr>').join('')}</w:tbl></w:body></w:document>`;
+        const z=new JSZip();z.file('word/document.xml',xml);
+        state=await parseDocx(new File([await z.generateAsync({type:'uint8array'})],'synthetic-shared-topic.docx'));
+        resolveEventYears();flagDateProblems();inferMissingTimes();state.events=dedupeEvents(state.events);
+        const short=ids=>(ids||[]).map(id=>state.faculty.find(f=>f.id===id)?.short||id).join('+');
+        return state.events.map(e=>`${e.date}|${e.topic}|${short(e.facultyIds)}`);
+      });
+      assert.deepEqual(shared,['9/21/2026|Introduction|Mentor','9/28/2026|Shared topic|Faculty','9/29/2026|Shared topic|Faculty','9/30/2026|Wrap up|Mentor'],'calendarbridge keeps every date of a shared-topic row with its faculty');
     }
     if(tool.id==='syllabusbridge') {
       // Report filters are generated dynamically after parsing the synthetic syllabus.
