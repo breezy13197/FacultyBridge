@@ -163,7 +163,8 @@ function parseSupplementalTables(tables){
 const DATE_PLACEHOLDER=/^(?:TBD|TBA|to be (?:determined|announced))\.?$/i;
 function likelySchedule(rows){const head=rows.slice(0,3).flat().map(c=>norm(c.text)).join(' | '),structure=/(topic|lecture|course topics?)/.test(head)&&/(date|day|week|time frame|time|faculty|instructor)/.test(head);if(!structure)return false;return scheduleTableProfile(rows).count>=2}
 
-function scheduleTableProfile(rows,tableIndex=-1){
+// A table that continues the schedule table before it has no header row (headerless).
+function scheduleTableProfile(rows,tableIndex=-1,headerless=false){
  let dateCol=-1,headerIndex=-1;
  const dateHead=/^(?:\(?[a-z]\)?\s*)?(?:date|date\/time)$/i;
  for(let ri=0;ri<Math.min(rows.length,6);ri++){
@@ -177,7 +178,7 @@ function scheduleTableProfile(rows,tableIndex=-1){
    let n=0;for(const row of rows.slice(1)){const cell=row[ci],ls=(cell?.lines?.length?cell.lines:[cell?.text||'']).map(clean).filter(Boolean);n+=ls.filter(broadDateish).length}
    if(n>best.n)best={i:ci,n};
   }
-  dateCol=best.i;headerIndex=0;
+  dateCol=best.i;headerIndex=headerless?-1:0;
  }
  const entries=[],failures=[];
  if(dateCol<0)return{tableIndex,dateCol,headerIndex,entries,failures,count:0};
@@ -196,67 +197,42 @@ function scheduleTableProfile(rows,tableIndex=-1){
  });
  return{tableIndex,dateCol,headerIndex,entries,failures,count:entries.length};
 }
-function parseScheduleTable(rows,tableIndex=-1){
- const events=[];let headerIndex=-1,cols={};
- const facultyHeader=t=>/^(?:course\s+)?(?:faculty|instructor|lead\s+instructor|presenter|lecturer|facilitator)s?$/.test(t);
- const readingHeader=t=>/(?:book|reading|chapter|chapters|textbook|medical term)/.test(t);
- for(let ri=0;ri<Math.min(rows.length,5);ri++){
-  const row=rows[ri];
-  row.forEach((c,i)=>{
-   const t=norm(c.text);
-   if(/^(?:\(?[a-z]\)?\s*)?(?:date|date\s*\/\s*time|date time)$/.test(t)){cols.date=i;if(/time/.test(t))cols.time=i}
-   else if(/^day$|^weekday$/.test(t))cols.day=i;
-   else if(/^time$/.test(t))cols.time=i;
-   else if(/^#/.test(t)||/^lecture(?: number)?$/.test(t))cols.num=i;
-   else if(/^topic$/.test(t)||/course topics?/.test(t))cols.topic=i;
-   else if(facultyHeader(t))cols.faculty=i;
-   else if(readingHeader(t))cols.reading=i;
-  });
-  if(cols.date!=null&&cols.topic!=null){headerIndex=ri;break}
- }
- if(headerIndex<0){
-  let bestDate={i:-1,n:0},bestDay={i:-1,n:0};const maxCols=Math.max(...rows.map(r=>r.length));
-  for(let ci=0;ci<maxCols;ci++){let dn=0,yn=0;for(const row of rows){const txt=row[ci]?.text||'';dn+=extractDates(txt).length;if(/^(Monday|Tuesday|Wednesday|Thursday|Friday|Mon|Tue(?:s)?|Wed|Thu(?:rs)?|Fri)$/i.test(clean(txt)))yn++}if(dn>bestDate.n)bestDate={i:ci,n:dn};if(yn>bestDay.n)bestDay={i:ci,n:yn}}
-  if(bestDate.n>=3){
-   cols.date=bestDate.i;cols.day=bestDay.n>=3?bestDay.i:Math.max(0,cols.date-1);cols.topic=cols.date+1;
-   // Infer faculty from actual faculty-name matches instead of assuming the last column.
-   let bestFaculty={i:-1,n:0};
-   for(let ci=0;ci<maxCols;ci++){
-    if([cols.date,cols.day,cols.topic].includes(ci))continue;
-    let n=0;
-    for(const row of rows.slice(1)){const text=clean(row[ci]?.text);if(!text)continue;for(const f of state.faculty||[]){const short=norm(f.short||''),name=norm(f.name||'');const t=norm(text);if((short&&t.includes(short))||(name&&t.includes(name))){n++;break}}}
-    if(n>bestFaculty.n)bestFaculty={i:ci,n};
-   }
-   if(bestFaculty.n>0)cols.faculty=bestFaculty.i;
-   headerIndex=0;
-  }else return events
- }
- const splitMerged=line=>{const parts=clean(line).split(/(?<=[a-z)])(?=[A-Z]{2,}\b)/).map(clean).filter(Boolean);return parts.length>1?parts:[clean(line)]};let carryFaculty='';
- const scheduleDataRows=rows.slice(headerIndex+1);for(let rowOffset=0;rowOffset<scheduleDataRows.length;rowOffset++){const cells=scheduleDataRows[rowOffset],sourceRowIndex=headerIndex+1+rowOffset;
-  let dc=cells[cols.date];let dateLines=dc?(dc.lines?.length?dc.lines:[dc.text]).flatMap(x=>extractDates(x)):[];
-  if(!dateLines.length){dateLines=cells.flatMap(c=>(c.lines?.length?c.lines:[c.text]).flatMap(x=>extractDates(x)));if(dateLines.length&&!dc)dc={text:dateLines.join(' '),lines:dateLines}}
-  // Keep a "TBD" row (for example the final exam) with its placeholder date; the editor marks it for a real date.
-  if(!dateLines.length&&dc&&DATE_PLACEHOLDER.test(clean(dc.text))&&cells.some((c,ci)=>ci!==cols.date&&clean(c.text)))dateLines=[clean(dc.text)];
-  if(!dateLines.length)continue;
-  let topicLines=(cells[cols.topic]?.lines||[]).flatMap(splitMerged).map(clean).filter(Boolean);
-  if(!topicLines.length&&cells[cols.topic]?.text)topicLines=[clean(cells[cols.topic].text)];
-  if(!topicLines.length){let fallback=clean(cells.map(c=>c.text).join(' '));for(const d of dateLines)fallback=fallback.replace(d,'');fallback=fallback.replace(/^\s*\d+\s+/,'').replace(/^\s*(?:M|T|W|Th|F|Mon|Tue|Wed|Thu|Fri|Monday|Tuesday|Wednesday|Thursday|Friday)\b\s*/i,'');topicLines=[clean(fallback)]}
-  const timeLines=cols.time!=null?(cells[cols.time]?.lines||[]).map(clean).filter(Boolean):[];
-  const facultyLines=cols.faculty!=null?(cells[cols.faculty]?.lines||[]).map(clean).filter(Boolean):[];
-  if(facultyLines.length)carryFaculty=clean(facultyLines.join(' ')).replace(/\s+/g,' ');
-  let fi=0;
-  for(let i=0;i<dateLines.length;i++){
-   const date=dateLines[i],printedDay=clean((cells[cols.day]?.lines||[])[i]||cells[cols.day]?.text||'')||(dateLines.length===1?namedDay(dc?.text||''):namedDay((dc?.lines||[]).find(l=>extractDates(l).includes(date))||'')),day=/^(Monday|Tuesday|Wednesday|Thursday|Friday|Mon|Tue(?:s)?|Wed|Thu(?:rs)?|Fri)$/i.test(printedDay)?({'monday':'Monday','mon':'Monday','tuesday':'Tuesday','tue':'Tuesday','tues':'Tuesday','wednesday':'Wednesday','wed':'Wednesday','thursday':'Thursday','thu':'Thursday','thurs':'Thursday','friday':'Friday','fri':'Friday'}[printedDay.toLowerCase()]||dayFromDate(date)):dayFromDate(date),topic=topicLines[i]||topicLines[Math.min(i,topicLines.length-1)]||'',nonTeaching=/\b(exam|quiz|final|holiday|veteran.?s day|no class|reinforcement|in[- ]class activit)/i.test(topic);
-   let explicitTime='';
-   if(timeLines.length)explicitTime=extractTime(timeLines[i]||'')||extractTime(timeLines[Math.min(i,timeLines.length-1)]||'');
-   if(!explicitTime&&cols.time!=null)explicitTime=extractTime(cells[cols.time]?.text||'');
-   const fac=nonTeaching?'':(facultyLines[fi++]||carryFaculty||'');
-   events.push({date,day,time:explicitTime||meetingTimeForDay(day),topic,faculty:fac,raw:cells.map(c=>c.text).join(' | '),source:{tableIndex,rowIndex:sourceRowIndex,lineIndex:i,columnMap:{date:cols.date,day:cols.day,time:cols.time,topic:cols.topic,faculty:cols.faculty}}})
+// The course schedule is read by the reader shared with CalendarBridge (packages/schedule-reader), so both tools
+// read the same rows from the same Word table. SyllabusBridge's own rules: the faculty of an exam, quiz, holiday,
+// or reinforcement period is left blank, a time not printed in the row comes from the course meeting times, and a
+// "TBD" date is kept for the editor to fill in. Each entry keeps the Word table, row, and boxes it was read from,
+// so edits can be written back; a box merged down from an earlier row is not this row's box.
+const ScheduleReader=window.FacultyBridgeScheduleReader;
+function readSchedule(doc,tables,tableEls){
+ const shared=ScheduleReader.readWordTables(doc),sbIndex=new Map(tableEls.map((el,i)=>[el,i]));
+ const found=new Map(ScheduleReader.findScheduleTables(shared.map(t=>t.rows)).map(x=>[x.tableIndex,x])),continued=new Set([...found.values()].filter(x=>x.continuation).map(x=>x.tableIndex));
+ // A table SyllabusBridge's own table check calls a schedule is read too, with the headers it shows.
+ shared.forEach((t,i)=>{const ti=sbIndex.get(t.element);if(found.has(i)||ti==null)return;const type=classifyStructuredTable(tables[ti],ti).type;if(type==='courseSchedule'||(type==='generic'&&likelySchedule(tables[ti])))found.set(i,{headers:ScheduleReader.detectHeaders(t.rows)})});
+ const faculty=(state.faculty||[]).map((f,i)=>({id:`f${i}`,name:f.name,short:f.short}));
+ let candidates=0;const failures=[],schedule=[];
+ for(const [i,{headers}] of [...found].sort((a,b)=>a[0]-b[0])){
+  const rows=shared[i].rows,ti=sbIndex.get(shared[i].element)??null;
+  if(ti!=null){const profile=scheduleTableProfile(tables[ti],ti,continued.has(i));candidates+=profile.count;failures.push(...profile.failures)}
+  for(const e of ScheduleReader.readScheduleRows(rows,headers,{faculty,year:state.course.year,placeholderDates:true})){
+   // A row with no date of its own (it continues the date above) is a source schedule row too.
+   if(e.continuationRow)candidates++;
+   const type=classifySharedEvent(e.topic),nonTeaching=type==='assessment'||type==='no-class'||/\b(?:reinforcement|in[- ]class activit)/i.test(e.topic);
+   // A date SyllabusBridge's date checks cannot read as written ("December 9th, 2026") is kept as 12/9/2026.
+   const date=e.placeholderDate||parseLooseDate(e.date)?e.date:ScheduleReader.normalizeDate(e.date,state.course.year),day=e.placeholderDate?'':e.day||dayFromDate(date);
+   schedule.push({date,day,time:e.time||e.timeLine||meetingTimeForDay(day),topic:e.topic,faculty:nonTeaching?'':clean(e.instructor),raw:rows[e.source.rowIndex].map(c=>c.text).join(' | '),
+    source:{tableIndex:ti,rowIndex:e.source.rowIndex,lineIndex:e.source.lineIndex,columnMap:{...e.source.columnMap}}});
   }
  }
- return events
+ state.schedule=schedule;state.extraction.scheduleCandidates=candidates;state.extraction.scheduleFailures=failures;
 }
-async function parseDocx(file){if(!window.JSZip)throw new Error('The built-in Word parser could not start. Reload SyllabusBridge and try again.');let zip;try{zip=await JSZip.loadAsync(file)}catch(e){throw new SyllabusFileError('This file could not be opened as a Word document. It may be damaged or saved in the older .doc format. Open it in Word and use Save As → .docx, then try again.')}let xml=await zip.file('word/document.xml')?.async('string');if(!xml)throw new SyllabusFileError('This Word file does not contain a readable document body.');const doc=new DOMParser().parseFromString(xml,'application/xml'),NS='http://schemas.openxmlformats.org/wordprocessingml/2006/main';let numDoc=null;const numXml=await zip.file('word/numbering.xml')?.async('string');if(numXml)numDoc=new DOMParser().parseFromString(numXml,'application/xml');const numDefs=new Map,numToAbs=new Map,counters=new Map;const attr=(n,name)=>n?.getAttributeNS(NS,name)||'';if(numDoc){for(const abs of [...numDoc.getElementsByTagNameNS(NS,'abstractNum')]){const aid=attr(abs,'abstractNumId'),levels={};for(const lvl of [...abs.getElementsByTagNameNS(NS,'lvl')]){const ilvl=+(attr(lvl,'ilvl')||0),fmt=attr(lvl.getElementsByTagNameNS(NS,'numFmt')[0],'val')||'decimal',txt=attr(lvl.getElementsByTagNameNS(NS,'lvlText')[0],'val')||'%1.';levels[ilvl]={fmt,txt}}numDefs.set(aid,levels)}for(const n of [...numDoc.getElementsByTagNameNS(NS,'num')]){const id=attr(n,'numId'),abs=attr(n.getElementsByTagNameNS(NS,'abstractNumId')[0],'val');numToAbs.set(id,abs)}}const alpha=n=>{let x='',v=n;while(v>0){v--;x=String.fromCharCode(97+v%26)+x;v=Math.floor(v/26)}return x};const roman=n=>{const vals=[[1000,'m'],[900,'cm'],[500,'d'],[400,'cd'],[100,'c'],[90,'xc'],[50,'l'],[40,'xl'],[10,'x'],[9,'ix'],[5,'v'],[4,'iv'],[1,'i']];let r='',v=n;for(const [a,b] of vals)while(v>=a){r+=b;v-=a}return r};const listPrefix=p=>{const numPr=p.getElementsByTagNameNS(NS,'numPr')[0];if(!numPr)return'';const numId=attr(numPr.getElementsByTagNameNS(NS,'numId')[0],'val'),ilvl=+(attr(numPr.getElementsByTagNameNS(NS,'ilvl')[0],'val')||0),def=numDefs.get(numToAbs.get(numId))?.[ilvl];if(!def)return'• ';if(def.fmt==='bullet')return'• ';const key=numId+':'+ilvl,n=(counters.get(key)||0)+1;counters.set(key,n);for(const k of [...counters.keys()]){const [nid,lev]=k.split(':');if(nid===numId&&+lev>ilvl)counters.delete(k)}let val=def.fmt==='lowerLetter'?alpha(n):def.fmt==='upperLetter'?alpha(n).toUpperCase():def.fmt==='lowerRoman'?roman(n):def.fmt==='upperRoman'?roman(n).toUpperCase():String(n);let pre=def.txt.replace(/%\d+/g,val);return pre+' '};const nodeText=n=>[...n.getElementsByTagNameNS(NS,'t')].map(x=>x.textContent).join('');const paragraphText=p=>clean(listPrefix(p)+nodeText(p));const cellLines=tc=>{const out=[];for(const p of [...tc.children].filter(x=>x.localName==='p')){let b='';const pieces=[];const walk=n=>{for(const ch of n.childNodes){if(ch.localName==='t')b+=ch.textContent||'';else if(ch.localName==='br'||ch.localName==='cr'){pieces.push(clean(b));b=''}else walk(ch)}};walk(p);pieces.push(clean(b));const pre=listPrefix(p);if(pieces.length){pieces[0]=clean(pre+pieces[0]);out.push(...pieces)}else out.push(clean(pre))}return out};const redText=[];for(const run of [...doc.getElementsByTagNameNS(NS,'r')]){const color=run.getElementsByTagNameNS(NS,'color')[0]?.getAttributeNS(NS,'val')||'';if(/^FF0000$/i.test(color)){const t=clean(nodeText(run));if(t)redText.push(t)}}const body=[...doc.getElementsByTagNameNS(NS,'body')][0],lines=[],tables=[],tableLines=[];for(const ch of body.children){if(ch.localName==='p'){const t=paragraphText(ch);if(t)lines.push(t)}else if(ch.localName==='tbl'){const rows=[];for(const r of [...ch.children].filter(x=>x.localName==='tr')){const cells=[...r.children].filter(x=>x.localName==='tc').map(c=>{const ls=cellLines(c);return{text:clean(ls.join(' ')),lines:ls}});rows.push(cells);for(const c of cells)for(const l of c.lines.filter(Boolean)){tableLines.push(lines.length);lines.push(l)}}tables.push(rows)}}state={sourceName:file.name,lines,tableLineIndexes:tableLines,sections:detectSections(lines),course:parseMetadata(lines,file.name),faculty:[],coordinator:null,clos:[],plos:[],cloMappings:[],meetingPatterns:[],assessments:[],policies:{},schedule:[],grading:[],rawTables:tables,structuredTables:tables.map((rows,i)=>classifyStructuredTable(rows,i)),assignmentTables:parseAssignmentTables(tables),supplementalTables:parseSupplementalTables(tables),redText,results:[],extraction:{scheduleFailures:[],scheduleCandidates:0,cloCandidates:0},dirty:false,reviewComplete:false,editorBaseline:null,tableMutations:[],editMutations:[],cloEditorIds:[]};const pf=parseFaculty(lines);state.faculty=pf.faculty;state.coordinator=pf.coordinator;const cloText=sectionText('clos');state.extraction.cloCandidates=(cloText.match(/\bCL?O\s*[-–—]?\s*\d+/gi)||[]).length;state.clos=parseCLOs();state.cloMappings=parseCLOMappings(tables);state.plos=[...new Set(state.cloMappings.flatMap(x=>x.pslos.map(p=>'PSLO '+p)))];if(!state.plos.length)state.plos=parsePLOs();state.meetingPatterns=parseMeetingPatterns(lines,tables);state.grading=parseGradingTable(tables);if(!state.grading.length)state.grading=parseGrading();state.policies=parsePolicies();state.policies.courseEvaluation=courseEvaluationNarrative();state.policies.courseEvaluationEdited=false;let scheduleCandidates=0,scheduleFailures=[];for(let ti=0;ti<tables.length;ti++){const rows=tables[ti],type=classifyStructuredTable(rows,ti).type;if(type==='courseSchedule'||(type==='generic'&&likelySchedule(rows))){const profile=scheduleTableProfile(rows,ti);scheduleCandidates+=profile.count;scheduleFailures.push(...profile.failures);state.schedule.push(...parseScheduleTable(rows,ti))}}state.schedule=state.schedule.filter((x,i,a)=>a.findIndex(y=>y.date===x.date&&clean(y.time)===clean(x.time)&&norm(y.topic)===norm(x.topic)&&clean(y.faculty)===clean(x.faculty)&&clean(y.raw)===clean(x.raw))===i);state.extraction.scheduleCandidates=scheduleCandidates;state.extraction.scheduleFailures=scheduleFailures;if(!state.meetingPatterns.length){const freq=new Map;for(const e of state.schedule){if(!e.day||!e.time||/exam|quiz|final|no class|holiday|reinforcement/i.test(e.topic))continue;const k=e.day+'|'+e.time;freq.set(k,(freq.get(k)||0)+1)}state.meetingPatterns=[...freq.entries()].filter(([,n])=>n>=2).map(([k])=>{const [day,time]=k.split('|');return{day,time,source:'Derived from recurring schedule rows'}})}enrichGrading();state.assessments=parseAssessments();return state}
+// Meeting times the shared reader finds ("Mondays (1:00 pm - 2:00 pm)", "Tuesday or Wednesday (1:15pm - 4:15pm)")
+// fill in days SyllabusBridge's own reading did not find.
+function addSharedMeetingPatterns(patterns,lines){
+ const out=patterns.slice();
+ for(const [day,times] of Object.entries(ScheduleReader.extractMeetingPatterns(lines)))if(!out.some(m=>m.day===day))for(const time of times)out.push({day,time,source:'Course meeting times'});
+ return out;
+}
+async function parseDocx(file){if(!window.JSZip)throw new Error('The built-in Word parser could not start. Reload SyllabusBridge and try again.');let zip;try{zip=await JSZip.loadAsync(file)}catch(e){throw new SyllabusFileError('This file could not be opened as a Word document. It may be damaged or saved in the older .doc format. Open it in Word and use Save As → .docx, then try again.')}let xml=await zip.file('word/document.xml')?.async('string');if(!xml)throw new SyllabusFileError('This Word file does not contain a readable document body.');const doc=new DOMParser().parseFromString(xml,'application/xml'),NS='http://schemas.openxmlformats.org/wordprocessingml/2006/main';let numDoc=null;const numXml=await zip.file('word/numbering.xml')?.async('string');if(numXml)numDoc=new DOMParser().parseFromString(numXml,'application/xml');const numDefs=new Map,numToAbs=new Map,counters=new Map;const attr=(n,name)=>n?.getAttributeNS(NS,name)||'';if(numDoc){for(const abs of [...numDoc.getElementsByTagNameNS(NS,'abstractNum')]){const aid=attr(abs,'abstractNumId'),levels={};for(const lvl of [...abs.getElementsByTagNameNS(NS,'lvl')]){const ilvl=+(attr(lvl,'ilvl')||0),fmt=attr(lvl.getElementsByTagNameNS(NS,'numFmt')[0],'val')||'decimal',txt=attr(lvl.getElementsByTagNameNS(NS,'lvlText')[0],'val')||'%1.';levels[ilvl]={fmt,txt}}numDefs.set(aid,levels)}for(const n of [...numDoc.getElementsByTagNameNS(NS,'num')]){const id=attr(n,'numId'),abs=attr(n.getElementsByTagNameNS(NS,'abstractNumId')[0],'val');numToAbs.set(id,abs)}}const alpha=n=>{let x='',v=n;while(v>0){v--;x=String.fromCharCode(97+v%26)+x;v=Math.floor(v/26)}return x};const roman=n=>{const vals=[[1000,'m'],[900,'cm'],[500,'d'],[400,'cd'],[100,'c'],[90,'xc'],[50,'l'],[40,'xl'],[10,'x'],[9,'ix'],[5,'v'],[4,'iv'],[1,'i']];let r='',v=n;for(const [a,b] of vals)while(v>=a){r+=b;v-=a}return r};const listPrefix=p=>{const numPr=p.getElementsByTagNameNS(NS,'numPr')[0];if(!numPr)return'';const numId=attr(numPr.getElementsByTagNameNS(NS,'numId')[0],'val'),ilvl=+(attr(numPr.getElementsByTagNameNS(NS,'ilvl')[0],'val')||0),def=numDefs.get(numToAbs.get(numId))?.[ilvl];if(!def)return'• ';if(def.fmt==='bullet')return'• ';const key=numId+':'+ilvl,n=(counters.get(key)||0)+1;counters.set(key,n);for(const k of [...counters.keys()]){const [nid,lev]=k.split(':');if(nid===numId&&+lev>ilvl)counters.delete(k)}let val=def.fmt==='lowerLetter'?alpha(n):def.fmt==='upperLetter'?alpha(n).toUpperCase():def.fmt==='lowerRoman'?roman(n):def.fmt==='upperRoman'?roman(n).toUpperCase():String(n);let pre=def.txt.replace(/%\d+/g,val);return pre+' '};const nodeText=n=>[...n.getElementsByTagNameNS(NS,'t')].map(x=>x.textContent).join('');const paragraphText=p=>clean(listPrefix(p)+nodeText(p));const cellLines=tc=>{const out=[];for(const p of [...tc.children].filter(x=>x.localName==='p')){let b='';const pieces=[];const walk=n=>{for(const ch of n.childNodes){if(ch.localName==='t')b+=ch.textContent||'';else if(ch.localName==='br'||ch.localName==='cr'){pieces.push(clean(b));b=''}else walk(ch)}};walk(p);pieces.push(clean(b));const pre=listPrefix(p);if(pieces.length){pieces[0]=clean(pre+pieces[0]);out.push(...pieces)}else out.push(clean(pre))}return out};const redText=[];for(const run of [...doc.getElementsByTagNameNS(NS,'r')]){const color=run.getElementsByTagNameNS(NS,'color')[0]?.getAttributeNS(NS,'val')||'';if(/^FF0000$/i.test(color)){const t=clean(nodeText(run));if(t)redText.push(t)}}const body=[...doc.getElementsByTagNameNS(NS,'body')][0],lines=[],tables=[],tableLines=[],tableEls=[];for(const ch of body.children){if(ch.localName==='p'){const t=paragraphText(ch);if(t)lines.push(t)}else if(ch.localName==='tbl'){tableEls.push(ch);const rows=[];for(const r of [...ch.children].filter(x=>x.localName==='tr')){const cells=[...r.children].filter(x=>x.localName==='tc').map(c=>{const ls=cellLines(c);return{text:clean(ls.join(' ')),lines:ls}});rows.push(cells);for(const c of cells)for(const l of c.lines.filter(Boolean)){tableLines.push(lines.length);lines.push(l)}}tables.push(rows)}}state={sourceName:file.name,lines,tableLineIndexes:tableLines,sections:detectSections(lines),course:parseMetadata(lines,file.name),faculty:[],coordinator:null,clos:[],plos:[],cloMappings:[],meetingPatterns:[],assessments:[],policies:{},schedule:[],grading:[],rawTables:tables,structuredTables:tables.map((rows,i)=>classifyStructuredTable(rows,i)),assignmentTables:parseAssignmentTables(tables),supplementalTables:parseSupplementalTables(tables),redText,results:[],extraction:{scheduleFailures:[],scheduleCandidates:0,cloCandidates:0},dirty:false,reviewComplete:false,editorBaseline:null,tableMutations:[],editMutations:[],cloEditorIds:[]};const pf=parseFaculty(lines);state.faculty=pf.faculty;state.coordinator=pf.coordinator;const cloText=sectionText('clos');state.extraction.cloCandidates=(cloText.match(/\bCL?O\s*[-–—]?\s*\d+/gi)||[]).length;state.clos=parseCLOs();state.cloMappings=parseCLOMappings(tables);state.plos=[...new Set(state.cloMappings.flatMap(x=>x.pslos.map(p=>'PSLO '+p)))];if(!state.plos.length)state.plos=parsePLOs();state.meetingPatterns=addSharedMeetingPatterns(parseMeetingPatterns(lines,tables),lines);state.grading=parseGradingTable(tables);if(!state.grading.length)state.grading=parseGrading();state.policies=parsePolicies();state.policies.courseEvaluation=courseEvaluationNarrative();state.policies.courseEvaluationEdited=false;readSchedule(doc,tables,tableEls);state.schedule=state.schedule.filter((x,i,a)=>a.findIndex(y=>y.date===x.date&&clean(y.time)===clean(x.time)&&norm(y.topic)===norm(x.topic)&&clean(y.faculty)===clean(x.faculty)&&clean(y.raw)===clean(x.raw))===i);if(!state.meetingPatterns.length){const freq=new Map;for(const e of state.schedule){if(!e.day||!e.time||/exam|quiz|final|no class|holiday|reinforcement/i.test(e.topic))continue;const k=e.day+'|'+e.time;freq.set(k,(freq.get(k)||0)+1)}state.meetingPatterns=[...freq.entries()].filter(([,n])=>n>=2).map(([k])=>{const [day,time]=k.split('|');return{day,time,source:'Derived from recurring schedule rows'}})}enrichGrading();state.assessments=parseAssessments();return state}
 function result(id,category,status,title,summary,evidence,action,evaluated=true){return{id,category,status,title,summary,evidence,action,evaluated}}
 
 
@@ -888,7 +864,9 @@ function facultyIdsForText(text,faculty){
  return [...new Set(ids)];
 }
 // A "(Quiz 1 due at 8 AM)" note is a deadline, not the meeting itself, and a review period that names an exam is still a class meeting.
-function classifySharedEvent(topic){const t=norm(topic);if(/no class|holiday|thanksgiving|veteran/.test(t))return'no-class';const core=t.replace(/\([^)]*\bdue\b[^)]*\)/g,' ');if(/\breview\b/.test(core.replace(/\([^)]*\)/g,' ')))return'activity';if(/exam|quiz/.test(core))return'assessment';if(/reinforcement|activity|assignment/.test(core))return'activity';return'class'}
+// The kind of class period (shared with CalendarBridge, so the Course JSON handoff agrees): a review period or a
+// "Pre-Lab Quiz" inside a lecture topic is a class meeting; an assignment is an activity.
+function classifySharedEvent(topic){const type=ScheduleReader.classifyTopic(topic);return type==='lecture'?(/assignment/.test(norm(topic))?'activity':'class'):type}
 function buildFacultyBridgeCourse(){
  const faculty=sharedFaculty(),coords=faculty.filter(f=>f.role==='coordinator').map(f=>f.id),coord=coords[0]||null;
  const recurringSchedule=(state.meetingPatterns||[]).map((m,i)=>{const tr=normalizedTimeRange(m.time);return{id:`meeting-${i+1}`,day:m.day,startTime:tr.startTime,endTime:tr.endTime,timeText:tr.timeText,location:clean(state.course.location),source:{kind:m.source?.toLowerCase().includes('derived')?'inferred':'syllabus',text:clean(m.source)}}});

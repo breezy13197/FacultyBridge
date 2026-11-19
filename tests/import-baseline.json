@@ -1,9 +1,10 @@
 {
-  "calendarbridge": "136f710876331df1930ff3da2ba8dfdf3e9ffbb490ec6d461f5e0a03ca2b29f7",
+  "calendarbridge": "7acb677e0e4482ad8c54931d428f03ab7889d6b4cf851ae0c24837716801f6c5",
   "exambridge": "4c84df6c84374e2dd3356590258b18fcaa96cd71a8d5b424b3c9af89ae6fb36a",
   "gradebridge": "892d7ab9bad984fa51df5afc62a7f451cd616358be524d3cfb39bd2fe300d1d2",
   "groupbridge": "d723a46d563243d71edd3497eda3328b73c1689b99346e18eadcc9b2622c5fb8",
   "itembridge": "056123e76aaeddacc4d05205d200daf481ce543abd1079b8ac838240f18f900d",
   "questionbridge": "b3a06eb0e02ed001165305ae7366f6deb294eec44d7cf0e692a94d4fa8fd5a0a",
-  "syllabusbridge": "91db4f9f9185329e191a51cb30239805ec95c7963b8bbcb3dee5f2864acd6f4f"
+  "syllabusbridge": "1163df47d66919e0f4bbbdfbce154a549e607af68b08fd4eac4ae5e70a1ae3a3",
+  "packages/schedule-reader/schedule-reader.js": "ab31531e29b2fae0d9da5cc2830bc36518bf7e4de65bd498cb74749f2306c6f9"
 }

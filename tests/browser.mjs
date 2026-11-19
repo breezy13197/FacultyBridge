@@ -11,6 +11,29 @@ const output=path.join(root,'test-results');fs.mkdirSync(output,{recursive:true}
 const server=createServer();await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const origin=`http://127.0.0.1:${server.address().port}`;
 const results=[];
+// Synthetic skills-lab syllabus (Word XML) read by both CalendarBridge and SyllabusBridge. Every name is made up.
+// A Monday pre-lab lecture plus a "Tuesday or Wednesday" lab section row whose Topic and Lead boxes are merged
+// down from the Monday row; job titles on their own line under each name; plural weekday names in the meeting
+// times; a pre-lab quiz inside the Monday lecture; "8:00 a – 5:00 p" times.
+function skillsLabXml(){
+  const NS='http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const p=t=>`<w:p><w:r><w:t xml:space="preserve">${t}</w:t></w:r></w:p>`;
+  // A cell is a string, or {lines, merge:'restart'|'continue', span}.
+  const tc=c=>{c=typeof c==='string'?{lines:[c]}:c;const pr=(c.span?`<w:gridSpan w:val="${c.span}"/>`:'')+(c.merge==='restart'?'<w:vMerge w:val="restart"/>':c.merge==='continue'?'<w:vMerge/>':'');return `<w:tc>${pr?`<w:tcPr>${pr}</w:tcPr>`:''}${c.merge==='continue'?'<w:p/>':c.lines.map(p).join('')}</w:tc>`};
+  const top=(lines,span)=>({lines,merge:'restart',span}),cont=span=>({merge:'continue',span});
+  const paragraphs=['PHA9998 - Synthetic Skills Lab','Fall 2026','COURSE COORDINATOR: Ada Faculty, PharmD','Assistant Professor, Dept of Pharmacy Practice','Email: afaculty@university.edu',
+    'COURSE FACULTY:','Ben Mentor, AAS, CPhT','Lab Assistant','Office: Room 101','Email: bmentor@university.edu','Cara Visitor, Pharm.D.','Adjunct, Department of Pharmacy Practice','Email: cvisitor@university.edu',
+    'TIME AND LOCATION: Lecture (101): Mondays (9:00 am -10:00 am)','Lab (201/202): Tuesday or Wednesday (1:30pm - 4:30pm)','QUARTER CREDIT HOURS: 2','Course Schedule'];
+  const rows=[['Week','Date','Topic(s)','Review in Brightspace','Lead'],
+    [top(['Week 1']),{lines:['Pre-Lab','Monday (9/21/26)']},top(['Pre-Lab: Quiz 1 (1 – 10)','Sterile Labels'],2),top(['Faculty'])],
+    [cont(),{lines:['Tuesday (9/22/26) or','Wednesday (9/23/26)']},cont(2),cont()],
+    ['Week 1',{lines:['Friday (9/25/26)','8:00 a – 5:00 p']},{lines:['Immunization Training'],span:2},'Faculty'],
+    [top(['Week 2']),{lines:['Pre-Lab','Monday (9/28/26)']},top(['Emulsions','Wednesday section: class will be held on Friday because of the 9/30/26 holiday'],2),top(['Visitor'])],
+    [cont(),{lines:['Tuesday (9/29/26) or','Friday (10/2/26)']},cont(2),cont()],
+    ['Week 3',{lines:['Tuesday (10/6/26) or','Wednesday (10/7/26)']},{lines:['Final Skills Assessment','Arrive at your assigned time'],span:2},'Faculty']];
+  const xml=`<?xml version="1.0"?><w:document xmlns:w="${NS}"><w:body>${paragraphs.map(p).join('')}<w:tbl>${rows.map(r=>'<w:tr>'+r.map(tc).join('')+'</w:tr>').join('')}</w:tbl></w:body></w:document>`;
+  return xml;
+}
 try {
   for(const format of ['site','standalone']) for(const tool of manifest.tools) {
     const context=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
@@ -179,26 +202,8 @@ try {
         return parsed.events.map(e=>`${e.topic}|${e.type}`);
       });
       assert.deepEqual(topics,['Proteins|lecture','Enzymes|lecture','Review for exam 1 (Quiz 1 due at 8 AM)|activity'],'calendarbridge skips Week heading rows');
-      // Skills-lab layout: a Monday pre-lab lecture plus a "Tuesday or Wednesday" lab section row whose Topic and
-      // Lead boxes are merged down from the Monday row; job titles on their own line under each name; plural
-      // weekday names in the meeting times; a pre-lab quiz inside the Monday lecture; "8:00 a – 5:00 p" times.
-      const lab=await page.evaluate(async()=>{
-        const NS='http://schemas.openxmlformats.org/wordprocessingml/2006/main';
-        const p=t=>`<w:p><w:r><w:t xml:space="preserve">${t}</w:t></w:r></w:p>`;
-        // A cell is a string, or {lines, merge:'restart'|'continue', span}.
-        const tc=c=>{c=typeof c==='string'?{lines:[c]}:c;const pr=(c.span?`<w:gridSpan w:val="${c.span}"/>`:'')+(c.merge==='restart'?'<w:vMerge w:val="restart"/>':c.merge==='continue'?'<w:vMerge/>':'');return `<w:tc>${pr?`<w:tcPr>${pr}</w:tcPr>`:''}${c.merge==='continue'?'<w:p/>':c.lines.map(p).join('')}</w:tc>`};
-        const top=(lines,span)=>({lines,merge:'restart',span}),cont=span=>({merge:'continue',span});
-        const paragraphs=['PHA9998 - Synthetic Skills Lab','Fall 2026','COURSE COORDINATOR: Ada Faculty, PharmD','Assistant Professor, Dept of Pharmacy Practice','Email: afaculty@university.edu',
-          'COURSE FACULTY:','Ben Mentor, AAS, CPhT','Lab Assistant','Office: Room 101','Email: bmentor@university.edu','Cara Visitor, Pharm.D.','Adjunct, Department of Pharmacy Practice','Email: cvisitor@university.edu',
-          'TIME AND LOCATION: Lecture (101): Mondays (9:00 am -10:00 am)','Lab (201/202): Tuesday or Wednesday (1:30pm - 4:30pm)','QUARTER CREDIT HOURS: 2','Course Schedule'];
-        const rows=[['Week','Date','Topic(s)','Review in Brightspace','Lead'],
-          [top(['Week 1']),{lines:['Pre-Lab','Monday (9/21/26)']},top(['Pre-Lab: Quiz 1 (1 – 10)','Sterile Labels'],2),top(['Faculty'])],
-          [cont(),{lines:['Tuesday (9/22/26) or','Wednesday (9/23/26)']},cont(2),cont()],
-          ['Week 1',{lines:['Friday (9/25/26)','8:00 a – 5:00 p']},{lines:['Immunization Training'],span:2},'Faculty'],
-          [top(['Week 2']),{lines:['Pre-Lab','Monday (9/28/26)']},top(['Emulsions','Wednesday section: class will be held on Friday because of the 9/30/26 holiday'],2),top(['Visitor'])],
-          [cont(),{lines:['Tuesday (9/29/26) or','Friday (10/2/26)']},cont(2),cont()],
-          ['Week 3',{lines:['Tuesday (10/6/26) or','Wednesday (10/7/26)']},{lines:['Final Skills Assessment','Arrive at your assigned time'],span:2},'Faculty']];
-        const xml=`<?xml version="1.0"?><w:document xmlns:w="${NS}"><w:body>${paragraphs.map(p).join('')}<w:tbl>${rows.map(r=>'<w:tr>'+r.map(tc).join('')+'</w:tr>').join('')}</w:tbl></w:body></w:document>`;
+      // Skills-lab layout (see skillsLabXml).
+      const lab=await page.evaluate(async xml=>{
         const z=new JSZip();z.file('word/document.xml',xml);
         // Same steps parseFile runs after reading the Word file.
         state=await parseDocx(new File([await z.generateAsync({type:'uint8array'})],'synthetic-skills-lab.docx'));
@@ -208,7 +213,7 @@ try {
           events:state.events.map(e=>`${e.date}|${e.day}|${e.time}|${e.topic}|${e.type}|${e.include}|${short(e.facultyIds)}`),
           // A full-day training (8 AM to 5 PM) is a usable time, not a time problem.
           fullDayIssues:eventIssues(state.events.find(e=>e.date==='9/25/2026'))};
-      });
+      },skillsLabXml());
       assert.deepEqual(lab.faculty,['Ada Faculty, PharmD|afaculty@university.edu','Ben Mentor, AAS, CPhT|bmentor@university.edu','Cara Visitor, Pharm.D.|cvisitor@university.edu'],'calendarbridge skips job-title lines when naming faculty');
       assert.deepEqual(lab.patterns,{Monday:['9:00 am – 10:00 am'],Tuesday:['1:30pm – 4:30pm'],Wednesday:['1:30pm – 4:30pm']},'calendarbridge reads plural weekday meeting times');
       assert.deepEqual(lab.events,[
@@ -239,6 +244,32 @@ try {
         await page.screenshot({path:path.join(output,`syllabusbridge-${format}-report-${mode}.png`),fullPage:true,animations:'disabled'});
       }
       await page.evaluate(()=>document.documentElement.setAttribute('data-ft-theme','light'));
+      // The same skills-lab syllabus CalendarBridge reads above: SyllabusBridge uses the shared schedule reader,
+      // so the "Tuesday or Wednesday" lab rows get the merged-down topic and lead, and Monday pre-lab rows keep theirs.
+      const lab=await page.evaluate(async xml=>{
+        const z=new JSZip();z.file('word/document.xml',xml);
+        await parseDocx(new File([await z.generateAsync({type:'uint8array'})],'synthetic-skills-lab.docx'));
+        const at=d=>state.schedule.find(e=>e.date===d)?.source;
+        return {patterns:Object.fromEntries(state.meetingPatterns.map(m=>[m.day,m.time])),
+          rows:state.schedule.map(e=>`${e.date}|${e.day}|${e.time}|${e.topic}|${e.faculty}`),
+          monday:at('9/21/26'),tuesday:at('9/22/26'),preLabType:classifySharedEvent(state.schedule[0]?.topic||'')};
+      },skillsLabXml());
+      assert.deepEqual(lab.patterns,{Monday:'9:00 am – 10:00 am',Tuesday:'1:30pm – 4:30pm',Wednesday:'1:30pm – 4:30pm'},'syllabusbridge reads plural weekday meeting times');
+      assert.deepEqual(lab.rows,[
+        '9/21/26|Monday|9:00 am – 10:00 am|Pre-Lab: Quiz 1 (1 – 10) Sterile Labels|Faculty',
+        '9/22/26|Tuesday|1:30pm – 4:30pm|Pre-Lab: Quiz 1 (1 – 10) Sterile Labels|Faculty',
+        '9/23/26|Wednesday|1:30pm – 4:30pm|Pre-Lab: Quiz 1 (1 – 10) Sterile Labels|Faculty',
+        '9/25/26|Friday|8:00 AM – 5:00 PM|Immunization Training|Faculty',
+        '9/28/26|Monday|9:00 am – 10:00 am|Emulsions Wednesday section: class will be held on Friday because of the 9/30/26 holiday|Visitor',
+        '9/29/26|Tuesday|1:30pm – 4:30pm|Emulsions Wednesday section: class will be held on Friday because of the 9/30/26 holiday|Visitor',
+        '10/2/26|Friday||Emulsions Wednesday section: class will be held on Friday because of the 9/30/26 holiday|Visitor',
+        '10/6/26|Tuesday|1:30pm – 4:30pm|Final Skills Assessment Arrive at your assigned time|Faculty',
+        '10/7/26|Wednesday|1:30pm – 4:30pm|Final Skills Assessment Arrive at your assigned time|Faculty'],'syllabusbridge skills-lab schedule rows');
+      assert.equal(lab.preLabType,'class','syllabusbridge: a pre-lab quiz inside a lecture topic is still a class meeting');
+      // Word export links: the Monday row's own boxes; the lab row's Topic and Lead boxes belong to the Monday row
+      // in Word, so they are not linked to the lab row (an edit there is listed for Word by hand, never misplaced).
+      assert.deepEqual([lab.monday?.rowIndex,lab.monday?.columnMap?.date,lab.monday?.columnMap?.topic,lab.monday?.columnMap?.faculty],[1,1,2,3],'syllabusbridge Monday row Word links');
+      assert.deepEqual([lab.tuesday?.rowIndex,lab.tuesday?.columnMap?.date,lab.tuesday?.columnMap?.topic,lab.tuesday?.columnMap?.faculty],[2,1,null,null],'syllabusbridge merged lab row Word links');
     }
     if(tool.id==='questionbridge') {
       for (const step of ['review','validate','export']) {
