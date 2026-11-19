@@ -189,7 +189,7 @@
       const f = (faculty || []).find(x => x.id === id);
       if (!f) continue;
       for (const a of facultyAliases(f).sort((a, b) => b.length - a.length)) {
-        const token = new RegExp(`\b${escapeRe(a)}\b`, 'ig');
+        const token = new RegExp(`\\b${escapeRe(a)}\\b`, 'ig');
         cleaned = cleaned.replace(token, ' ');
       }
     }
