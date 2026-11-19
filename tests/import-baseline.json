@@ -5,6 +5,6 @@
   "groupbridge": "d723a46d563243d71edd3497eda3328b73c1689b99346e18eadcc9b2622c5fb8",
   "itembridge": "056123e76aaeddacc4d05205d200daf481ce543abd1079b8ac838240f18f900d",
   "questionbridge": "b3a06eb0e02ed001165305ae7366f6deb294eec44d7cf0e692a94d4fa8fd5a0a",
-  "syllabusbridge": "1163df47d66919e0f4bbbdfbce154a549e607af68b08fd4eac4ae5e70a1ae3a3",
-  "packages/schedule-reader/schedule-reader.js": "ab31531e29b2fae0d9da5cc2830bc36518bf7e4de65bd498cb74749f2306c6f9"
+  "syllabusbridge": "e34c0ffa1f35d4469f7bd955c95bcc9890d94e5ed8aa8feca8dc7b05082b5dc1",
+  "packages/schedule-reader/schedule-reader.js": "90b3e86c3c7762d67be4c081d3e6ce3d88f7d31182e61bc33e4acced2d7ad5a7"
 }

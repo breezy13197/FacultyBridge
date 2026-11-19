@@ -212,16 +212,24 @@ function readSchedule(doc,tables,tableEls){
  let candidates=0;const failures=[],schedule=[];
  for(const [i,{headers}] of [...found].sort((a,b)=>a[0]-b[0])){
   const rows=shared[i].rows,ti=sbIndex.get(shared[i].element)??null;
-  if(ti!=null){const profile=scheduleTableProfile(tables[ti],ti,continued.has(i));candidates+=profile.count;failures.push(...profile.failures)}
-  for(const e of ScheduleReader.readScheduleRows(rows,headers,{faculty,year:state.course.year,placeholderDates:true})){
+  // Source rows counted in the Word table: one per dated line. A line holding two dates ("11/21/26 to 11/29/26") or
+  // a date the count does not recognize ("December 9th") is still read, so a table counts at least what was read
+  // from it; unreadable dates stay listed in the extraction failures.
+  let tableCount=0;const before=schedule.length;
+  if(ti!=null){const profile=scheduleTableProfile(tables[ti],ti,continued.has(i));tableCount=profile.count;failures.push(...profile.failures)}
+  // A faculty name carries down to later meetings with no faculty of their own, until another name appears.
+  let carryFaculty='';
+  for(const e of ScheduleReader.readScheduleRows(rows,headers,{faculty,year:state.course.year,placeholderDates:true,repeatTopics:true})){
    // A row with no date of its own (it continues the date above) is a source schedule row too.
-   if(e.continuationRow)candidates++;
+   if(e.continuationRow)tableCount++;
+   if(clean(e.instructor))carryFaculty=clean(e.instructor);
    const type=classifySharedEvent(e.topic),nonTeaching=type==='assessment'||type==='no-class'||/\b(?:reinforcement|in[- ]class activit)/i.test(e.topic);
    // A date SyllabusBridge's date checks cannot read as written ("December 9th, 2026") is kept as 12/9/2026.
    const date=e.placeholderDate||parseLooseDate(e.date)?e.date:ScheduleReader.normalizeDate(e.date,state.course.year),day=e.placeholderDate?'':e.day||dayFromDate(date);
-   schedule.push({date,day,time:e.time||e.timeLine||meetingTimeForDay(day),topic:e.topic,faculty:nonTeaching?'':clean(e.instructor),raw:rows[e.source.rowIndex].map(c=>c.text).join(' | '),
+   schedule.push({date,day,time:e.time||e.timeLine||meetingTimeForDay(day),topic:e.topic,faculty:nonTeaching?'':clean(e.instructor)||carryFaculty,raw:rows[e.source.rowIndex].map(c=>c.text).join(' | '),
     source:{tableIndex:ti,rowIndex:e.source.rowIndex,lineIndex:e.source.lineIndex,columnMap:{...e.source.columnMap}}});
   }
+  candidates+=Math.max(tableCount,schedule.length-before);
  }
  state.schedule=schedule;state.extraction.scheduleCandidates=candidates;state.extraction.scheduleFailures=failures;
 }

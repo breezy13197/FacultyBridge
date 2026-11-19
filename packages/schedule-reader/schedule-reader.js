@@ -326,6 +326,8 @@
   // ---- Reading one schedule table ----
   function splitLikelyTopics(s) { s = clean(s); if (!s) return []; s = s.replace(/([a-z)])([A-Z]{2,}\b)/g, '$1|$2').replace(/(Overview)(ANS\b)/g, '$1|$2'); return s.split('|').map(clean).filter(Boolean); }
   function expandTopics(arr, n) { if (arr.length === n) return arr; if (arr.length > n) return arr.slice(0, n); return [...arr, ...Array(n - arr.length).fill('')]; }
+  // More dates than topics: the remaining dates repeat the last topic (one topic shared by several meetings).
+  function repeatLast(arr, n) { return arr.length >= n ? arr.slice(0, n) : [...arr, ...Array(n - arr.length).fill(arr.at(-1) || '')]; }
   function expandToN(a, n) { if (a.length >= n) return a.slice(0, n); return [...a, ...Array(n - a.length).fill('')]; }
   // Spreads a column's lines over the dates of a row; a reading or lecture number belongs only to the kind of
   // period that has one.
@@ -435,7 +437,8 @@
   //  confidence, lectureSource, source:{rowIndex, lineIndex, columnMap:{date, day, time, topic, faculty}}}.
   // A row with several dates gives one entry per date. A row with no date continues the date above it
   // (continuationRow). Options: faculty [{id, name, short}] (to recognize names), year (for undated years),
-  // placeholderDates (keep "TBD" date rows).
+  // placeholderDates (keep "TBD" date rows), repeatTopics (a row with more dates than topics gives
+  // every date the last topic, instead of dropping the extra dates).
   function readScheduleRows(rows, headers = null, options = {}) {
     const faculty = options.faculty || [], year = options.year || '';
     const entries = [];
@@ -484,7 +487,7 @@
       }
       const n = dates.length, dateCellLines = (cells[dateCellIndex]?.lines || []).filter(x => extractDates(x).length);
       const days = dayLines.length ? expandToN(dayLines, n) : dateCellLines.length === n ? dateCellLines.map(namedDay) : [];
-      const topicArr = expandTopics(topics, n), lectureArr = alignOptional(findLectureLines(cells, dateCellIndex, n), topicArr, n, 'lecture');
+      const topicArr = options.repeatTopics ? repeatLast(topics, n) : expandTopics(topics, n), lectureArr = alignOptional(findLectureLines(cells, dateCellIndex, n), topicArr, n, 'lecture');
       const facultyFound = findInstructorCellLines(cells, topicCell, headers, faculty), facultySource = facultyFound.lines, readingSource = findReadingLines(cells, topicCell);
       const facultyArr = alignOptional(facultySource, topicArr, n, 'faculty'), readingArr = alignOptional(readingSource, topicArr, n, 'reading');
       if (isAlternateSectionDates(cells[dateCellIndex]?.text || '', dates)) {

@@ -270,6 +270,17 @@ try {
       // in Word, so they are not linked to the lab row (an edit there is listed for Word by hand, never misplaced).
       assert.deepEqual([lab.monday?.rowIndex,lab.monday?.columnMap?.date,lab.monday?.columnMap?.topic,lab.monday?.columnMap?.faculty],[1,1,2,3],'syllabusbridge Monday row Word links');
       assert.deepEqual([lab.tuesday?.rowIndex,lab.tuesday?.columnMap?.date,lab.tuesday?.columnMap?.topic,lab.tuesday?.columnMap?.faculty],[2,1,null,null],'syllabusbridge merged lab row Word links');
+      // Several dates in one box: two dates with one topic are two meetings of that topic, and a faculty name
+      // carries down to later meetings with no faculty of their own (as SyllabusBridge always did).
+      const shared=await page.evaluate(async()=>{
+        const p=t=>`<w:p><w:r><w:t>${t}</w:t></w:r></w:p>`,tc=c=>'<w:tc>'+[].concat(c).map(p).join('')+'</w:tc>';
+        const rows=[['Date','Topic','Faculty'],[['9/21/26','9/22/26'],['Introduction','Practice'],'Mentor'],['9/23/26','Discussion',''],[['9/28/26','9/29/26'],'Shared topic','Faculty'],['9/30/26','Wrap up','']];
+        const xml=`<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${p('PHA9999 - Synthetic Course')}${p('Fall 2026')}${p('COURSE COORDINATOR: Ada Faculty, PharmD')}${p('Email: afaculty@university.edu')}${p('COURSE FACULTY:')}${p('Ben Mentor, Ph.D.')}${p('Email: bmentor@university.edu')}${p('Course Schedule')}<w:tbl>${rows.map(r=>'<w:tr>'+r.map(tc).join('')+'</w:tr>').join('')}</w:tbl></w:body></w:document>`;
+        const z=new JSZip();z.file('word/document.xml',xml);
+        await parseDocx(new File([await z.generateAsync({type:'uint8array'})],'synthetic-shared-topic.docx'));
+        return state.schedule.map(e=>`${e.date}|${e.topic}|${e.faculty}`);
+      });
+      assert.deepEqual(shared,['9/21/26|Introduction|Mentor','9/22/26|Practice|Mentor','9/23/26|Discussion|Mentor','9/28/26|Shared topic|Faculty','9/29/26|Shared topic|Faculty','9/30/26|Wrap up|Faculty'],'syllabusbridge keeps every date of a shared-topic row and carries faculty down');
     }
     if(tool.id==='questionbridge') {
       for (const step of ['review','validate','export']) {
