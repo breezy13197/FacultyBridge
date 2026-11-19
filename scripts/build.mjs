@@ -14,7 +14,8 @@ export const blocks = /<(?<tag>style|script)\b(?<attrs>[^>]*)>(?<data>[\s\S]*?)<
 function safeScript(js) { return js.replace(/<\/script/gi, '<\\/script'); }
 function target(source) {
   const rel = path.relative(root, source).replaceAll(path.sep, '/');
-  if (rel.startsWith('packages/ui/')) return path.join(site, 'assets/ui', rel.slice('packages/ui/'.length));
+  // Shared packages (packages/ui, packages/schedule-reader) are published under assets/<package>/.
+  if (rel.startsWith('packages/')) return path.join(site, 'assets', rel.slice('packages/'.length));
   if (rel.startsWith('vendor/')) return path.join(site, rel);
   const [, id, ...rest] = rel.split('/');
   const tool = manifest.tools.find(t => t.id === id);
