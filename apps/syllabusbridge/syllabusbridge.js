@@ -1062,7 +1062,7 @@ function showFixOutcome(){
  const f=state.activeFix;if(!f)return;const r=(state.results||[]).find(x=>x.id===f.id);if(!r)return;
  showFixContext(r.status==='passed'?(linkedChanges(f.id)?'<span aria-hidden="true">✓</span> This finding now passes. Resolved by your edit.':'<span aria-hidden="true">✓</span> This finding now passes.'):`Still needs attention: ${esc(r.summary)}`)
 }
-function go(step){if(step!=='review')endFix();['upload','review','report'].forEach(s=>$('screen-'+s).classList.toggle('active',s===step));document.querySelectorAll('.sb-step').forEach(b=>{const target=b.dataset.step,available=target==='upload'||state.lines.length>0;b.classList.toggle('active',target===step);b.classList.toggle('done',(target==='upload'&&state.lines.length>0)||(target==='review'&&state.reviewComplete));b.setAttribute('aria-disabled',available?'false':'true');if(target===step)b.setAttribute('aria-current','step');else b.removeAttribute('aria-current')});if(step==='review')requestAnimationFrame(()=>document.querySelectorAll('#editors textarea').forEach(autoGrow));const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;window.scrollTo({top:0,behavior:reduce?'auto':'smooth'})}
+function go(step){if(step!=='review')endFix();['upload','review','report'].forEach(s=>$('screen-'+s).classList.toggle('active',s===step));document.querySelectorAll('.sb-step').forEach(b=>{const target=b.dataset.step,available=target==='upload'||syllabusOpen();b.classList.toggle('active',target===step);b.classList.toggle('done',(target==='upload'&&syllabusOpen())||(target==='review'&&state.reviewComplete));b.setAttribute('aria-disabled',available?'false':'true');if(target===step)b.setAttribute('aria-current','step');else b.removeAttribute('aria-current')});if(step==='review')requestAnimationFrame(()=>document.querySelectorAll('#editors textarea').forEach(autoGrow));const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;window.scrollTo({top:0,behavior:reduce?'auto':'smooth'})}
 function resetState(){state={sourceName:'',lines:[],sections:[],course:{code:'',title:'',year:'',location:''},faculty:[],coordinator:null,clos:[],plos:[],cloMappings:[],meetingPatterns:[],assessments:[],policies:{},schedule:[],grading:[],rawTables:[],structuredTables:[],assignmentTables:[],supplementalTables:[],redText:[],results:[],extraction:{scheduleFailures:[],scheduleCandidates:0,cloCandidates:0},dirty:false,reviewComplete:false,editorBaseline:null,tableMutations:[],editMutations:[],cloEditorIds:[]};}
 
 function showLoading(on,text,pct){$('loading').classList.toggle('show',on);if(text)$('loadingText').textContent=text;$('bar').style.width=(pct||0)+'%'}function showError(msg,title='Word syllabus required'){$('uploadError').classList.add('show');$('uploadError').innerHTML=`<strong>${esc(title)}</strong><br>${esc(msg).replace(/\n/g,'<br>')}`}function clearError(){$('uploadError').classList.remove('show');$('uploadError').innerHTML=''}
@@ -1323,7 +1323,7 @@ function buildProject(){
   editor:historySnapshot().editor,tableMutations:structuredClone(state.tableMutations||[]),changeKinds:(pruneChangeKinds(),structuredClone(state.changeKinds||{})),changeFindings:structuredClone(state.changeFindings||{}),baseline:structuredClone(state.editorBaseline)}
 }
 function saveProject(){
- if(!state.lines.length)return;
+ if(!syllabusOpen())return;
  const project=buildProject(),base=(state.course.code||state.sourceName.replace(/\.docx$/i,'')||'Syllabus').replace(/[^\w.-]+/g,'_'),name=`${base}-SyllabusBridge-project.json`;
  downloadText(JSON.stringify(project,null,2),name);projectWork.markSaved();
  const st=$('historyStatus');if(st)st.textContent=`Project saved as ${name}. Keep it with the Word syllabus; reopening needs both.`
@@ -1446,7 +1446,62 @@ async function applyPendingProject(){
  state.projectNote=notes.join(' ');
  return true
 }
-async function handleFile(file){clearError();resetState();go('upload');if(!file?.name?.toLowerCase().endsWith('.docx')){showError('SyllabusBridge accepts .docx Word syllabi only.');return}showLoading(true,'Reading Word syllabus…',15);try{const fingerprint=await fileFingerprint(file),tracked=await trackedChangesIn(file);await parseDocx(file);promoteGradingScaleTables();state.sourceFingerprint=fingerprint;state.sourceBytes=await file.arrayBuffer();state.trackedChanges=tracked;showLoading(true,'Extracting syllabus structure…',72);captureEditorBaseline();if(pendingProject&&!await applyPendingProject()){showLoading(false);resetState();go('upload');return}renderReview();showTrackedChanges();if(state.openedProject){const st=$('historyStatus');if(st)st.textContent=state.projectNote||''}showLoading(true,'Extraction complete',100);setTimeout(()=>{showLoading(false);go('review')},180)}catch(e){console.error(e);showLoading(false);if(e instanceof SyllabusFileError)showError(e.message,'Word syllabus could not be read');else showError(`Something went wrong while reading this syllabus. SyllabusBridge v${toolVersion()}.\n\nTechnical detail: ${e?.message||'Unknown error'}\n\nPlease send a screenshot of this message and the syllabus filename to the FacultyBridge project owner.`,'SyllabusBridge encountered an internal error')}}
+// Opening a Word syllabus, including one chosen while another is already open.
+// The new file is read into a fresh copy of SyllabusBridge's state. The syllabus
+// already open is set aside untouched and comes back exactly as it was (edits,
+// undo history, edit count) if the new file can't be read, or if it has edits not
+// saved in a project file and faculty choose not to replace it. Reading changes
+// shared state, so one file is read at a time; if another file is chosen in the
+// meantime, the earlier read is abandoned and only the last file chosen opens.
+// A syllabus is open once SyllabusBridge has read it into the editor, even a blank
+// Word file with no text. While a replacement is being read or confirmed, the draft
+// set aside is not what projectWork sees, so it keeps its own leave-page warning.
+function syllabusOpen(){return !!state.editorBaseline}
+let uploadAttempt=0,uploadInProgress=null,setAsideDraft=null;
+FTUnsavedWork.watch(()=>!!setAsideDraft);
+async function handleFile(file){
+ const attempt=++uploadAttempt;
+ while(uploadInProgress)await uploadInProgress;
+ if(attempt!==uploadAttempt)return;
+ let finished;uploadInProgress=new Promise(r=>finished=r);
+ try{await readSyllabusFile(file,attempt)}finally{setAsideDraft=null;uploadInProgress=null;finished()}
+}
+async function readSyllabusFile(file,attempt){
+ clearError();go('upload');
+ const previous=syllabusOpen()?state:null,unsaved=!!previous&&projectWork.isDirty(),changes=previous?editorDiffCount():0,
+  openName=previous?.sourceName?`“${previous.sourceName}”`:'The syllabus you were working on';
+ let editorsRedrawn=false;
+ const stillOpen=previous?`\n\n${openName} is still open${changes?' with your edits':''}. To keep working on it, choose Review extraction (step 2) at the top of the page.`:'';
+ // Put the open syllabus back (or start empty if none was open).
+ const keepPrevious=(screen='upload')=>{setAsideDraft=null;showLoading(false);if(!previous){resetState();return}state=previous;if(editorsRedrawn)renderReview();updateEditorStatus();updateHistoryControls('');go(screen)};
+ const stale=()=>attempt!==uploadAttempt;
+ if(!file?.name?.toLowerCase().endsWith('.docx')){showLoading(false);showError(`“${file?.name||'This file'}” is not a Word (.docx) file. SyllabusBridge accepts .docx Word syllabi only: choose a .docx syllabus, or open this file in Word and save it as .docx first.`+stillOpen);return}
+ if(unsaved)setAsideDraft=previous;
+ resetState();showLoading(true,'Reading Word syllabus…',15);
+ try{
+  const fingerprint=await fileFingerprint(file),tracked=await trackedChangesIn(file);
+  if(stale())return keepPrevious();
+  await parseDocx(file);promoteGradingScaleTables();state.sourceFingerprint=fingerprint;state.sourceBytes=await file.arrayBuffer();state.trackedChanges=tracked;
+  if(stale())return keepPrevious();
+  showLoading(true,'Extracting syllabus structure…',72);
+  if(unsaved){
+   showLoading(false);
+   const replace=await FTDialog.confirm(`${openName} has edits that aren’t saved in a SyllabusBridge project file (${changes} net change${changes===1?'':'s'} in all). If you open “${file.name}”, they will be lost.\n\nTo keep them, choose Cancel, then Save SyllabusBridge project.`,{title:'Replace the syllabus you’re editing?',confirmLabel:'Replace syllabus',danger:true});
+   if(!replace||stale())return keepPrevious(replace?'upload':'review');
+   showLoading(true,'Extracting syllabus structure…',72);
+  }
+  // From here the new file replaces the old one, unless a project being reopened is
+  // canceled. Nothing is saved for the new file yet; a reopened project marks its own
+  // saved state once it is applied, and a canceled one leaves the old saved state alone.
+  setAsideDraft=null;captureEditorBaseline();if(!pendingProject)projectWork.markSaved();
+  if(pendingProject){editorsRedrawn=true;if(!await applyPendingProject()){showLoading(false);return keepPrevious()}}
+  renderReview();showTrackedChanges();if(state.openedProject){const st=$('historyStatus');if(st)st.textContent=state.projectNote||''}showLoading(true,'Extraction complete',100);await new Promise(r=>setTimeout(r,180));showLoading(false);if(!stale())go('review')
+ }catch(e){
+  console.error(e);showLoading(false);keepPrevious();
+  if(e instanceof SyllabusFileError)showError(e.message+stillOpen,'Word syllabus could not be read');
+  else showError(`Something went wrong while reading this syllabus. SyllabusBridge v${toolVersion()}.\n\nTechnical detail: ${e?.message||'Unknown error'}\n\nPlease send a screenshot of this message and the syllabus filename to the FacultyBridge project owner.${stillOpen}`,'SyllabusBridge encountered an internal error')
+ }
+}
 $('exportCourseJson').onclick=exportCourseJson;if($('exportCourseJsonReport'))$('exportCourseJsonReport').onclick=exportCourseJson;$('choose').onclick=()=>$('file').click();$('openProject').onclick=()=>$('projectFile').click();$('projectFile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)openProjectFile(f)};$('saveProject').onclick=saveProject;$('saveProjectReport').onclick=saveProject;$('file').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)handleFile(f)};['dragenter','dragover'].forEach(ev=>$('drop').addEventListener(ev,e=>{e.preventDefault();$('drop').classList.add('drag')}));['dragleave','drop'].forEach(ev=>$('drop').addEventListener(ev,e=>{e.preventDefault();$('drop').classList.remove('drag')}));$('drop').addEventListener('drop',e=>e.dataTransfer.files[0]&&handleFile(e.dataTransfer.files[0]));$('runValidation').onclick=()=>{state.reviewComplete=true;syncCourseFields();renderReport();updateEditorStatus();go('report')};document.querySelectorAll('.sb-step').forEach(b=>b.onclick=()=>{if(b.getAttribute('aria-disabled')==='true')return;if(b.dataset.step==='report'){renderReport()}go(b.dataset.step)});const root=document.documentElement;const savedTheme=localStorage.getItem('ft-theme')||'light';root.dataset.theme=savedTheme;root.dataset.ftTheme=savedTheme;$('theme').onclick=()=>{const dark=root.dataset.theme==='dark',next=dark?'light':'dark';root.dataset.theme=next;root.dataset.ftTheme=next;localStorage.setItem('ft-theme',next)};
 // Undo/redo buttons and keyboard shortcuts. Inside a text box, Ctrl+Z / Cmd+Z
 // keeps doing the browser's own typing undo.

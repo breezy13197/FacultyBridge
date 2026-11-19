@@ -17,7 +17,12 @@ const body = [
   'Course Schedule', schedule,
 ];
 const syllabus = async () => ({ name: 'syllabus.docx', mimeType: DOCX_MIME, buffer: await syntheticDocxBody(body) });
-async function upload(page, file) { await page.locator('#file').setInputFiles(file); await expect(page.locator('#screen-review')).toBeVisible(); }
+// Uploading over unsaved edits asks first; `replace` answers "Replace syllabus".
+async function upload(page, file, { replace = false } = {}) {
+  await page.locator('#file').setInputFiles(file);
+  if (replace) await page.getByRole('dialog', { name: 'Replace the syllabus you’re editing?' }).getByRole('button', { name: 'Replace syllabus' }).click();
+  await expect(page.locator('#screen-review')).toBeVisible();
+}
 async function setField(locator, value) { await locator.fill(value); await locator.press('Tab'); }
 const exportDialog = page => page.getByRole('dialog', { name: 'Export edited Word syllabus' });
 const scaleTable = page => page.locator('.sb-structured-editor').filter({ hasText: 'Grading scale' });
@@ -115,7 +120,8 @@ test('syllabus edits are written as tracked changes in a new copy; reading corre
   // (A removed row still waiting in Word as a tracked change is read as an empty
   // row until it is accepted, so empty rows are left out here.)
   for (const file of [{ name: 'tracked.docx', mimeType: DOCX_MIME, buffer: out.bytes }, await accepted(out.bytes)]) {
-    await upload(page, file);
+    // Only the first upload replaces unsaved edits; the second replaces an unedited copy.
+    await upload(page, file, { replace: file.name === 'tracked.docx' });
     const read = await page.evaluate(() => ({
       title: state.course.title, description: state.policies.description,
       scale: state.structuredTables.find(t => t.type === 'gradingScale').rows.map(r => r.cells.map(c => c.text)).filter(r => r.some(Boolean)),
@@ -140,7 +146,7 @@ test('after accepting the exported changes in Word, the finding a fix was made f
   await expect(card).toContainText('Resolved by your edit');
 
   const out = await exportWord(page, '#exportWordReport');
-  await upload(page, await accepted(out.bytes));
+  await upload(page, await accepted(out.bytes), { replace: true });
   await page.locator('#runValidation').click();
   await expect(card.locator('.pill')).toHaveText('Passed');
   expect(await page.evaluate(() => editorDiffCount())).toBe(0);
@@ -180,6 +186,7 @@ test('a reopened project exports against the Word file chosen when reopening', a
   await page.locator('#file').setInputFiles(file);
   await expect(page.locator('#screen-review')).toBeVisible();
   const out = await exportWord(page);
+  // The reopened project matches its saved copy, so nothing unsaved is replaced and no question is asked.
   await upload(page, await accepted(out.bytes));
   expect(await page.evaluate(() => state.schedule.map(e => e.topic))).toEqual(['Protein structure', 'Enzymes', 'Hemoglobin']);
 });
@@ -219,7 +226,7 @@ test('a new schedule entry with a time and faculty the table has no columns for 
   const out = await exportWord(page);
   expect(out.xml).toContain('Case discussion');
   for (const text of ['Review session', 'Grace Teacher', '9:00 AM']) expect(out.xml).not.toContain(text);
-  await upload(page, await accepted(out.bytes));
+  await upload(page, await accepted(out.bytes), { replace: true });
   expect(await page.evaluate(() => state.schedule.map(e => `${e.date} ${e.topic}`))).toEqual(['9/21/2026 Proteins', '9/23/2026 Enzymes', '9/28/2026 Hemoglobin', '10/5/2026 Case discussion']);
 });
 
@@ -233,7 +240,7 @@ test('a new schedule entry is written in full when the table has a column for ea
   await exportDialog(page).getByRole('button', { name: 'Close', exact: true }).click();
 
   const out = await exportWord(page);
-  await upload(page, await accepted(out.bytes));
+  await upload(page, await accepted(out.bytes), { replace: true });
   const added = await page.evaluate(() => state.schedule.find(e => e.topic === 'Review session'));
   expect([added.date, added.time, added.faculty]).toEqual(['10/1/2026', '1:00 PM – 2:00 PM', 'Dr. Grace Teacher']);
 });
@@ -261,7 +268,7 @@ test('a required section written in the editor counts as found, and export adds 
   await expect(card).toContainText('Choose “Export edited Word syllabus” to add it to the Word file.');
 
   const out = await exportWord(page, '#exportWordReport');
-  await upload(page, await accepted(out.bytes));
+  await upload(page, await accepted(out.bytes), { replace: true });
   const read = await page.evaluate(() => ({ lines: state.lines, incomplete: state.policies.incomplete }));
   const at = read.lines.indexOf('INCOMPLETE POLICY:');
   expect(at).toBeGreaterThan(read.lines.indexOf('Students who miss an exam must notify the coordinator before the exam begins.'));
@@ -301,7 +308,7 @@ test('changing a date in a "Friday 2/13/26" cell also changes the day word', asy
   await expect(exportDialog(page).locator('.sb-export-unplaced')).toHaveCount(0);
   await exportDialog(page).getByRole('button', { name: 'Close', exact: true }).click();
   const out = await exportWord(page);
-  await upload(page, await accepted(out.bytes));
+  await upload(page, await accepted(out.bytes), { replace: true });
   expect(await page.evaluate(() => state.rawTables.at(-1).slice(2).map(r => r[1].text))).toEqual(['Monday 1/4/27', 'Thu 1/7/27', 'Friday 2/12/27']);
 });
 
@@ -326,7 +333,7 @@ test('a date change updates the weekday in the Date cell and the Day column; an 
   await expect(listed).toContainText('could not tell which day to change');
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   const out = await exportWord(page);
-  await upload(page, await accepted(out.bytes));
+  await upload(page, await accepted(out.bytes), { replace: true });
   expect(await page.evaluate(() => state.rawTables.at(-1).slice(1).map(r => `${r[1].text} | ${r[2].text}`)))
     .toEqual(['Monday 1/4/27 | Mon', 'Thursday 2/11/27 | Thu', 'Friday 2/20/27 (Friday lab) | Fri']);
 });
@@ -341,7 +348,7 @@ test('two missing sections added together are written in template order', async 
   await setField(page.locator('#review-accessibility textarea'), 'Synthetic accessibility wording for testing only.');
   await setField(page.locator('#review-hardware textarea'), 'Synthetic hardware wording for testing only.');
   const out = await exportWord(page);
-  await upload(page, await accepted(out.bytes));
+  await upload(page, await accepted(out.bytes), { replace: true });
   const lines = await page.evaluate(() => state.lines);
   const at = t => lines.indexOf(t);
   expect(at('REQUIRED HARDWARE AND SOFTWARE:')).toBeGreaterThan(at('A synthetic textbook, 1st edition.'));

@@ -96,7 +96,9 @@ test('a different Word file is warned about before any saved edit is applied', a
   await expect(warning).toContainText('rubric.docx');
   await warning.getByRole('button', { name: 'Cancel' }).click();
   await expect(page.locator('#screen-upload')).toBeVisible();
-  expect(await page.evaluate(() => state.lines.length)).toBe(0);
+  // Canceling keeps the syllabus that was already open.
+  expect(await page.evaluate(() => state.sourceName)).toBe('rubric.docx');
+  await expect(page.locator('#courseTitle')).toHaveValue('Revised Synthetic Course');
   await expect(page.locator('#projectPending')).toBeVisible();
 
   await page.locator('#file').setInputFiles(other);
@@ -159,7 +161,9 @@ test('without file fingerprints, reopening always asks before applying edits', a
   const notVerified = page.getByRole('dialog', { name: 'Word file not verified' });
   await expect(notVerified).toContainText('could not confirm');
   await notVerified.getByRole('button', { name: 'Cancel' }).click();
-  expect(await page.evaluate(() => state.lines.length)).toBe(0);
+  // Canceling keeps the syllabus that was already open, not the unverified one.
+  await expect(page.locator('#screen-upload')).toBeVisible();
+  expect(await page.evaluate(() => state.course.title)).toBe('Revised Synthetic Course');
 
   // Even the identical file cannot be proven identical without fingerprints.
   await page.locator('#file').setInputFiles(original);
