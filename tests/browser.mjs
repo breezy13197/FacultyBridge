@@ -201,7 +201,7 @@ try {
     }
     if(['calendarbridge','syllabusbridge'].includes(tool.id)) {
       // A faculty name inside a topic ("Antibiotics (Mentor)"): CalendarBridge names the event "Antibiotics" and lists
-      // Mentor as its faculty. SyllabusBridge keeps the topic as written in Word.
+      // Mentor as its faculty. SyllabusBridge keeps the topic as written in Word and lists Mentor for that row only.
       const rows=await page.evaluate(async({id,xml})=>{
         const z=new JSZip();z.file('word/document.xml',xml);
         const parsed=await parseDocx(new File([await z.generateAsync({type:'uint8array'})],'synthetic-faculty-in-topic.docx'));
@@ -209,7 +209,7 @@ try {
         return parsed.events.map(e=>`${e.date}|${e.topic}|${e.facultyIds.map(f=>parsed.faculty.find(x=>x.id===f)?.short||f).join('+')}`);
       },{id:tool.id,xml:facultyInTopicXml()});
       if(tool.id==='calendarbridge') assert.deepEqual(rows,['9/21/2026|Proteins|Faculty','9/22/2026|Antibiotics|Mentor','9/23/2026|Enzymes|Faculty'],'calendarbridge removes a faculty name from the topic');
-      else assert.deepEqual(rows,['9/21/26|Proteins|Faculty','9/22/26|Antibiotics (Mentor)|Faculty','9/23/26|Enzymes|Faculty'],'syllabusbridge keeps a topic that names a faculty member');
+      else assert.deepEqual(rows,['9/21/26|Proteins|Faculty','9/22/26|Antibiotics (Mentor)|Mentor','9/23/26|Enzymes|Faculty'],'syllabusbridge lists the faculty named in a topic for that row only');
     }
     if(tool.id==='calendarbridge') {
       // "Week N" heading rows inside a schedule table are section labels, not calendar events.
