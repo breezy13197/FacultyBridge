@@ -223,10 +223,13 @@ function readSchedule(doc,tables,tableEls){
    // A row with no date of its own (it continues the date above) is a source schedule row too.
    if(e.continuationRow)tableCount++;
    if(clean(e.instructor))carryFaculty=clean(e.instructor);
+   // A topic that names a course faculty member ("Antibiotics (Mentor)") with no faculty of its own lists that person
+   // for this row only; the name carried down from the rows above is unchanged.
+   const named=clean(e.instructor)?'':ScheduleReader.extractFacultyFromTopic(e.topic,faculty).ids.map(id=>faculty.find(f=>f.id===id)?.short).filter(Boolean).join(', ');
    const type=classifySharedEvent(e.topic),nonTeaching=type==='assessment'||type==='no-class'||/\b(?:reinforcement|in[- ]class activit)/i.test(e.topic);
    // A date SyllabusBridge's date checks cannot read as written ("December 9th, 2026") is kept as 12/9/2026.
    const date=e.placeholderDate||parseLooseDate(e.date)?e.date:ScheduleReader.normalizeDate(e.date,state.course.year),day=e.placeholderDate?'':e.day||dayFromDate(date);
-   schedule.push({date,day,time:e.time||e.timeLine||meetingTimeForDay(day),topic:e.topic,faculty:nonTeaching?'':clean(e.instructor)||carryFaculty,raw:rows[e.source.rowIndex].map(c=>c.text).join(' | '),
+   schedule.push({date,day,time:e.time||e.timeLine||meetingTimeForDay(day),topic:e.topic,faculty:nonTeaching?'':clean(e.instructor)||named||carryFaculty,raw:rows[e.source.rowIndex].map(c=>c.text).join(' | '),
     source:{tableIndex:ti,rowIndex:e.source.rowIndex,lineIndex:e.source.lineIndex,columnMap:{...e.source.columnMap}}});
   }
   candidates+=Math.max(tableCount,schedule.length-before);
