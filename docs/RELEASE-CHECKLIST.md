@@ -63,6 +63,7 @@ npm run test:e2e
 - [ ] Reload during a workflow and verify promised persistence. Starting over, replacing input, and deleting the final item leave no stale output or enabled unsafe actions.
 - [ ] Save/export a project before destructive changes and confirm it can be reopened where supported. Explain browser storage limits and how users recover if storage is unavailable or cleared.
 - [ ] Theme preferences and startup remain usable when storage is empty; check blocked/unavailable storage for affected tools.
+- [ ] On each managed faculty machine type, after `npm run build`, run `npm run probe:storage -- --channel=msedge` (1 worker) and again with `--workers=8`. Record the "lost N of M" counts in the release record. Any loss at 1 worker blocks distribution until issue #50 has an agreed fix or exception; losses only at 8 workers are a known issue to record. The probe saves only random test values, in temporary profiles.
 
 Storage belongs to a browser origin. Moving from a local file to a hosted site, or changing hosts, does not transfer saved projects automatically. Tell users to export from the old location first.
 
