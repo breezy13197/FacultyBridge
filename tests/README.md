@@ -115,6 +115,16 @@ and synthetic Word parsing.
   folder is missing). Covers encoding, line-ending, Excel-mangled, percent-only,
   banner-row, duplicate, name-variant, and missing-score files.
 
+## Storage-reload probe (issue #50)
+
+`npm run probe:storage` (after `npm run build`) opens every standalone build in
+a temporary, persistent browser profile, saves a random value, reloads at once,
+and prints how many saves were lost per tool. It is a measurement, not part of
+`validate` or CI: losses appear only under load, so results depend on the
+computer. Use `--workers=8` for load, `--channel=msedge` for installed Edge, and
+`--tools`, `--rounds`, `--delay` to narrow it (see the top of
+`scripts/storage-reload-probe.mjs`). Exit code 1 means a save was lost.
+
 ## Uploaded files: local regression only
 
 Keep course material in `tests/test files/` with `exams/`, `item analysis/`,

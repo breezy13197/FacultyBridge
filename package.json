@@ -16,6 +16,7 @@
     "preview": "node scripts/serve.mjs",
     "test:e2e": "playwright test",
     "test:e2e:local": "node scripts/test-local-files.mjs",
+    "probe:storage": "node scripts/storage-reload-probe.mjs",
     "lint": "eslint \"apps/**/*.js\" \"packages/**/*.js\" \"scripts/**/*.{js,mjs}\" \"tests/**/*.{js,mjs}\" \"e2e/**/*.{js,mjs}\" \"playwright.config.js\" \".claude/hooks/**/*.{js,mjs}\""
   },
   "devDependencies": {
